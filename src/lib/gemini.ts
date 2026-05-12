@@ -119,5 +119,23 @@ ${rechargeData}
     [{ role: 'user', content: prompt }],
     true
   );
-  return JSON.parse(content);
+  const raw = JSON.parse(content);
+  return {
+    identifiedKeyPlayers: raw.identifiedKeyPlayers ?? [],
+    playerReports: (raw.playerReports ?? []).map((p: any) => ({
+      ...p,
+      negativeOutbursts: (p.negativeOutbursts ?? []).map((o: any) => ({
+        ...o,
+        context: o.context ?? [],
+      })),
+    })),
+    rechargeReport: {
+      totalPaid: raw.rechargeReport?.totalPaid ?? 0,
+      totalUnpaid: raw.rechargeReport?.totalUnpaid ?? 0,
+      playerSummaries: raw.rechargeReport?.playerSummaries ?? [],
+      paymentProfile: raw.rechargeReport?.paymentProfile ?? '',
+      rechargeData: raw.rechargeReport?.rechargeData ?? [],
+    },
+    serverEcology: raw.serverEcology ?? '',
+  };
 }

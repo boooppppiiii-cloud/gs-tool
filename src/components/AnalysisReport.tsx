@@ -167,7 +167,7 @@ export default function AnalysisReport({ result, onRemovePlayer, onUpdateReport 
           </h3>
           <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 rounded-full border border-indigo-100 shadow-sm">
             <Zap className="w-3 h-3 text-indigo-600 animate-pulse adventure-icon-active" />
-            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest leading-none">AI 自动筛选共 {result.identifiedKeyPlayers.length} 人</span>
+            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest leading-none">AI 自动筛选共 {result.identifiedKeyPlayers?.length ?? 0} 人</span>
           </div>
         </div>
 
