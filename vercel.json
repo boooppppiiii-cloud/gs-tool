@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": null,
+  "rewrites": [
+    { "source": "/api/gemini/(.*)", "destination": "/api/gemini" },
+    { "source": "/api/coze/(.*)",   "destination": "/api/coze" }
+  ]
+}
