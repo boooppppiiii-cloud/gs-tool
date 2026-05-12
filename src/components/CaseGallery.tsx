@@ -89,9 +89,9 @@ export default function CaseGallery({ cases, user, filter, onFilterChange, onVot
   });
 
   const filteredCases = sortedCases.filter(c => {
-    const matchesSearch = c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (c.playerName && c.playerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                          (c.outburstReason && c.outburstReason.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesSearch = toStr(c.title).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (c.playerName && toStr(c.playerName).toLowerCase().includes(searchTerm.toLowerCase())) ||
+                          (c.outburstReason && toStr(c.outburstReason).toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesTag = !selectedTag || (c.tags && c.tags.includes(selectedTag));
     const matchesFilter = filter === 'online' ? c.isPublic : c.ownerId === user.id;
     return matchesSearch && matchesTag && matchesFilter;
@@ -444,7 +444,7 @@ export default function CaseGallery({ cases, user, filter, onFilterChange, onVot
                              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl">
                                <p className="text-[10px] font-bold text-emerald-400 uppercase mb-2">案例结果</p>
                                <p className="text-sm text-slate-700 leading-relaxed font-medium">
-                                 {c.caseResult || '跟进中'}
+                                 {toStr(c.caseResult) || '跟进中'}
                                </p>
                              </div>
                            </div>
