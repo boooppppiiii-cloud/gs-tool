@@ -77,20 +77,22 @@ ${text}
       const result = JSON.parse(jsonText);
       setSuccessData(result);
 
+      const toStr = (v: any): string => typeof v === 'string' ? v : (v != null ? JSON.stringify(v) : '');
+
       // Map result to AnalysisCase and save
       const id = `case_auto_${Date.now()}`;
       const newCase: AnalysisCase = {
         id,
-        title: result.title,
+        title: toStr(result.title),
         tags: ['系统自动提取'],
         serverName: '批量录入',
         gsName: 'AI 专家',
         playerName: '案例玩家',
-        outburstReason: result.core_scenario,
-        triggerPoint: result.player_portrait,
+        outburstReason: toStr(result.core_scenario),
+        triggerPoint: toStr(result.player_portrait),
         context: [],
-        gsAction: result.gs_discourse,
-        disposalPlan: result.reusable_strategy,
+        gsAction: toStr(result.gs_discourse),
+        disposalPlan: toStr(result.reusable_strategy),
         caseResult: '已归档',
         timestamp: new Date().toISOString(),
         views: 0,

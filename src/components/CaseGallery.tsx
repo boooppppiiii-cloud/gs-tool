@@ -63,6 +63,8 @@ const TAG_COLORS: { [key: string]: string } = {
   '对抗号维护思路': 'bg-cyan-600 shadow-cyan-100'
 };
 
+const toStr = (v: unknown): string => typeof v === 'string' ? v : (v != null ? JSON.stringify(v) : '');
+
 export default function CaseGallery({ cases, user, filter, onFilterChange, onVote, onView, onUpdate, onDelete, onRefresh }: Props) {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [selectedTag, setSelectedTag] = React.useState<string | null>(null);
@@ -360,7 +362,7 @@ export default function CaseGallery({ cases, user, filter, onFilterChange, onVot
                       <Sparkles className="w-3 h-3" /> 玩家爆发负面原因
                     </p>
                     <div className={`p-4 bg-rose-50 border border-rose-100 rounded-2xl text-xs text-rose-700 font-bold leading-relaxed ${expandedId === c.id ? '' : 'line-clamp-3'}`}>
-                      {c.outburstReason || '暂无说明'}
+                      {toStr(c.outburstReason) || '暂无说明'}
                     </div>
                   </div>
 
@@ -421,21 +423,21 @@ export default function CaseGallery({ cases, user, filter, onFilterChange, onVot
                                <div className="p-4 bg-orange-50 border border-orange-100 rounded-2xl">
                                  <p className="text-[10px] font-bold text-orange-400 uppercase mb-2">负面触发点</p>
                                  <p className="text-sm text-orange-900 font-medium leading-relaxed">
-                                   {c.triggerPoint}
+                                   {toStr(c.triggerPoint)}
                                  </p>
                                </div>
                              )}
                              <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl">
                                <p className="text-[10px] font-bold text-indigo-400 uppercase mb-2 text-indigo-600 font-black">GS具体处置动作</p>
                                <p className="text-sm text-slate-700 leading-relaxed font-bold">
-                                 {c.gsAction || '未填写'}
+                                 {toStr(c.gsAction) || '未填写'}
                                </p>
                              </div>
                              {c.disposalPlan && (
                                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
                                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">GS 处置方案详情</p>
                                  <p className="text-xs text-slate-600 leading-relaxed">
-                                   {c.disposalPlan}
+                                   {toStr(c.disposalPlan)}
                                  </p>
                                </div>
                              )}

@@ -88,8 +88,10 @@ export async function updateHistoryRecord(id: string, updates: Partial<HistoryRe
 }
 
 // ---------------- Cases ----------------
+function toStr(v: any): string { return typeof v === 'string' ? v : (v != null ? JSON.stringify(v) : ''); }
+
 function createCaseFromReport(serverConfig: ServerProfile, report: any, userId: string) {
-  const outburstReason = report.negativeOutbursts[0]?.trigger;
+  const outburstReason = toStr(report.negativeOutbursts[0]?.trigger);
   const playerName = report.roleName;
   if (!outburstReason || !playerName) return;
 
@@ -107,10 +109,10 @@ function createCaseFromReport(serverConfig: ServerProfile, report: any, userId: 
     gsName: serverConfig.gsName || '系统默认',
     playerName,
     outburstReason,
-    triggerPoint: report.negativeOutbursts[0]?.triggerPoint || '',
+    triggerPoint: toStr(report.negativeOutbursts[0]?.triggerPoint),
     context: report.negativeOutbursts[0]?.context || [],
-    gsAction: gsAdvice.action || '',
-    disposalPlan: gsAdvice.disposalPlan || '',
+    gsAction: toStr(gsAdvice.action),
+    disposalPlan: toStr(gsAdvice.disposalPlan),
     caseResult: '处理中',
     timestamp: new Date().toISOString(),
     views: 0,
