@@ -1,5 +1,19 @@
 export const config = { maxDuration: 60 };
 
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3): Promise<Response> {
+  let lastRes: Response | undefined;
+  for (let i = 0; i <= retries; i++) {
+    const res = await fetch(url, options);
+    if (res.status !== 503 && res.status !== 429) return res;
+    lastRes = res;
+    if (i < retries) {
+      const wait = (i + 1) * 3000;
+      await new Promise(r => setTimeout(r, wait));
+    }
+  }
+  return lastRes!;
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -20,7 +34,7 @@ export default async function handler(req: any, res: any) {
 
     if (stream) {
       const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${process.env.GEMINI_API_KEY}`;
-      const response = await fetch(targetUrl, {
+      const response = await fetchWithRetry(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(geminiBody),
@@ -57,7 +71,7 @@ export default async function handler(req: any, res: any) {
     }
 
     const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
-    const response = await fetch(targetUrl, {
+    const response = await fetchWithRetry(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(geminiBody),

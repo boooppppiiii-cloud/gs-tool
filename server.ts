@@ -13,6 +13,21 @@ process.on('unhandledRejection', (reason) => {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3): Promise<Response> {
+  let lastRes: Response | undefined;
+  for (let i = 0; i <= retries; i++) {
+    const res = await fetch(url, options);
+    if (res.status !== 503 && res.status !== 429) return res;
+    lastRes = res;
+    if (i < retries) {
+      const wait = (i + 1) * 3000;
+      console.log(`[Gemini] ${res.status}，${wait / 1000}s 后重试 (${i + 1}/${retries})...`);
+      await new Promise(r => setTimeout(r, wait));
+    }
+  }
+  return lastRes!;
+}
+
 async function startServer() {
   const app = express();
   const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -85,7 +100,7 @@ async function startServer() {
       if (stream) {
         const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${process.env.GEMINI_API_KEY}`;
         console.log(`[Gemini Stream] POST ${model}:streamGenerateContent`);
-        const response = await fetch(targetUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) });
+        const response = await fetchWithRetry(targetUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) });
         if (!response.ok) {
           const errText = await response.text();
           const safeStatus = response.status >= 100 && response.status <= 599 ? response.status : 502;
@@ -119,7 +134,7 @@ async function startServer() {
 
       const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
       console.log(`[Gemini] POST ${model}:generateContent`);
-      const response = await fetch(targetUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) });
+      const response = await fetchWithRetry(targetUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) });
       const rawText = await response.text();
       const safeStatus = response.status >= 100 && response.status <= 599 ? response.status : 502;
       console.log(`[Gemini] status=${response.status} body=${rawText.slice(0, 200)}`);
