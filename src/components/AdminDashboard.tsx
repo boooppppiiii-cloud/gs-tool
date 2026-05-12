@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAnalyticsLogs } from '../services/analyticsService';
+import { getAnalyticsLogs, fetchAllAnalyticsLogs } from '../services/analyticsService';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
   LineChart, Line,
@@ -64,8 +64,16 @@ export default function AdminDashboard() {
   const [logs, setLogs] = useState<UsageLog[]>([]);
 
   useEffect(() => {
-    setLogs(getAnalyticsLogs());
-    const interval = setInterval(() => setLogs(getAnalyticsLogs()), 30000);
+    const load = async () => {
+      try {
+        const all = await fetchAllAnalyticsLogs();
+        setLogs(all.length > 0 ? all : getAnalyticsLogs());
+      } catch {
+        setLogs(getAnalyticsLogs());
+      }
+    };
+    load();
+    const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
   }, []);
 

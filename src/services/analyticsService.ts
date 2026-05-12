@@ -1,3 +1,5 @@
+import { db } from '../lib/firebase';
+
 interface UsageLog {
   id: string;
   userId: string;
@@ -52,6 +54,8 @@ export function logUsage(action: string, details: string = '', chatCount?: numbe
     logs.unshift(log);
     if (logs.length > MAX_LOGS) logs.length = MAX_LOGS;
     saveLogs(logs);
+    // 异步上云（fire-and-forget，失败静默）
+    db.collection('analytics_logs').doc(log.id).set(log).catch(() => {});
   } catch (e) {
     console.error('[Analytics] 记录失败', e);
   }
@@ -59,4 +63,12 @@ export function logUsage(action: string, details: string = '', chatCount?: numbe
 
 export function getAnalyticsLogs(): UsageLog[] {
   return loadLogs();
+}
+
+export async function fetchAllAnalyticsLogs(): Promise<UsageLog[]> {
+  const res = await db.collection('analytics_logs')
+    .orderBy('timestamp', 'desc')
+    .limit(500)
+    .get();
+  return (res.data || []) as UsageLog[];
 }
