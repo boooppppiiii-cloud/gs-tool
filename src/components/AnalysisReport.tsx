@@ -35,7 +35,27 @@ interface Props {
 
 const COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 
-export default function AnalysisReport({ result, onRemovePlayer, onUpdateReport }: Props & { onRemovePlayer: (roleName: string) => void, onUpdateReport?: (newResult: AnalysisResult) => void }) {
+export default function AnalysisReport({ result: rawResult, onRemovePlayer, onUpdateReport }: Props & { onRemovePlayer: (roleName: string) => void, onUpdateReport?: (newResult: AnalysisResult) => void }) {
+  const result: AnalysisResult = {
+    ...rawResult,
+    identifiedKeyPlayers: rawResult.identifiedKeyPlayers ?? [],
+    playerReports: (rawResult.playerReports ?? []).map((p: any) => ({
+      ...p,
+      negativeOutbursts: (p.negativeOutbursts ?? []).map((o: any) => ({
+        ...o,
+        context: o.context ?? [],
+      })),
+    })),
+    rechargeReport: {
+      totalPaid: rawResult.rechargeReport?.totalPaid ?? 0,
+      totalUnpaid: rawResult.rechargeReport?.totalUnpaid ?? 0,
+      playerSummaries: rawResult.rechargeReport?.playerSummaries ?? [],
+      paymentProfile: rawResult.rechargeReport?.paymentProfile ?? '',
+      rechargeData: rawResult.rechargeReport?.rechargeData ?? [],
+    },
+    serverEcology: rawResult.serverEcology ?? '',
+  };
+
   const exportToWord = async () => {
     const doc = new Document({
       sections: [{
