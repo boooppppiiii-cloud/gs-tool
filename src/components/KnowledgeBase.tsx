@@ -192,22 +192,46 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
     logUsage('search', `Searched for: ${searchQuery}`, '/knowledge');
     if (activeTab !== 'items') onTabChange('items');
 
-    // 先走本地库快速响应
-    const q = searchQuery.toLowerCase();
-    const localResults = ITEM_DATABASE.filter(item =>
-      item.name.toLowerCase().includes(q) ||
-      item.activity.toLowerCase().includes(q) ||
-      item.time.toLowerCase().includes(q) ||
-      item.keywords.some(k => k.toLowerCase().includes(q))
-    );
+    // 先走本地库快速响应（多词拆分 + 8字段加权评分）
+    const terms = searchQuery.toLowerCase().split(/[\s,，·・]+/).filter(Boolean);
+    const scored = ITEM_DATABASE.map(item => {
+      let score = 0;
+      // 把复合名称（如"红颜·阿离"）拆成各部分单独索引
+      const nameParts = item.name.split(/[·・\\/\s]+/).filter(p => p.length > 0);
+      const fields = [
+        { text: item.name, w: 10 },
+        ...nameParts.map(part => ({ text: part, w: 10 })),
+        { text: item.keywords.join(' '), w: 6 },
+        { text: item.review, w: 4 },
+        { text: item.boost, w: 4 },
+        { text: item.gsApplication, w: 3 },
+        { text: item.gsTier, w: 3 },
+        { text: item.activity, w: 2 },
+        { text: item.time, w: 2 },
+      ];
+      for (const term of terms) {
+        for (const { text, w } of fields) {
+          if (text?.toLowerCase().includes(term)) score += w;
+        }
+      }
+      return { item, score };
+    }).filter(r => r.score > 0).sort((a, b) => b.score - a.score);
+    const localResults = scored.map(r => r.item);
     setSearchResults(localResults);
     setSelectedItem(localResults.length === 1 ? localResults[0] : null);
 
-    // Coze 知识库轮询检索（稳定可靠，卡片出现后 spinner 等待结果填入）
+    // Coze 知识库检索：先用完整词搜，未命中再逐个拆分词搜索
     setIsSearching(true);
     setCozeResult('');
     try {
-      const result = await searchKnowledgeBase(searchQuery.trim());
+      const queryParts = searchQuery.trim().split(/[·・\\/\s,，]+/).filter(Boolean);
+      let result = await searchKnowledgeBase(searchQuery.trim());
+      if ((result === '未找到数据' || !result) && queryParts.length > 1) {
+        for (const part of queryParts) {
+          const partResult = await searchKnowledgeBase(part);
+          if (partResult && partResult !== '未找到数据') { result = partResult; break; }
+        }
+      }
       setCozeResult(result);
     } catch (err) {
       setCozeResult('检索服务暂时不可用，请稍后重试');
