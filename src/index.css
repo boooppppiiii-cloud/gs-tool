@@ -1,0 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Noto Sans SC", "SimHei", "Heiti SC", sans-serif;
+  
+  --color-slate-50: #FDFCF7;
+  --color-slate-100: #F7F3EA;
+  --color-slate-200: #EAE3D5;
+  --color-slate-400: #948C7E;
+  --color-slate-500: #7A7267;
+  --color-slate-600: #5C554B;
+  --color-slate-800: #3E342B;
+  --color-slate-900: #2D241C;
+
+  --color-indigo-50: #F5F7FF;
+  --color-indigo-600: #C5A059;
+  --color-rose-50: #FFF5F5;
+  --color-amber-50: #FFF9EB;
+  --color-emerald-50: #F2FAF5;
+}
+
+@layer components {
+  .adventure-icon {
+    @apply transition-all duration-300;
+  }
+  
+  .adventure-icon:hover {
+    filter: drop-shadow(0 0 12px var(--color-indigo-600));
+    transform: scale(1.15) rotate(-2deg);
+  }
+
+  .adventure-icon-active {
+    filter: drop-shadow(0 0 10px var(--color-indigo-600));
+    transform: scale(1.05);
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased;
+  }
+}

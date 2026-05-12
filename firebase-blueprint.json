@@ -1,0 +1,136 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string", "description": "Hashed password" }
+      },
+      "required": ["id", "username", "password"]
+    },
+    "ServerProfile": {
+      "title": "Server Profile",
+      "description": "Configuration for a game server",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "keyPlayers": { "type": "array", "items": { "type": "string" } },
+        "openingDate": { "type": "string" },
+        "gsName": { "type": "string" },
+        "gsPersona": {
+          "type": "object",
+          "properties": {
+            "age": { "type": "string" },
+            "hometown": { "type": "string" },
+            "occupation": { "type": "string" },
+            "family": { "type": "string" },
+            "lifestyle": { "type": "string" },
+            "others": { "type": "string" }
+          }
+        },
+        "serverEcology": { "type": "string" },
+        "persistentPortraits": { 
+          "type": "object",
+          "description": "Map of roleName to portrait data"
+        },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["id", "name", "ownerId"]
+    },
+    "AnalysisHistory": {
+      "title": "Analysis History",
+      "description": "Record of a completed analysis",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "serverConfig": { "$ref": "#/entities/ServerProfile" },
+        "result": { "type": "object" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "userId"]
+    },
+    "AnalysisCase": {
+      "title": "Analysis Case",
+      "description": "An interesting case extracted from analysis",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "serverName": { "type": "string" },
+        "gsName": { "type": "string" },
+        "playerName": { "type": "string" },
+        "outburstReason": { "type": "string" },
+        "gsAction": { "type": "string" },
+        "caseResult": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "views": { "type": "integer" },
+        "likes": { "type": "integer" },
+        "votedUserIds": { "type": "array", "items": { "type": "string" } },
+        "isPublic": { "type": "boolean" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["id", "title", "ownerId"]
+    },
+    "UsageLog": {
+      "title": "Usage Log",
+      "description": "App usage tracking data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "path": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "action"]
+    },
+    "MaintenanceEvent": {
+      "title": "Maintenance Event",
+      "description": "Editable maintenance calendar item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "day": { "type": "string" },
+        "dayNumber": { "type": "integer" },
+        "activity": { "type": "string" },
+        "item": { "type": "string" },
+        "maintenance": { "type": "string" }
+      },
+      "required": ["id", "day", "activity", "item", "maintenance"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User storage"
+    },
+    "serverProfiles/{profileId}": {
+      "schema": "ServerProfile",
+      "description": "Server configuration storage"
+    },
+    "analysisHistory/{historyId}": {
+      "schema": "AnalysisHistory",
+      "description": "Analysis history storage"
+    },
+    "cases/{caseId}": {
+      "schema": "AnalysisCase",
+      "description": "Case gallery storage"
+    },
+    "usage_logs/{logId}": {
+      "schema": "UsageLog",
+      "description": "Tracking logs"
+    },
+    "maintenance_calendar/{eventId}": {
+      "schema": "MaintenanceEvent",
+      "description": "Dynamic calendar storage"
+    }
+  }
+}

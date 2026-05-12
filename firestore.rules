@@ -1,0 +1,70 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == '1463432441@qq.com';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // 1. Users
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    // 2. Server Profiles
+    match /serverProfiles/{profileId} {
+      allow read: if isOwner(resource.data.ownerId) || isAdmin();
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.ownerId) || isAdmin();
+    }
+
+    // 3. Analysis History
+    match /analysisHistory/{historyId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+
+    // 4. Cases
+    match /cases/{caseId} {
+      allow read: if (isSignedIn() && (resource.data.isPublic == true || isOwner(resource.data.ownerId))) || isAdmin();
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isOwner(resource.data.ownerId) || isAdmin() || (
+        isSignedIn() && (
+          request.resource.data.diff(resource.data).affectedKeys().hasAny(['views', 'likes', 'votedUserIds'])
+        )
+      );
+      allow delete: if isOwner(resource.data.ownerId) || isAdmin();
+    }
+
+    // 5. Usage Logs
+    match /usage_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn(); // Allow tracking for all signed in users
+    }
+
+    // 6. Maintenance Calendar
+    match /maintenance_calendar/{eventId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}
