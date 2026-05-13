@@ -489,11 +489,11 @@ function FeedbackPanel() {
   const [accuracy, setAccuracy] = useState('');
   const [usefulness, setUsefulness] = useState('');
   const [comment, setComment] = useState('');
-  const [missedPlayers, setMissedPlayers] = useState('');
+  const [missedChats, setMissedChats] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = () => {
-    logUsage('analysis_feedback', JSON.stringify({ accuracy, usefulness, comment, missedPlayers: missedPlayers.trim() || undefined }));
+    logUsage('analysis_feedback', JSON.stringify({ accuracy, usefulness, comment, missedChats: missedChats.trim() || undefined }));
     setSubmitted(true);
   };
 
@@ -533,13 +533,12 @@ function FeedbackPanel() {
 
       {accuracy === '有明显遗漏/误判' && (
         <div className="space-y-2 animate-in fade-in duration-200">
-          <p className="text-sm font-bold text-slate-600">AI 漏掉了哪些玩家？（用逗号隔开）</p>
-          <input
-            type="text"
-            value={missedPlayers}
-            onChange={e => setMissedPlayers(e.target.value)}
-            placeholder="例如：张三, 李四, 王五"
-            className="w-full px-4 py-3 rounded-2xl border border-rose-200 bg-rose-50/30 text-sm focus:outline-none focus:border-rose-400 text-slate-700"
+          <p className="text-sm font-bold text-slate-600">把 AI 漏掉的负面聊天记录粘贴到这里</p>
+          <textarea
+            value={missedChats}
+            onChange={e => setMissedChats(e.target.value)}
+            placeholder="直接粘贴聊天截图文字，例如：&#10;[22:13] 张三：这游戏太坑了，活动奖励太少&#10;[22:15] 张三：我要退游了…"
+            className="w-full h-32 px-4 py-3 rounded-2xl border border-rose-200 bg-rose-50/30 text-sm resize-none focus:outline-none focus:border-rose-400 text-slate-700 font-mono leading-relaxed"
           />
         </div>
       )}

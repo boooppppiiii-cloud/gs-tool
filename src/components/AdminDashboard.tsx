@@ -318,7 +318,7 @@ interface FeedbackEntry {
   accuracy: string;
   usefulness: string;
   comment?: string;
-  missedPlayers?: string;
+  missedChats?: string;
 }
 
 function RatingBar({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
@@ -370,12 +370,10 @@ function FeedbackSummary({ logs }: { logs: UsageLog[] }) {
     if (f.usefulness) usefulnessCounts[f.usefulness] = (usefulnessCounts[f.usefulness] || 0) + 1;
   });
   const comments = feedbackLogs.filter(f => f.comment?.trim()).map(f => f.comment!).slice(0, 5);
-  const missedPlayersList = feedbackLogs
-    .filter(f => f.missedPlayers?.trim())
-    .flatMap(f => f.missedPlayers!.split(/[,，\s]+/).map(s => s.trim()).filter(Boolean));
-  const missedCounts: Record<string, number> = {};
-  missedPlayersList.forEach(p => { missedCounts[p] = (missedCounts[p] || 0) + 1; });
-  const topMissed = Object.entries(missedCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const missedChatsList = feedbackLogs
+    .filter(f => f.missedChats?.trim())
+    .map(f => f.missedChats!)
+    .slice(0, 10);
 
   // 处置建议评分统计
   const adviceUp = adviceLogs.filter(l => l.rating === 'up').length;
@@ -432,16 +430,14 @@ function FeedbackSummary({ logs }: { logs: UsageLog[] }) {
               ))}
             </div>
           </div>
-          {topMissed.length > 0 && (
+          {missedChatsList.length > 0 && (
             <div className="space-y-2 pt-2">
-              <p className="text-xs font-bold text-slate-500">漏报玩家名单（频次）</p>
-              <div className="flex flex-wrap gap-2">
-                {topMissed.map(([name, count]) => (
-                  <span key={name} className="px-3 py-1 bg-rose-50 border border-rose-100 rounded-full text-xs font-black text-rose-700">
-                    {name} ×{count}
-                  </span>
-                ))}
-              </div>
+              <p className="text-xs font-bold text-slate-500">用户补充的漏报聊天（最新 {missedChatsList.length} 条）</p>
+              {missedChatsList.map((chat, i) => (
+                <div key={i} className="p-3 bg-rose-50 rounded-2xl border border-rose-100">
+                  <pre className="text-xs text-rose-900 leading-relaxed whitespace-pre-wrap font-mono">{chat}</pre>
+                </div>
+              ))}
             </div>
           )}
           {comments.length > 0 && (
