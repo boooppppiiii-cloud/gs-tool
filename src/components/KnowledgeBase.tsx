@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Scroll, FileText, Search, Sparkles, ChevronRight, AlertTriangle, Package, Zap, Edit2, Check, X, Loader2 } from 'lucide-react';
+import { Scroll, FileText, Search, Sparkles, ChevronRight, AlertTriangle, Package, Zap, Edit2, Check, X, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { logUsage } from '../services/analyticsService';
 import { searchKnowledgeBase, isNotFound } from '../lib/coze';
@@ -559,6 +559,14 @@ function CozeResultCard({ query, content, isStreaming }: { query: string; conten
 }
 
 function ItemResultCard({ item }: { item: ItemData }) {
+  const [kbRating, setKbRating] = useState<'yes' | 'no' | null>(null);
+
+  const rateKbItem = (rating: 'yes' | 'no') => {
+    if (kbRating) return;
+    setKbRating(rating);
+    logUsage('kb_item_rating', JSON.stringify({ itemName: item.name, rating }));
+  };
+
   return (
     <div className="bg-white rounded-[40px] border border-slate-200 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
@@ -636,6 +644,30 @@ function ItemResultCard({ item }: { item: ItemData }) {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="px-10 py-5 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
+        <p className="text-xs font-bold text-slate-400">这份档案解决你的问题了吗？</p>
+        {kbRating ? (
+          <span className={`text-xs font-black px-3 py-1 rounded-full ${kbRating === 'yes' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+            {kbRating === 'yes' ? '已记录：有帮助' : '已记录：未解决'}
+          </span>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              onClick={() => rateKbItem('yes')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 transition-colors"
+            >
+              <ThumbsUp className="w-3 h-3" /> 有帮助
+            </button>
+            <button
+              onClick={() => rateKbItem('no')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-500 bg-rose-50 border border-rose-100 hover:bg-rose-100 transition-colors"
+            >
+              <ThumbsDown className="w-3 h-3" /> 未解决
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

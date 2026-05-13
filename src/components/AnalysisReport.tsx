@@ -5,11 +5,11 @@
 
 import React, { useState } from 'react';
 import { 
-  UserCheck, 
-  TrendingUp, 
-  AlertTriangle, 
-  MessageSquare, 
-  Zap, 
+  UserCheck,
+  TrendingUp,
+  AlertTriangle,
+  MessageSquare,
+  Zap,
   CreditCard,
   PieChart as PieIcon,
   User,
@@ -22,7 +22,9 @@ import {
   Shield,
   Sword,
   Scroll,
-  Crown
+  Crown,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import { AnalysisResult, PlayerBehaviorReport } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
@@ -55,6 +57,14 @@ export default function AnalysisReport({ result: rawResult, onRemovePlayer, onUp
       rechargeData: rawResult.rechargeReport?.rechargeData ?? [],
     },
     serverEcology: rawResult.serverEcology ?? '',
+  };
+
+  const [adviceRatings, setAdviceRatings] = useState<Record<string, 'up' | 'down'>>({});
+
+  const rateAdvice = (key: string, rating: 'up' | 'down', playerName: string, trigger: string) => {
+    if (adviceRatings[key]) return;
+    setAdviceRatings(prev => ({ ...prev, [key]: rating }));
+    logUsage('advice_rating', JSON.stringify({ playerName, trigger, rating }));
   };
 
   const exportToWord = async () => {
@@ -319,7 +329,30 @@ export default function AnalysisReport({ result: rawResult, onRemovePlayer, onUp
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">核心动作推荐</span>
-                          <Zap className="w-3 h-3 text-indigo-400" />
+                          {(() => {
+                            const ratingKey = `${player.roleName}-${idx}`;
+                            const rated = adviceRatings[ratingKey];
+                            return (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => rateAdvice(ratingKey, 'up', player.roleName, outburst.trigger)}
+                                  className={`p-1 rounded-lg transition-colors ${rated === 'up' ? 'text-emerald-600 bg-emerald-50' : rated ? 'text-slate-200' : 'text-slate-300 hover:text-emerald-500 hover:bg-emerald-50'}`}
+                                  disabled={!!rated}
+                                  title="这条建议有用"
+                                >
+                                  <ThumbsUp className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => rateAdvice(ratingKey, 'down', player.roleName, outburst.trigger)}
+                                  className={`p-1 rounded-lg transition-colors ${rated === 'down' ? 'text-rose-600 bg-rose-50' : rated ? 'text-slate-200' : 'text-slate-300 hover:text-rose-500 hover:bg-rose-50'}`}
+                                  disabled={!!rated}
+                                  title="这条建议没用"
+                                >
+                                  <ThumbsDown className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div className="p-4 bg-indigo-50 border-l-4 border-l-indigo-600 rounded-r-xl text-indigo-800 font-bold">
                           {outburst.gsAdvice.action}
@@ -456,10 +489,11 @@ function FeedbackPanel() {
   const [accuracy, setAccuracy] = useState('');
   const [usefulness, setUsefulness] = useState('');
   const [comment, setComment] = useState('');
+  const [missedPlayers, setMissedPlayers] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = () => {
-    logUsage('analysis_feedback', JSON.stringify({ accuracy, usefulness, comment }));
+    logUsage('analysis_feedback', JSON.stringify({ accuracy, usefulness, comment, missedPlayers: missedPlayers.trim() || undefined }));
     setSubmitted(true);
   };
 
@@ -496,6 +530,19 @@ function FeedbackPanel() {
           ))}
         </div>
       </div>
+
+      {accuracy === '有明显遗漏/误判' && (
+        <div className="space-y-2 animate-in fade-in duration-200">
+          <p className="text-sm font-bold text-slate-600">AI 漏掉了哪些玩家？（用逗号隔开）</p>
+          <input
+            type="text"
+            value={missedPlayers}
+            onChange={e => setMissedPlayers(e.target.value)}
+            placeholder="例如：张三, 李四, 王五"
+            className="w-full px-4 py-3 rounded-2xl border border-rose-200 bg-rose-50/30 text-sm focus:outline-none focus:border-rose-400 text-slate-700"
+          />
+        </div>
+      )}
 
       <div className="space-y-2">
         <p className="text-sm font-bold text-slate-600">GS 处置建议的实用性如何？</p>

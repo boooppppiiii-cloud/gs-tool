@@ -5,7 +5,7 @@ import {
   LineChart, Line,
   PieChart, Pie, Legend,
 } from 'recharts';
-import { Shield, Activity, Clock, Zap, MousePointer2, TrendingUp, PieChart as PieChartIcon, MessageSquare, AlertTriangle, Users } from 'lucide-react';
+import { Shield, Activity, Clock, Zap, MousePointer2, TrendingUp, PieChart as PieChartIcon, MessageSquare, AlertTriangle, Users, ThumbsUp, ThumbsDown, BookOpen } from 'lucide-react';
 
 interface UsageLog {
   id: string;
@@ -36,6 +36,9 @@ const ACTION_LABELS: Record<string, string> = {
   delete_case: '案例删除',
   delete_history: '历史删除',
   analysis_feedback: '分析质量反馈',
+  advice_rating: '处置建议评分',
+  simulation_msg_rating: '模拟回复评分',
+  kb_item_rating: '知识库满意度',
 };
 
 const FEATURE_CATEGORIES: Record<string, string> = {
@@ -214,7 +217,7 @@ export default function AdminDashboard() {
                 cx="50%"
                 cy="50%"
                 outerRadius={90}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
               >
                 {pieData.map((_, index) => (
                   <Cell key={`pie-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -314,26 +317,84 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
 interface FeedbackEntry {
   accuracy: string;
   usefulness: string;
-  comment: string;
+  comment?: string;
+  missedPlayers?: string;
+}
+
+function RatingBar({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black shrink-0 ${color}`}>{label}</span>
+      <div className="flex-1 bg-slate-100 rounded-full h-2">
+        <div className={`h-2 rounded-full ${color.includes('indigo') ? 'bg-indigo-500' : color.includes('emerald') ? 'bg-emerald-500' : color.includes('amber') ? 'bg-amber-400' : 'bg-slate-400'}`} style={{ width: `${(count / total) * 100}%` }} />
+      </div>
+      <span className="text-xs font-black text-slate-500 tabular-nums w-12 text-right">{count}/{total}</span>
+    </div>
+  );
 }
 
 function FeedbackSummary({ logs }: { logs: UsageLog[] }) {
+  // 分析质量反馈
   const feedbackLogs = logs
     .filter(l => l.action === 'analysis_feedback')
     .map(l => { try { return JSON.parse(l.details) as FeedbackEntry; } catch { return null; } })
     .filter((x): x is FeedbackEntry => x !== null);
 
-  if (feedbackLogs.length === 0) return null;
+  // 处置建议评分
+  const adviceLogs = logs
+    .filter(l => l.action === 'advice_rating')
+    .map(l => { try { return JSON.parse(l.details) as { playerName: string; trigger: string; rating: 'up' | 'down' }; } catch { return null; } })
+    .filter(Boolean) as { playerName: string; trigger: string; rating: 'up' | 'down' }[];
 
+  // 模拟回复评分
+  const simLogs = logs
+    .filter(l => l.action === 'simulation_msg_rating')
+    .map(l => { try { return JSON.parse(l.details) as { msgIndex: number; rating: 'up' | 'down' }; } catch { return null; } })
+    .filter(Boolean) as { msgIndex: number; rating: 'up' | 'down' }[];
+
+  // 知识库满意度
+  const kbLogs = logs
+    .filter(l => l.action === 'kb_item_rating')
+    .map(l => { try { return JSON.parse(l.details) as { itemName: string; rating: 'yes' | 'no' }; } catch { return null; } })
+    .filter(Boolean) as { itemName: string; rating: 'yes' | 'no' }[];
+
+  const hasAnyData = feedbackLogs.length > 0 || adviceLogs.length > 0 || simLogs.length > 0 || kbLogs.length > 0;
+  if (!hasAnyData) return null;
+
+  // 分析质量反馈统计
+  const total = feedbackLogs.length;
   const accuracyCounts: Record<string, number> = {};
   const usefulnessCounts: Record<string, number> = {};
   feedbackLogs.forEach(f => {
-    accuracyCounts[f.accuracy] = (accuracyCounts[f.accuracy] || 0) + 1;
-    usefulnessCounts[f.usefulness] = (usefulnessCounts[f.usefulness] || 0) + 1;
+    if (f.accuracy) accuracyCounts[f.accuracy] = (accuracyCounts[f.accuracy] || 0) + 1;
+    if (f.usefulness) usefulnessCounts[f.usefulness] = (usefulnessCounts[f.usefulness] || 0) + 1;
+  });
+  const comments = feedbackLogs.filter(f => f.comment?.trim()).map(f => f.comment!).slice(0, 5);
+  const missedPlayersList = feedbackLogs
+    .filter(f => f.missedPlayers?.trim())
+    .flatMap(f => f.missedPlayers!.split(/[,，\s]+/).map(s => s.trim()).filter(Boolean));
+  const missedCounts: Record<string, number> = {};
+  missedPlayersList.forEach(p => { missedCounts[p] = (missedCounts[p] || 0) + 1; });
+  const topMissed = Object.entries(missedCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  // 处置建议评分统计
+  const adviceUp = adviceLogs.filter(l => l.rating === 'up').length;
+  const adviceDown = adviceLogs.filter(l => l.rating === 'down').length;
+  const adviceTotal = adviceLogs.length;
+  const adviceByPlayer: Record<string, { up: number; down: number }> = {};
+  adviceLogs.forEach(l => {
+    if (!adviceByPlayer[l.playerName]) adviceByPlayer[l.playerName] = { up: 0, down: 0 };
+    adviceByPlayer[l.playerName][l.rating]++;
   });
 
-  const total = feedbackLogs.length;
-  const comments = feedbackLogs.filter(f => f.comment?.trim()).map(f => f.comment).slice(0, 5);
+  // 模拟回复统计
+  const simUp = simLogs.filter(l => l.rating === 'up').length;
+  const simTotal = simLogs.length;
+
+  // 知识库统计
+  const kbYes = kbLogs.filter(l => l.rating === 'yes').length;
+  const kbTotal = kbLogs.length;
+  const kbMissItems = kbLogs.filter(l => l.rating === 'no').map(l => l.itemName);
 
   const accuracyColors: Record<string, string> = {
     '准确无遗漏': 'bg-emerald-100 text-emerald-700',
@@ -347,73 +408,138 @@ function FeedbackSummary({ logs }: { logs: UsageLog[] }) {
   };
 
   return (
-    <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
-          <MessageSquare className="w-5 h-5 text-emerald-600" />
-          内测质量反馈汇总
-        </h3>
-        <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded-full uppercase tracking-widest">
-          共 {total} 条反馈
-        </span>
-      </div>
+    <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
+      <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+        <MessageSquare className="w-5 h-5 text-emerald-600" />
+        内测质量反馈汇总
+      </h3>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-3">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">AI 识别准确率</p>
-          <div className="space-y-2">
-            {Object.entries(accuracyCounts).map(([label, count]) => (
-              <div key={label} className="flex items-center gap-3">
-                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black shrink-0 ${accuracyColors[label] || 'bg-slate-100 text-slate-600'}`}>
-                  {label}
-                </span>
-                <div className="flex-1 bg-slate-100 rounded-full h-2">
-                  <div
-                    className="bg-indigo-500 h-2 rounded-full"
-                    style={{ width: `${(count / total) * 100}%` }}
-                  />
-                </div>
-                <span className="text-xs font-black text-slate-500 tabular-nums w-12 text-right">
-                  {count}/{total}
-                </span>
-              </div>
-            ))}
+      {/* 分析质量反馈 */}
+      {total > 0 && (
+        <div className="space-y-4">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">分析报告质量（{total} 条）</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-slate-500">AI 识别准确率</p>
+              {Object.entries(accuracyCounts).map(([label, count]) => (
+                <RatingBar key={label} label={label} count={count} total={total} color={accuracyColors[label] || 'bg-slate-100 text-slate-600'} />
+              ))}
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-slate-500">GS 建议实用性</p>
+              {Object.entries(usefulnessCounts).map(([label, count]) => (
+                <RatingBar key={label} label={label} count={count} total={total} color={usefulnessColors[label] || 'bg-slate-100 text-slate-600'} />
+              ))}
+            </div>
           </div>
-        </div>
-
-        <div className="space-y-3">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">GS 建议实用性</p>
-          <div className="space-y-2">
-            {Object.entries(usefulnessCounts).map(([label, count]) => (
-              <div key={label} className="flex items-center gap-3">
-                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black shrink-0 ${usefulnessColors[label] || 'bg-slate-100 text-slate-600'}`}>
-                  {label}
-                </span>
-                <div className="flex-1 bg-slate-100 rounded-full h-2">
-                  <div
-                    className="bg-emerald-500 h-2 rounded-full"
-                    style={{ width: `${(count / total) * 100}%` }}
-                  />
-                </div>
-                <span className="text-xs font-black text-slate-500 tabular-nums w-12 text-right">
-                  {count}/{total}
-                </span>
+          {topMissed.length > 0 && (
+            <div className="space-y-2 pt-2">
+              <p className="text-xs font-bold text-slate-500">漏报玩家名单（频次）</p>
+              <div className="flex flex-wrap gap-2">
+                {topMissed.map(([name, count]) => (
+                  <span key={name} className="px-3 py-1 bg-rose-50 border border-rose-100 rounded-full text-xs font-black text-rose-700">
+                    {name} ×{count}
+                  </span>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+          {comments.length > 0 && (
+            <div className="space-y-2 pt-2">
+              <p className="text-xs font-bold text-slate-500">补充说明（最新 {comments.length} 条）</p>
+              {comments.map((c, i) => (
+                <div key={i} className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                  <p className="text-sm text-slate-700 leading-relaxed">"{c}"</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
-      {comments.length > 0 && (
+      {/* 处置建议评分 */}
+      {adviceTotal > 0 && (
+        <div className="space-y-4 border-t border-slate-100 pt-6">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <ThumbsUp className="w-3 h-3" /> 处置建议评分（{adviceTotal} 条）
+            </p>
+            <span className={`text-xs font-black px-2 py-0.5 rounded-full ${adviceTotal > 0 && adviceUp / adviceTotal >= 0.7 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+              好评率 {adviceTotal > 0 ? Math.round((adviceUp / adviceTotal) * 100) : 0}%
+            </span>
+          </div>
+          <div className="flex gap-4">
+            <div className="flex items-center gap-2 text-emerald-600">
+              <ThumbsUp className="w-4 h-4" />
+              <span className="text-lg font-black">{adviceUp}</span>
+              <span className="text-xs text-slate-400">有用</span>
+            </div>
+            <div className="flex items-center gap-2 text-rose-500">
+              <ThumbsDown className="w-4 h-4" />
+              <span className="text-lg font-black">{adviceDown}</span>
+              <span className="text-xs text-slate-400">没用</span>
+            </div>
+          </div>
+          {Object.entries(adviceByPlayer).length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-bold text-slate-400">按玩家分组</p>
+              {Object.entries(adviceByPlayer).map(([name, { up, down }]) => (
+                <div key={name} className="flex items-center gap-3 text-xs">
+                  <span className="font-bold text-slate-600 w-20 truncate">{name}</span>
+                  <span className="text-emerald-600 font-black">👍 {up}</span>
+                  <span className="text-rose-500 font-black">👎 {down}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 模拟回复评分 */}
+      {simTotal > 0 && (
         <div className="space-y-3 border-t border-slate-100 pt-6">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">用户补充说明（最新 {comments.length} 条）</p>
-          <div className="space-y-2">
-            {comments.map((c, i) => (
-              <div key={i} className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                <p className="text-sm text-slate-700 leading-relaxed">"{c}"</p>
-              </div>
-            ))}
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">对话模拟回复评分（{simTotal} 条）</p>
+            <span className={`text-xs font-black px-2 py-0.5 rounded-full ${simTotal > 0 && simUp / simTotal >= 0.7 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+              好评率 {simTotal > 0 ? Math.round((simUp / simTotal) * 100) : 0}%
+            </span>
           </div>
+          <div className="flex gap-4">
+            <div className="flex items-center gap-2 text-emerald-600">
+              <ThumbsUp className="w-4 h-4" />
+              <span className="text-lg font-black">{simUp}</span>
+              <span className="text-xs text-slate-400">有用</span>
+            </div>
+            <div className="flex items-center gap-2 text-rose-500">
+              <ThumbsDown className="w-4 h-4" />
+              <span className="text-lg font-black">{simTotal - simUp}</span>
+              <span className="text-xs text-slate-400">没用</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 知识库满意度 */}
+      {kbTotal > 0 && (
+        <div className="space-y-3 border-t border-slate-100 pt-6">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <BookOpen className="w-3 h-3" /> 知识库命中率（{kbTotal} 次查阅）
+            </p>
+            <span className={`text-xs font-black px-2 py-0.5 rounded-full ${kbTotal > 0 && kbYes / kbTotal >= 0.7 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+              命中率 {kbTotal > 0 ? Math.round((kbYes / kbTotal) * 100) : 0}%
+            </span>
+          </div>
+          {kbMissItems.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-bold text-slate-400">未解决的查阅（用户说"没帮助"的道具）</p>
+              <div className="flex flex-wrap gap-2">
+                {[...new Set(kbMissItems)].slice(0, 10).map(name => (
+                  <span key={name} className="px-2 py-0.5 bg-amber-50 border border-amber-100 rounded-lg text-[10px] font-black text-amber-700">{name}</span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

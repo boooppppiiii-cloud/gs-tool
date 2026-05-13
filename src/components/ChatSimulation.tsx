@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Shield as User, MessageSquare, Bot, Sparkles, RefreshCcw, Settings, Sword } from 'lucide-react';
+import { Send, Shield as User, MessageSquare, Bot, Sparkles, RefreshCcw, Settings, Sword, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { ServerProfile } from '../types';
 import { logUsage } from '../services/analyticsService';
 
@@ -18,7 +18,14 @@ export default function ChatSimulation({ profiles }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [msgRatings, setMsgRatings] = useState<Record<number, 'up' | 'down'>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const rateMsgRating = (idx: number, rating: 'up' | 'down') => {
+    if (msgRatings[idx]) return;
+    setMsgRatings(prev => ({ ...prev, [idx]: rating }));
+    logUsage('simulation_msg_rating', JSON.stringify({ msgIndex: idx, rating }));
+  };
 
   const activeProfile = profiles.find(p => p.id === selectedProfileId);
   const players = activeProfile?.persistentPortraits ? Object.keys(activeProfile.persistentPortraits) : [];
@@ -235,12 +242,34 @@ export default function ChatSimulation({ profiles }: Props) {
                     }`}>
                       {m.role === 'assistant' ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
                     </div>
-                    <div className={`p-6 rounded-[32px] text-sm leading-relaxed ${
-                      m.role === 'assistant' 
-                        ? 'bg-slate-50 text-slate-800 rounded-tl-none border border-slate-100' 
-                        : 'bg-indigo-50 text-indigo-900 rounded-tr-none border border-indigo-100'
-                    }`}>
-                      {m.content}
+                    <div className="flex flex-col gap-1">
+                      <div className={`p-6 rounded-[32px] text-sm leading-relaxed ${
+                        m.role === 'assistant'
+                          ? 'bg-slate-50 text-slate-800 rounded-tl-none border border-slate-100'
+                          : 'bg-indigo-50 text-indigo-900 rounded-tr-none border border-indigo-100'
+                      }`}>
+                        {m.content}
+                      </div>
+                      {m.role === 'assistant' && (!isLoading || i < messages.length - 1) && (
+                        <div className="flex items-center gap-1 pl-2">
+                          <button
+                            onClick={() => rateMsgRating(i, 'up')}
+                            disabled={!!msgRatings[i]}
+                            className={`p-1 rounded-lg transition-colors ${msgRatings[i] === 'up' ? 'text-emerald-600' : msgRatings[i] ? 'text-slate-200' : 'text-slate-300 hover:text-emerald-500'}`}
+                            title="这条回复有用"
+                          >
+                            <ThumbsUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => rateMsgRating(i, 'down')}
+                            disabled={!!msgRatings[i]}
+                            className={`p-1 rounded-lg transition-colors ${msgRatings[i] === 'down' ? 'text-rose-600' : msgRatings[i] ? 'text-slate-200' : 'text-slate-300 hover:text-rose-500'}`}
+                            title="这条回复没用"
+                          >
+                            <ThumbsDown className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
