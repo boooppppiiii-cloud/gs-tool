@@ -35,6 +35,7 @@ const ACTION_LABELS: Record<string, string> = {
   case_view: '案例查看',
   delete_case: '案例删除',
   delete_history: '历史删除',
+  analysis_feedback: '分析质量反馈',
 };
 
 const FEATURE_CATEGORIES: Record<string, string> = {
@@ -226,6 +227,8 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      <FeedbackSummary logs={logs} />
+
       <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
@@ -304,6 +307,115 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
         <p className="text-2xl font-black text-slate-900 tabular-nums mt-1">{value}</p>
       </div>
+    </div>
+  );
+}
+
+interface FeedbackEntry {
+  accuracy: string;
+  usefulness: string;
+  comment: string;
+}
+
+function FeedbackSummary({ logs }: { logs: UsageLog[] }) {
+  const feedbackLogs = logs
+    .filter(l => l.action === 'analysis_feedback')
+    .map(l => { try { return JSON.parse(l.details) as FeedbackEntry; } catch { return null; } })
+    .filter((x): x is FeedbackEntry => x !== null);
+
+  if (feedbackLogs.length === 0) return null;
+
+  const accuracyCounts: Record<string, number> = {};
+  const usefulnessCounts: Record<string, number> = {};
+  feedbackLogs.forEach(f => {
+    accuracyCounts[f.accuracy] = (accuracyCounts[f.accuracy] || 0) + 1;
+    usefulnessCounts[f.usefulness] = (usefulnessCounts[f.usefulness] || 0) + 1;
+  });
+
+  const total = feedbackLogs.length;
+  const comments = feedbackLogs.filter(f => f.comment?.trim()).map(f => f.comment).slice(0, 5);
+
+  const accuracyColors: Record<string, string> = {
+    '准确无遗漏': 'bg-emerald-100 text-emerald-700',
+    '基本准确，有小错': 'bg-amber-100 text-amber-700',
+    '有明显遗漏/误判': 'bg-rose-100 text-rose-700',
+  };
+  const usefulnessColors: Record<string, string> = {
+    '非常有用，会采纳': 'bg-indigo-100 text-indigo-700',
+    '部分参考': 'bg-amber-100 text-amber-700',
+    '参考价值有限': 'bg-slate-100 text-slate-600',
+  };
+
+  return (
+    <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+          <MessageSquare className="w-5 h-5 text-emerald-600" />
+          内测质量反馈汇总
+        </h3>
+        <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded-full uppercase tracking-widest">
+          共 {total} 条反馈
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-3">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">AI 识别准确率</p>
+          <div className="space-y-2">
+            {Object.entries(accuracyCounts).map(([label, count]) => (
+              <div key={label} className="flex items-center gap-3">
+                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black shrink-0 ${accuracyColors[label] || 'bg-slate-100 text-slate-600'}`}>
+                  {label}
+                </span>
+                <div className="flex-1 bg-slate-100 rounded-full h-2">
+                  <div
+                    className="bg-indigo-500 h-2 rounded-full"
+                    style={{ width: `${(count / total) * 100}%` }}
+                  />
+                </div>
+                <span className="text-xs font-black text-slate-500 tabular-nums w-12 text-right">
+                  {count}/{total}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">GS 建议实用性</p>
+          <div className="space-y-2">
+            {Object.entries(usefulnessCounts).map(([label, count]) => (
+              <div key={label} className="flex items-center gap-3">
+                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black shrink-0 ${usefulnessColors[label] || 'bg-slate-100 text-slate-600'}`}>
+                  {label}
+                </span>
+                <div className="flex-1 bg-slate-100 rounded-full h-2">
+                  <div
+                    className="bg-emerald-500 h-2 rounded-full"
+                    style={{ width: `${(count / total) * 100}%` }}
+                  />
+                </div>
+                <span className="text-xs font-black text-slate-500 tabular-nums w-12 text-right">
+                  {count}/{total}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {comments.length > 0 && (
+        <div className="space-y-3 border-t border-slate-100 pt-6">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">用户补充说明（最新 {comments.length} 条）</p>
+          <div className="space-y-2">
+            {comments.map((c, i) => (
+              <div key={i} className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                <p className="text-sm text-slate-700 leading-relaxed">"{c}"</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

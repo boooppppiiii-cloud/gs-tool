@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   UserCheck, 
   TrendingUp, 
@@ -28,6 +28,7 @@ import { AnalysisResult, PlayerBehaviorReport } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle } from 'docx';
 import { saveAs } from 'file-saver';
+import { logUsage } from '../services/analyticsService';
 
 interface Props {
   result: AnalysisResult;
@@ -434,6 +435,8 @@ export default function AnalysisReport({ result: rawResult, onRemovePlayer, onUp
           </div>
         </div>
       </section>
+
+      <FeedbackPanel />
     </div>
   );
 }
@@ -445,6 +448,91 @@ function PortraitDetail({ title, content, color }: { title: string; content: str
         {title}
       </span>
       <p className="text-sm text-slate-600 leading-snug">{content}</p>
+    </div>
+  );
+}
+
+function FeedbackPanel() {
+  const [accuracy, setAccuracy] = useState('');
+  const [usefulness, setUsefulness] = useState('');
+  const [comment, setComment] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = () => {
+    logUsage('analysis_feedback', JSON.stringify({ accuracy, usefulness, comment }));
+    setSubmitted(true);
+  };
+
+  if (submitted) {
+    return (
+      <div className="bg-emerald-50 p-6 rounded-[32px] border border-emerald-100 text-center">
+        <p className="text-emerald-700 font-black text-base">感谢你的反馈！这将帮助我们持续优化 AI 分析质量。</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
+      <div>
+        <h3 className="text-xl font-black text-slate-800">这次分析结果如何？</h3>
+        <p className="text-xs text-slate-400 font-medium mt-1">你的反馈直接影响 AI 模型优化方向</p>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-bold text-slate-600">AI 识别的负面事件和重点玩家，准确率如何？</p>
+        <div className="flex gap-2 flex-wrap">
+          {['准确无遗漏', '基本准确，有小错', '有明显遗漏/误判'].map(opt => (
+            <button
+              key={opt}
+              onClick={() => setAccuracy(opt)}
+              className={`px-4 py-2 rounded-2xl text-sm font-bold border transition-colors ${
+                accuracy === opt
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+              }`}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-bold text-slate-600">GS 处置建议的实用性如何？</p>
+        <div className="flex gap-2 flex-wrap">
+          {['非常有用，会采纳', '部分参考', '参考价值有限'].map(opt => (
+            <button
+              key={opt}
+              onClick={() => setUsefulness(opt)}
+              className={`px-4 py-2 rounded-2xl text-sm font-bold border transition-colors ${
+                usefulness === opt
+                  ? 'bg-emerald-600 text-white border-emerald-600'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-300'
+              }`}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-sm font-bold text-slate-600">补充说明（可选）：AI 漏掉了什么？哪条建议不准确？</p>
+        <textarea
+          value={comment}
+          onChange={e => setComment(e.target.value)}
+          placeholder="例如：漏掉了张三在5月1号的强烈投诉，或者某条处置建议不适合这个玩家的情况…"
+          className="w-full h-20 px-4 py-3 rounded-2xl border border-slate-200 text-sm resize-none focus:outline-none focus:border-indigo-300 text-slate-700"
+        />
+      </div>
+
+      <button
+        onClick={handleSubmit}
+        disabled={!accuracy || !usefulness}
+        className="px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-sm disabled:opacity-40 hover:bg-slate-700 transition-colors"
+      >
+        提交反馈
+      </button>
     </div>
   );
 }
