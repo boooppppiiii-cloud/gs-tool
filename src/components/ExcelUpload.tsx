@@ -22,46 +22,69 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const isCsv = file.name.toLowerCase().endsWith('.csv');
     setFileName(file.name);
     setError(null);
 
     try {
       logUsage('excel_upload', `Started processing ${file.name}`);
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
 
-      // Sheet 1: Chat Logs
-      const chatSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const chatJson = XLSX.utils.sheet_to_json<any>(chatSheet, { header: 'A' });
-      
-      // Map columns based on user request: C列时间、D列角色名、E列类型、F列内容、H列目标
-      const chatRecords: ChatRecord[] = chatJson.slice(1).map(row => ({
-        time: String(row.C || ''),
-        roleName: String(row.D || ''),
-        type: String(row.E || ''),
-        content: String(row.F || ''),
-        target: String(row.H || '')
-      })).filter(r => r.roleName && r.content);
+      let chatRecords: ChatRecord[];
+      let rechargeRecords: RechargeRecord[];
 
-      // Sort by time
+      if (isCsv) {
+        // Tab-delimited CSV: columns [2]=时间, [3]=角色名, [4]=聊天类型, [5]=聊天内容, [6]=目标帐号
+        const text = await file.text();
+        const rows = text.split(/\r?\n/).filter(l => l.trim()).map(l => l.split('\t'));
+
+        chatRecords = rows.slice(1).map(row => ({
+          time:     String(row[2] || '').trim(),
+          roleName: String(row[3] || '').trim(),
+          type:     String(row[4] || '').trim(),
+          content:  String(row[5] || '').trim(),
+          target:   String(row[6] || '').trim()
+        })).filter(r => r.roleName && r.content);
+
+        rechargeRecords = [];
+      } else {
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data);
+
+        // Sheet 1: Chat Logs — C列时间、D列角色名、E列类型、F列内容、H列目标
+        const chatSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const chatJson = XLSX.utils.sheet_to_json<any>(chatSheet, { header: 'A' });
+
+        chatRecords = chatJson.slice(1).map(row => ({
+          time:     String(row.C || ''),
+          roleName: String(row.D || ''),
+          type:     String(row.E || ''),
+          content:  String(row.F || ''),
+          target:   String(row.H || '')
+        })).filter(r => r.roleName && r.content);
+
+        // Sheet 2: Recharge — B列金额/礼包、C列角色名、G列状态、H列方式
+        const rechargeSheet = workbook.Sheets[workbook.SheetNames[1]];
+        const rechargeJson = XLSX.utils.sheet_to_json<any>(rechargeSheet, { header: 'A' });
+
+        rechargeRecords = rechargeJson.slice(1).map(row => ({
+          amount:   String(row.B || ''),
+          roleName: String(row.C || ''),
+          status:   String(row.G || ''),
+          method:   String(row.H || '')
+        })).filter(r => r.roleName);
+      }
+
       chatRecords.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 
-      // Sheet 2: Recharge
-      const rechargeSheet = workbook.Sheets[workbook.SheetNames[1]];
-      const rechargeJson = XLSX.utils.sheet_to_json<any>(rechargeSheet, { header: 'A' });
-
-      // Map columns: B列金额/礼包、C列角色名、G列状态、H列方式
-      const rechargeRecords: RechargeRecord[] = rechargeJson.slice(1).map(row => ({
-        amount: String(row.B || ''),
-        roleName: String(row.C || ''),
-        status: String(row.G || ''),
-        method: String(row.H || '')
-      })).filter(r => r.roleName);
-
-      onDataLoaded(chatRecords, rechargeRecords, file.name);
+      // For CSV, strip extension so the bare filename serves as server/region name
+      const displayName = isCsv ? file.name.replace(/\.csv$/i, '') : file.name;
+      onDataLoaded(chatRecords, rechargeRecords, displayName);
     } catch (err) {
       console.error(err);
-      setError('文件解析失败，请确保格式符合要求（Sheet1: 聊天, Sheet2: 充值）');
+      setError(isCsv
+        ? 'CSV 文件解析失败，请确保文件为制表符分隔格式，包含标准聊天记录列'
+        : '文件解析失败，请确保格式符合要求（Sheet1: 聊天, Sheet2: 充值）'
+      );
     }
   };
 
@@ -70,7 +93,7 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
       <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl p-10 transition-colors hover:border-indigo-300 group relative">
         <input
           type="file"
-          accept=".xlsx, .xls"
+          accept=".xlsx,.xls,.csv"
           onChange={handleFileUpload}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           disabled={isAnalyzing}
@@ -95,7 +118,7 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
                   <span>{fileName ? fileName : '上传 Excel 数据文件'}</span>
                 </p>
                 <p className="text-sm text-slate-500 mt-1">
-                  支持 .xlsx, .xls 格式 | 必须包含聊天记录与充值记录两个 Sheet
+                  支持 .xlsx, .xls, .csv 格式 | CSV 文件以文件名作为区服名称
                 </p>
               </div>
               {fileName && !error && (
@@ -119,11 +142,15 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
       <div className="mt-6 grid grid-cols-2 gap-4 text-xs text-slate-400">
         <div className="flex items-start gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1" />
-          <p>Sheet1: C时间, D角色, E类型, F内容, H目标</p>
+          <p>Excel Sheet1: C时间, D角色, E类型, F内容, H目标</p>
         </div>
         <div className="flex items-start gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1" />
-          <p>Sheet2: B金额, C角色, G状态, H方式</p>
+          <p>Excel Sheet2: B金额, C角色, G状态, H方式</p>
+        </div>
+        <div className="flex items-start gap-2 col-span-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1" />
+          <p>CSV（制表符分隔）: 角色ID, 帐号, 时间, 角色名, 聊天类型, 聊天内容, 目标帐号, 目标角色, 历史IP, 当前IP</p>
         </div>
       </div>
     </div>
