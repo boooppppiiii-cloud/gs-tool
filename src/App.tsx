@@ -178,7 +178,7 @@ export default function App() {
         `${r.roleName}: ${r.amount} (${r.status}, ${r.method})`
       ).join('\n');
 
-      const result = await analyzeGameEcology(serverContextStr, chatSample, rechargeSample, cases.slice(0, 5), persistentPortraitsStr);
+      const result = await analyzeGameEcology(serverContextStr, chatSample, rechargeSample, cases.slice(0, 10), persistentPortraitsStr);
       setAnalysisResult(result);
       setCurrentHistoryId(null);
       const negativeCount = result.playerReports?.reduce((sum, r) => sum + (r.negativeOutbursts?.length || 0), 0) ?? 0;
@@ -221,6 +221,18 @@ export default function App() {
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleUpdatePortrait = async (profileId: string, roleName: string, portrait: { paymentHabits: string; personality: string; gameHabits: string; realLifePersona: string; summary: string }) => {
+    const profile = serverProfiles.find(p => p.id === profileId);
+    if (!profile) return;
+    const updatedPortraits = {
+      ...(profile.persistentPortraits || {}),
+      [roleName]: { ...portrait, lastUpdated: new Date().toISOString() },
+    };
+    const updated = { ...profile, persistentPortraits: updatedPortraits };
+    setServerProfiles(prev => prev.map(p => p.id === profileId ? updated : p));
+    await dataService.saveServerProfile(updated);
   };
 
   const handleUpdateCase = async (id: string, updates: Partial<AnalysisCase>) => {
@@ -427,7 +439,7 @@ export default function App() {
         </header>
 
         <div className="px-10 pb-12 overflow-y-auto flex-1">
-           {activeTab === 'home' && <HomeView serverProfiles={serverProfiles} />}
+           {activeTab === 'home' && <HomeView serverProfiles={serverProfiles} onUpdatePortrait={handleUpdatePortrait} />}
            
            {activeTab === 'server' && (
              <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-5 duration-500">
