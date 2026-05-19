@@ -55,7 +55,7 @@ export function logUsage(action: string, details: string = '', chatCount?: numbe
     if (logs.length > MAX_LOGS) logs.length = MAX_LOGS;
     saveLogs(logs);
     // 异步上云（fire-and-forget，失败静默）
-    db.collection('analytics_logs').doc(log.id).set(log).catch(() => {});
+    db.collection('usage_logs').doc(log.id).set(log).catch(() => {});
   } catch (e) {
     console.error('[Analytics] 记录失败', e);
   }
@@ -66,7 +66,7 @@ export function getAnalyticsLogs(): UsageLog[] {
 }
 
 export async function fetchAllAnalyticsLogs(): Promise<UsageLog[]> {
-  const res = await db.collection('analytics_logs')
+  const res = await db.collection('usage_logs')
     .orderBy('timestamp', 'desc')
     .limit(500)
     .get();
