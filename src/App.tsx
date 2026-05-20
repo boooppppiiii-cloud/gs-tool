@@ -230,9 +230,14 @@ export default function App() {
       ...(profile.persistentPortraits || {}),
       [roleName]: { ...portrait, lastUpdated: new Date().toISOString() },
     };
-    const updated = { ...profile, persistentPortraits: updatedPortraits };
-    setServerProfiles(prev => prev.map(p => p.id === profileId ? updated : p));
-    await dataService.saveServerProfile(updated);
+    setServerProfiles(prev => prev.map(p =>
+      p.id === profileId ? { ...p, persistentPortraits: updatedPortraits } : p
+    ));
+    try {
+      await dataService.updateServerProfile(profileId, { persistentPortraits: updatedPortraits });
+    } catch (err) {
+      console.error('[画像编辑] 保存失败', err);
+    }
   };
 
   const handleUpdateCase = async (id: string, updates: Partial<AnalysisCase>) => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Users, Search, BookOpen, Clock, Pencil, Check, X } from 'lucide-react';
+import { Users, BookOpen, Clock, Pencil, Check, X } from 'lucide-react';
 
 import { ServerProfile } from '../types';
 

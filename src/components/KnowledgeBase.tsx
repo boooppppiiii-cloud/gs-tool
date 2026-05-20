@@ -544,13 +544,16 @@ function CozeResultCard({ query, content, isStreaming }: { query: string; conten
             <p className="text-sm mt-1">尝试调整关键词或联系管理员更新表格</p>
           </div>
         ) : (
-          <div className="relative">
-            <p className="text-sm font-medium text-slate-700 leading-loose whitespace-pre-line">
-              {content}
-              {isStreaming && (
-                <span className="inline-block w-1.5 h-4 bg-indigo-500 animate-pulse ml-0.5 rounded-sm align-middle" />
-              )}
-            </p>
+          <div>
+            <SectionHeader icon={<FileText className="w-5 h-5 text-indigo-600" />} title="第一部分：完整道具档案" />
+            <div className="mt-8 bg-slate-50/60 rounded-3xl border border-slate-100 p-6">
+              <p className="text-sm font-medium text-slate-700 leading-loose whitespace-pre-line">
+                {content}
+                {isStreaming && (
+                  <span className="inline-block w-1.5 h-4 bg-indigo-500 animate-pulse ml-0.5 rounded-sm align-middle" />
+                )}
+              </p>
+            </div>
           </div>
         )}
       </div>
@@ -584,64 +587,31 @@ function ItemResultCard({ item }: { item: ItemData }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2">
-        {/* Part 1: Detailed Profile */}
-        <div className="p-10 border-r border-slate-100">
-          <SectionHeader icon={<FileText className="w-5 h-5 text-indigo-600" />} title="第一部分：完整道具档案" />
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 mt-8">
-            <DataField label="道具名称" value={item.name} />
-            <DataField label="所属活动" value={item.activity || '暂无数据'} />
-            <DataField label="登场天数" value={item.time || '暂无数据'} />
-            <DataField label="评估单价" value={item.price || '暂无数据'} />
-            <div className="col-span-full">
-              <DataField label="道具深度点评" value={item.review || '暂无数据'} />
-            </div>
-            <div className="col-span-full">
-              <DataField label="战力提升维度" value={item.boost || '暂无数据'} />
-            </div>
-          </div>
+      <div className="p-10">
+        <SectionHeader icon={<FileText className="w-5 h-5 text-indigo-600" />} title="第一部分：完整道具档案" />
 
-          <div className="mt-8 pt-8 border-t border-slate-100">
-            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-              <Sparkles className="w-3 h-3" /> 各阶玩家购买方案评定
-            </p>
-            <div className="grid grid-cols-2 gap-4">
-              <PlanBox tier="超R" content={item.planSuperR} color="bg-slate-50 text-slate-900 border border-slate-200" />
-              <PlanBox tier="大R" content={item.planBigR} color="bg-slate-50 text-slate-900 border border-slate-200" />
-              <PlanBox tier="中R" content={item.planMidR} color="bg-slate-50 text-slate-900 border border-slate-200" />
-              <PlanBox tier="小R" content={item.planSmallR} color="bg-slate-50 text-slate-900 border border-slate-200" />
-            </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 mt-8">
+          <DataField label="道具名称" value={item.name} />
+          <DataField label="所属活动" value={item.activity || '暂无数据'} />
+          <DataField label="登场天数" value={item.time || '暂无数据'} />
+          <DataField label="评估单价" value={item.price || '暂无数据'} />
+          <div className="col-span-full">
+            <DataField label="道具深度点评" value={item.review || '暂无数据'} />
+          </div>
+          <div className="col-span-full">
+            <DataField label="战力提升维度" value={item.boost || '暂无数据'} />
           </div>
         </div>
 
-        {/* Part 2: GS Recommendations */}
-        <div className="p-10 bg-slate-50/50 relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-10 opacity-[0.02] pointer-events-none">
-             <Scroll className="w-64 h-64 rotate-12" />
-          </div>
-          <SectionHeader icon={<Sparkles className="w-5 h-5 text-indigo-600 adventure-icon" />} title="第二部分：GS 运营决策建议" />
-          
-          <div className="mt-8 space-y-8 relative z-10">
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm group">
-              <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">核心适配分层</p>
-              <p className="text-slate-800 font-bold leading-relaxed text-lg">{item.gsTier}</p>
-            </div>
-
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm group">
-              <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">实战场景应用</p>
-              <p className="text-slate-700 font-medium leading-relaxed">{item.gsApplication}</p>
-            </div>
-
-            <div className="p-8 bg-slate-900 rounded-[32px] text-white shadow-2xl border border-indigo-600/30">
-               <div className="flex items-center gap-2 mb-4">
-                 <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full" />
-                 <p className="text-xs font-black uppercase tracking-widest text-slate-400">GS 运营话术核心</p>
-               </div>
-               <p className="text-sm font-medium leading-relaxed text-slate-300">
-                 此珍宝于 <span className="text-indigo-600">{item.time}</span> 降世。策略重点应聚焦于 <span className="text-white font-bold">{item.keywords.join('、')}</span> 带来的压制力。针对 <span className="text-white">{item.gsTier.split('/')[0]}</span> 阶层，建议从 <span className="text-indigo-600 underline underline-offset-4 decoration-indigo-600/30">{item.activity}</span> 的稀缺性切入引导。
-               </p>
-            </div>
+        <div className="mt-8 pt-8 border-t border-slate-100">
+          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+            <Sparkles className="w-3 h-3" /> 各阶玩家购买方案评定
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <PlanBox tier="超R" content={item.planSuperR} color="bg-slate-50 text-slate-900 border border-slate-200" />
+            <PlanBox tier="大R" content={item.planBigR} color="bg-slate-50 text-slate-900 border border-slate-200" />
+            <PlanBox tier="中R" content={item.planMidR} color="bg-slate-50 text-slate-900 border border-slate-200" />
+            <PlanBox tier="小R" content={item.planSmallR} color="bg-slate-50 text-slate-900 border border-slate-200" />
           </div>
         </div>
       </div>
