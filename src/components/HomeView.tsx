@@ -188,7 +188,7 @@ export default function HomeView({ serverProfiles, onUpdatePortrait }: Props) {
                                   <Pencil className="w-4 h-4" /> 编辑画像
                                 </button>
                                 <button
-                                  className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black text-sm hover:bg-indigo-600 transition-colors shadow-lg shadow-slate-200"
+                                  className="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
                                   onClick={e => { e.stopPropagation(); setExpandedId(null); }}
                                 >
                                   收起详情

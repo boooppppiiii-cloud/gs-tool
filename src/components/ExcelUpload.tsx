@@ -101,7 +101,7 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
             </>
           ) : (
             <>
-              <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mb-4 group-hover:bg-slate-800 transition-colors adventure-icon shadow-lg shadow-indigo-600/10">
+              <div className="w-16 h-16 bg-amber-50 border border-amber-200/60 rounded-full flex items-center justify-center mb-4 group-hover:bg-amber-100 transition-colors adventure-icon shadow-lg shadow-indigo-600/10">
                 <Upload className="w-8 h-8 text-indigo-600" />
               </div>
               <div className="text-center">

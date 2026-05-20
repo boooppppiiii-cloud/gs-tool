@@ -35,7 +35,7 @@ export default function HistoryView({ history, onSelect, onDelete }: Props) {
   if (history.length === 0) {
     return (
       <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
-        <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-4 adventure-icon shadow-lg shadow-indigo-600/10">
+        <div className="w-16 h-16 bg-amber-50 border border-amber-200/60 rounded-full flex items-center justify-center mx-auto mb-4 adventure-icon shadow-lg shadow-amber-100">
           <Clock className="w-8 h-8 text-indigo-600" />
         </div>
         <h3 className="text-lg font-bold text-slate-800">暂无历史记录</h3>

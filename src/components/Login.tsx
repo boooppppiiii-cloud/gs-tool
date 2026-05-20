@@ -107,7 +107,7 @@ export default function Login({ onLogin }: Props) {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex justify-center py-5 px-4 border border-transparent rounded-3xl shadow-xl text-sm font-black text-white bg-slate-900 hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50"
+              className="w-full flex justify-center py-5 px-4 border border-transparent rounded-3xl shadow-xl text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50"
             >
               {isLoading ? '发送中...' : '获取验证码'}
             </button>
@@ -137,7 +137,7 @@ export default function Login({ onLogin }: Props) {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex justify-center py-5 px-4 border border-transparent rounded-3xl shadow-xl text-sm font-black text-white bg-slate-900 hover:bg-indigo-600 transition-all active:scale-[0.98] disabled:opacity-50"
+              className="w-full flex justify-center py-5 px-4 border border-transparent rounded-3xl shadow-xl text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50"
             >
               {isLoading ? '验证中...' : '验证登录'}
             </button>

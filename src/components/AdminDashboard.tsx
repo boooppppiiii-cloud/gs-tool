@@ -147,7 +147,7 @@ export default function AdminDashboard() {
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div>
         <h2 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-          <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-indigo-500 shadow-lg adventure-icon-active">
+          <div className="w-10 h-10 bg-amber-50 border border-amber-200/60 rounded-xl flex items-center justify-center text-indigo-600 shadow-lg shadow-amber-100 adventure-icon-active">
             <Shield className="w-6 h-6" />
           </div>
           后台管理打点系统

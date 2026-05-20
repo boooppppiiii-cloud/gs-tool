@@ -162,7 +162,7 @@ export default function CaseGallery({ cases, user, filter, onFilterChange, onVot
             </div>
             <button 
               onClick={() => setIsAutoEntryOpen(true)}
-              className="px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-sm shadow-xl shadow-slate-200 hover:bg-indigo-600 transition-all flex items-center gap-2 group shrink-0"
+              className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2 group shrink-0"
             >
               <Sparkles className="w-4 h-4 group-hover:scale-110 transition-transform" />
               智能提取录入

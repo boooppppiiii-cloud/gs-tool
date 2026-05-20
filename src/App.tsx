@@ -347,62 +347,73 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900">
+    <div className="min-h-screen bg-white flex font-sans text-slate-800">
       {/* Sidebar Navigation */}
-      <aside 
-        className={`bg-slate-900 text-slate-100 flex flex-col transition-all duration-300 z-50 sticky top-0 h-screen border-r border-indigo-600/10 ${
-          isSidebarOpen ? 'w-64' : 'w-20'
+      <aside
+        className={`bg-white flex flex-col transition-all duration-300 z-50 sticky top-0 h-screen border-r border-slate-200 ${
+          isSidebarOpen ? 'w-60' : 'w-[72px]'
         }`}
       >
-        <div className="p-6 flex items-center justify-between mb-8 overflow-hidden">
-          <div className="flex items-center gap-3">
-             <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-indigo-600/20 adventure-icon group">
-                <Crown className="w-6 h-6 text-indigo-600 group-hover:text-amber-500 transition-colors" />
-             </div>
-             {isSidebarOpen && <span className="font-black text-lg tracking-tight whitespace-nowrap text-slate-100 uppercase">傲世传奇专家</span>}
+        {/* Logo */}
+        <div className="px-4 py-5 flex items-center justify-between overflow-hidden border-b border-slate-100">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-center shrink-0">
+              <Crown className="w-5 h-5 text-indigo-600" />
+            </div>
+            {isSidebarOpen && (
+              <span className="font-black text-base tracking-tight whitespace-nowrap text-slate-800 leading-none">
+                傲世传奇专家
+              </span>
+            )}
           </div>
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-white/5 rounded-lg lg:flex hidden transition-colors">
-             {isSidebarOpen ? <CloseIcon className="w-5 h-5 text-slate-500" /> : <Menu className="w-5 h-5 text-slate-500" />}
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-1.5 hover:bg-slate-100 rounded-lg lg:flex hidden transition-colors shrink-0"
+          >
+            {isSidebarOpen ? <CloseIcon className="w-4 h-4 text-slate-400" /> : <Menu className="w-4 h-4 text-slate-400" />}
           </button>
         </div>
 
-        <nav className="flex-1 px-4 space-y-1">
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => (
             <React.Fragment key={item.id}>
               <button
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all relative group ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all relative group ${
                   activeTab === item.id
-                    ? 'bg-white/5 text-indigo-600 border border-indigo-600/20 shadow-xl'
-                    : 'text-slate-500 hover:bg-white/5 hover:text-slate-300'
-                }`}
+                    ? 'bg-amber-50 text-indigo-600 border border-amber-200/80'
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                } ${!isSidebarOpen && 'justify-center'}`}
               >
-                <div className={`shrink-0 adventure-icon ${activeTab === item.id ? 'text-indigo-600 adventure-icon-active' : 'group-hover:text-amber-500'}`}>{item.icon}</div>
-                {isSidebarOpen && <span className="text-sm font-bold tracking-wide uppercase">{item.label}</span>}
+                <div className={`shrink-0 transition-colors ${activeTab === item.id ? 'text-indigo-600' : 'text-slate-400 group-hover:text-indigo-600'}`}>
+                  {item.icon}
+                </div>
+                {isSidebarOpen && <span className="text-sm font-semibold">{item.label}</span>}
                 {!isSidebarOpen && (
-                  <div className="absolute left-20 bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap shadow-xl border border-slate-700">
+                  <div className="absolute left-full ml-2 bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap shadow-lg z-50">
                     {item.label}
                   </div>
                 )}
-                {activeTab === item.id && (
-                  <div className="absolute right-0 w-1 h-6 bg-indigo-600 rounded-l-full shadow-[0_0_8px_var(--color-indigo-600)]" />
+                {activeTab === item.id && isSidebarOpen && (
+                  <div className="absolute right-0 w-0.5 h-5 bg-indigo-600 rounded-l-full" />
                 )}
               </button>
               {isSidebarOpen && activeTab === item.id && item.children && (
-                <div className="ml-4 mb-1 space-y-0.5 border-l border-indigo-600/20 pl-3">
+                <div className="ml-3 mt-0.5 mb-1 space-y-0.5 border-l-2 border-amber-200 pl-3">
                   {item.children.map((child) => {
                     const isChildActive = getSubTab(item.id) === child.id;
                     return (
                       <button
                         key={child.id}
                         onClick={() => setSubTab(item.id, child.id)}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                           isChildActive
-                            ? 'bg-indigo-600/10 text-indigo-400'
-                            : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                            ? 'bg-amber-50 text-indigo-600'
+                            : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'
                         }`}
                       >
-                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isChildActive ? 'bg-indigo-500' : 'bg-slate-600'}`} />
+                        <div className={`w-1 h-1 rounded-full shrink-0 ${isChildActive ? 'bg-indigo-600' : 'bg-slate-300'}`} />
                         {child.label}
                       </button>
                     );
@@ -413,37 +424,35 @@ export default function App() {
           ))}
         </nav>
 
-        <div className="p-6 mt-auto border-t border-white/5">
-           <button 
-             onClick={() => auth.signOut()}
-             className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-slate-500 hover:bg-rose-500/10 hover:text-rose-500 transition-all ${!isSidebarOpen && 'justify-center'}`}
-           >
-              <LogOut className="w-5 h-5 adventure-icon" />
-              {isSidebarOpen && <span className="text-sm font-bold uppercase tracking-widest">撤出公会</span>}
-           </button>
+        {/* Footer */}
+        <div className="px-3 py-4 border-t border-slate-100">
+          <button
+            onClick={() => auth.signOut()}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all ${!isSidebarOpen && 'justify-center'}`}
+          >
+            <LogOut className="w-4 h-4 shrink-0" />
+            {isSidebarOpen && <span className="text-sm font-semibold">退出登录</span>}
+          </button>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
-        <header className="px-10 py-6 sticky top-0 bg-slate-50/80 backdrop-blur-md z-40 flex items-center justify-between border-b border-slate-200/50 shadow-sm">
-           <div className="flex items-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
-              <span>系统路径</span>
-              <ChevronRight className="w-3 h-3" />
-              <span className="text-slate-900">{navItems.find(i => i.id === activeTab)?.label}</span>
-           </div>
-           <div className="flex items-center gap-4">
-              <div className="text-right">
-                 <p className="text-xs font-black text-slate-900 leading-none uppercase tracking-tight">{user.username}</p>
-                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1 italic">Authorized Expert</p>
-              </div>
-              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-indigo-600 font-black border border-indigo-600/20 shadow-sm">
-                 {user.username[0].toUpperCase()}
-              </div>
-           </div>
+        <header className="px-8 py-4 sticky top-0 bg-white/95 backdrop-blur-sm z-40 flex items-center justify-between border-b border-slate-100">
+          <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
+            <span>{navItems.find(i => i.id === activeTab)?.label}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-sm font-bold text-slate-800 leading-none">{user.username}</p>
+            </div>
+            <div className="w-9 h-9 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-center text-indigo-600 font-black text-sm">
+              {user.username[0].toUpperCase()}
+            </div>
+          </div>
         </header>
 
-        <div className="px-10 pb-12 overflow-y-auto flex-1">
+        <div className="px-8 pb-12 pt-8 overflow-y-auto flex-1">
            {activeTab === 'home' && <HomeView serverProfiles={serverProfiles} onUpdatePortrait={handleUpdatePortrait} />}
            
            {activeTab === 'server' && (

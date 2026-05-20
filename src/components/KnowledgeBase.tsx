@@ -177,7 +177,7 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h2 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4">
-            <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-indigo-600 shadow-xl shadow-slate-200 adventure-icon-active group">
+            <div className="w-12 h-12 bg-amber-50 border border-amber-200/60 rounded-2xl flex items-center justify-center text-indigo-600 shadow-xl shadow-amber-100 adventure-icon-active group">
               <Scroll className="w-6 h-6 group-hover:text-amber-500 transition-colors" />
             </div>
             专家知识库
@@ -199,7 +199,7 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
             <button
               onClick={handleSearch}
               disabled={isSearching}
-              className="absolute right-3 top-1/2 -translate-y-1/2 px-6 py-2.5 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all border border-indigo-600/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+              className="absolute right-3 top-1/2 -translate-y-1/2 px-6 py-2.5 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSearching ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
               检索档案
@@ -239,7 +239,7 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
                       className="w-full px-8 py-5 flex items-center justify-between hover:bg-slate-50/80 transition-colors group text-left"
                     >
                       <div className="flex items-center gap-4">
-                        <div className="w-8 h-8 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-400 group-hover:bg-slate-900 group-hover:text-indigo-500 transition-all border border-indigo-100">
+                        <div className="w-8 h-8 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-400 group-hover:bg-amber-50 group-hover:text-indigo-600 transition-all border border-indigo-100">
                           <Scroll className="w-4 h-4" />
                         </div>
                         <span className="text-base font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{cat.name}</span>
@@ -264,10 +264,10 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
                   {/* Day Label with Circle */}
                   <div className="absolute -left-12 md:-left-40 top-0 flex items-center h-full">
                     <div className="flex flex-col items-center">
-                      <div className="bg-slate-900 text-indigo-600 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest z-10 shadow-lg mb-2 border border-indigo-600/20">
+                      <div className="bg-white text-indigo-600 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest z-10 shadow-sm mb-2 border border-indigo-600">
                         {event.day}
                       </div>
-                      <div className="w-4 h-4 rounded-full bg-slate-50 border-4 border-slate-900 z-10 shadow-sm" />
+                      <div className="w-4 h-4 rounded-full bg-white border-4 border-indigo-600 z-10 shadow-sm" />
                     </div>
                   </div>
 
@@ -330,7 +330,7 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
                           {isAdmin && (
                             <button 
                               onClick={() => { setEditingEventId(event.id || idx.toString()); setEditValues(event); }}
-                              className="absolute top-4 right-4 p-2 bg-slate-900/5 hover:bg-slate-900 text-slate-400 hover:text-white rounded-xl opacity-0 group-hover/card:opacity-100 transition-all z-20"
+                              className="absolute top-4 right-4 p-2 bg-slate-100/50 hover:bg-amber-50 text-slate-400 hover:text-indigo-600 rounded-xl opacity-0 group-hover/card:opacity-100 transition-all z-20"
                             >
                               <Edit2 className="w-3 h-3" />
                             </button>
@@ -391,17 +391,17 @@ function CozeResultCard({ query, content, isStreaming }: { query: string; conten
 
   return (
     <div className="bg-white rounded-[40px] border border-slate-200 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-slate-900 px-10 py-8 text-white flex items-center justify-between border-b border-indigo-600/20">
+      <div className="bg-amber-50/60 px-10 py-8 flex items-center justify-between border-b border-amber-200/60">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">知识库直查档案</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">知识库直查档案</span>
           </div>
-          <h3 className="text-3xl font-black tracking-tight text-slate-50">{query}</h3>
+          <h3 className="text-3xl font-black tracking-tight text-slate-900">{query}</h3>
         </div>
         <div className="text-right">
           {isStreaming ? (
-            <div className="flex items-center gap-2 text-slate-400">
+            <div className="flex items-center gap-2 text-slate-500">
               <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
               <span className="text-xs font-black uppercase tracking-widest">检索中</span>
             </div>
@@ -472,7 +472,7 @@ function CozeResultCard({ query, content, isStreaming }: { query: string; conten
 
 function SectionHeader({ icon, title }: { icon: React.ReactNode, title: string }) {
   return (
-    <div className="flex items-center gap-3 pb-2 border-b-2 border-slate-900 w-fit">
+    <div className="flex items-center gap-3 pb-2 border-b-2 border-indigo-600 w-fit">
       {icon}
       <h4 className="text-lg font-black text-slate-900 tracking-tight uppercase">{title}</h4>
     </div>
@@ -485,8 +485,8 @@ function TabButton({ active, label, onClick, icon }: { active: boolean, label: s
       onClick={onClick}
       className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
         active 
-          ? 'bg-slate-900 text-indigo-600 border border-indigo-600/30 shadow-xl shadow-slate-200' 
-          : 'text-slate-400 hover:text-slate-900 hover:bg-white/50'
+          ? 'bg-amber-50 text-indigo-600 border border-amber-200 shadow-sm'
+          : 'text-slate-400 hover:text-slate-800 hover:bg-white/50'
       }`}
     >
       <div className={active ? 'adventure-icon-active' : ''}>

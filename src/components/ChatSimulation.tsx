@@ -176,7 +176,7 @@ export default function ChatSimulation({ profiles }: Props) {
               <button 
                 onClick={startNewSimulation}
                 disabled={!selectedPlayer}
-                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-600/10 hover:bg-slate-800 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group"
+                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-600/10 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group"
               >
                 <RefreshCcw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500 adventure-icon" />
                 重新开始模拟
@@ -207,7 +207,7 @@ export default function ChatSimulation({ profiles }: Props) {
           {/* Header */}
           <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-slate-900 rounded-2xl border border-indigo-600/20 flex items-center justify-center text-indigo-600 shadow-xl shadow-slate-200 adventure-icon-active group">
+              <div className="w-10 h-10 bg-amber-50 border border-amber-200/60 rounded-2xl flex items-center justify-center text-indigo-600 shadow-xl shadow-amber-100 adventure-icon-active group">
                 <Sword className="w-5 h-5 group-hover:text-amber-500 transition-colors" />
               </div>
               <div>
@@ -238,7 +238,7 @@ export default function ChatSimulation({ profiles }: Props) {
                 <div key={i} className={`flex ${m.role === 'assistant' ? 'justify-start' : 'justify-end'}`}>
                   <div className={`flex gap-4 max-w-[80%] ${m.role === 'assistant' ? 'flex-row' : 'flex-row-reverse'}`}>
                     <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
-                      m.role === 'assistant' ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-white'
+                      m.role === 'assistant' ? 'bg-indigo-600 text-white' : 'bg-amber-50 border border-amber-200/60 text-slate-700'
                     }`}>
                       {m.role === 'assistant' ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
                     </div>
@@ -292,7 +292,7 @@ export default function ChatSimulation({ profiles }: Props) {
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || isLoading || !selectedPlayer}
-                className="w-16 h-16 bg-slate-900 text-white rounded-3xl flex items-center justify-center hover:bg-indigo-600 transition-all shadow-xl shadow-slate-200 disabled:opacity-50 group"
+                className="w-16 h-16 bg-indigo-600 text-white rounded-3xl flex items-center justify-center hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 disabled:opacity-50 group"
               >
                 <Send className="w-5 h-5 group-hover:scale-125 transition-transform" />
               </button>

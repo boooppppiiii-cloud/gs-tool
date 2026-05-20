@@ -207,7 +207,7 @@ export default function AnalysisReport({ result: rawResult, onRemovePlayer, onUp
             <div key={player.roleName} className="bg-white border border-slate-200 rounded-[40px] overflow-hidden shadow-sm hover:shadow-xl transition-all group">
               <div className="p-8 bg-gradient-to-br from-indigo-50/50 to-white border-b border-slate-100">
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center text-indigo-600 shadow-lg shadow-slate-200 adventure-icon-active">
+                  <div className="w-14 h-14 bg-amber-50 border border-amber-200/60 rounded-2xl flex items-center justify-center text-indigo-600 shadow-lg shadow-amber-100 adventure-icon-active">
                     <Shield className="w-7 h-7" />
                   </div>
                   <div className="flex-1">
@@ -575,7 +575,7 @@ function FeedbackPanel() {
       <button
         onClick={handleSubmit}
         disabled={!accuracy || !usefulness}
-        className="px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-sm disabled:opacity-40 hover:bg-slate-700 transition-colors"
+        className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-sm disabled:opacity-40 hover:bg-indigo-700 transition-colors"
       >
         提交反馈
       </button>

@@ -278,7 +278,7 @@ export default function ServerConfig({ profiles, activeProfileId, onProfilesChan
                 onSaveProfile(activeProfile);
                 onSelectProfile('');
               }}
-              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-sm shadow-xl shadow-slate-200 hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 group"
+              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 group"
             >
               <Check className="w-4 h-4 group-hover:scale-125 transition-transform" />
               保存并应用全局配置

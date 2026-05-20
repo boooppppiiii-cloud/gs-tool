@@ -120,7 +120,7 @@ ${text}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-stone-800/40 backdrop-blur-sm"
       />
       
       <motion.div 
@@ -172,7 +172,7 @@ ${text}
               <button
                 onClick={processAI}
                 disabled={!text.trim() || isProcessing}
-                className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black text-lg shadow-xl shadow-slate-200 hover:bg-indigo-600 disabled:opacity-30 transition-all flex items-center justify-center gap-3 group"
+                className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-30 transition-all flex items-center justify-center gap-3 group"
               >
                 {isProcessing ? (
                   <span className="flex items-center justify-center gap-3">
