@@ -35,34 +35,124 @@ interface CalendarEvent {
 const ITEM_DATABASE: ItemData[] = [
   {
     name: '麻痹戒指',
-    activity: '充值排行 / 这里的活动名称',
-    time: '开服第1天',
-    price: '暂无数据',
-    review: '顶级控制道具，PK必备。',
-    boost: '攻击时5%几率使敌方进入麻痹状态，持续3秒。',
-    planSuperR: '通过充值榜直接抢占第一。',
-    planBigR: '通过累计充值活动获取进度。',
-    planMidR: '建议参与循环累充活动缓慢追赶。',
-    planSmallR: '日常打宝看运气，不建议强求。',
-    gsApplication: '在行会混战或劫镖过程中，该戒指能起到决定性作用。',
-    gsTier: '超R/大R核心追求，属性极高。',
-    keywords: ['控制', 'PK', '胜率']
+    activity: '充值排行榜',
+    time: '开服第1天起',
+    price: '充值榜专属奖励',
+    review: '全服顶级控制神器，PK场决定性装备，超R/大R必争之物。',
+    boost: '攻击时一定几率使目标陷入麻痹状态，持续数秒无法行动，战场上拥有则掌握节奏。',
+    planSuperR: '冲刺充值排行榜第一，全额拿到，开服前三天是关键窗口期。',
+    planBigR: '保持充值排行前三，至少争取前五有概率获得，配合节点礼包补充战力差距。',
+    planMidR: '无法直接竞争排行榜，建议主攻累计充值活动缓慢积累材料，等待返场机会。',
+    planSmallR: '不建议为该道具专门氪金，等满月/百天庆典返场活动碰运气。',
+    gsApplication: '行会混战、劫镖护镖、沙巴克攻城时，该戒指的控制效果直接决定战局走向，是引导大R竞争的核心话题点。',
+    gsTier: '超R/大R最高优先级追求，拥有即为服内顶级战力标志。',
+    keywords: ['控制', '麻痹', 'PK', '胜率', '戒指', '排行榜']
   },
   {
     name: '圣灵披风',
-    activity: '特权返场 - 神技宝库',
-    time: '开服第113天',
-    price: '1998 元宝',
-    review: '高阶防御装备，防御力惊人。',
-    boost: '防御提升20%，血量上限提升15%。',
-    planSuperR: '直接购买全套返场礼包。',
-    planBigR: '购买核心单品。',
-    planMidR: '关注后续特价礼包。',
-    planSmallR: '暂无推荐方案。',
-    gsApplication: '提高前排生存能力，尤其是在抢夺资源点时。',
-    gsTier: '中R及以上必买，性价比较高。',
-    keywords: ['肉', '防御', '生存']
-  }
+    activity: '特权返场 · 神技宝库',
+    time: '开服第30天起周期返场',
+    price: '1998元宝（单件）/ 礼包价格浮动',
+    review: '顶级防御披风，前排坦克核心装备，大幅提升战场生存能力。',
+    boost: '防御属性大幅提升，血量上限显著增加，使穿戴者在高强度对抗中更耐打。',
+    planSuperR: '直接购买完整返场礼包，同步锁定附属套装加成，最大化性价比。',
+    planBigR: '优先购买披风本体，配合日常活动补充其余套装件。',
+    planMidR: '关注后续特价礼包，返场期间价格通常会有折扣窗口，把握时机。',
+    planSmallR: '暂无推荐方案，该道具价位对小R不友好，建议关注低价防御类替代品。',
+    gsApplication: '适合引导需要提升生存能力的前排玩家，尤其在资源争夺战（Boss点位/沙城外围）话术中重点推荐。',
+    gsTier: '中R及以上必购，前排战士/法师职业优先，性价比高于同价位攻击类装备。',
+    keywords: ['披风', '防御', '生存', '肉', '坦克', '血量', '圣灵']
+  },
+  {
+    name: '屠龙刀',
+    activity: '开服首充 / 战力排行榜',
+    time: '开服第1天',
+    price: '首充礼包 / 排行榜专属',
+    review: '传奇服标志性武器，攻击力天花板，服内拥有者即为战力顶标。',
+    boost: '攻击属性大幅领先同级武器，附带特殊光效，区服内具有极高的社交展示价值。',
+    planSuperR: '开服首日冲刺充值排行第一，直接获取，是超R的身份标配。',
+    planBigR: '竞争充值榜前三，或通过节点累充活动稳定推进获取进度。',
+    planMidR: '参与各类副本和竞技活动积累材料，走分解合成路线，周期较长但可实现。',
+    planSmallR: '专注日常任务爆材料，长线合成，不建议为此大额充值。',
+    gsApplication: '区服最强攻击符号，是大R玩家最重要的社交资本，GS可在行会频道主动提及战力榜，刺激竞争欲望。',
+    gsTier: '超R最高优先级，服内标杆性道具，影响整体战力格局。',
+    keywords: ['屠龙', '屠龙刀', '武器', '攻击', '排行榜', '第一', '战力']
+  },
+  {
+    name: '霸王神兽',
+    activity: '神兽活动 / 坐骑礼包',
+    time: '开服第7天起',
+    price: '礼包价格浮动（598-1998元不等）',
+    review: '顶级坐骑神兽，属性加成全面，视觉效果震撼，是区服内的稀有展示品。',
+    boost: '骑乘速度、攻击、防御全属性加成，部分版本附带神兽技能（如召唤辅助攻击）。',
+    planSuperR: '直接购买顶级神兽礼包，附带限定称号和专属技能，完整体验最优。',
+    planBigR: '购买中级礼包获得基础版本，后续升级，控制单次消费但长期投入。',
+    planMidR: '参与神兽碎片活动缓慢积累，等候免费/低价合成机会。',
+    planSmallR: '关注开服签到、活跃任务中的神兽碎片奖励，主打免费路线。',
+    gsApplication: '神兽在全服可见，视觉冲击力强，适合在大R玩家发布全服公告时配合推荐，营造氛围感。',
+    gsTier: '大R以上优先追求，中R可选基础款，视觉展示价值高于战力价值。',
+    keywords: ['神兽', '坐骑', '霸王', '宠物', '骑乘', '展示']
+  },
+  {
+    name: '魔龙套装',
+    activity: '副本挑战 / 限时打造活动',
+    time: '开服第15天起',
+    price: '材料可通过副本获取，打造费用约500-2000元宝',
+    review: '中高端套装，属性均衡，适合中期过渡到后期核心战力的关键装备。',
+    boost: '攻防属性均衡提升，穿戴套装后触发额外套装效果（攻击速度/暴击几率提升）。',
+    planSuperR: '直接购买套装礼包一次性成型，省略材料收集阶段，快速建立战力优势。',
+    planBigR: '购买核心套件+材料礼包，7天内完成套装，性价比最优路线。',
+    planMidR: '日常副本刷材料，配合每日免费打造次数，约30天可完整获取。',
+    planSmallR: '纯副本免费路线，耗时较长，建议优先完成高性价比单件。',
+    gsApplication: '副本开放初期是推广时机，鼓励玩家组队参与，可引导行会统一目标，增强凝聚力同时带动消费。',
+    gsTier: '全档玩家均可参与，中R以上建议走付费加速路线，小R适合纯免费慢慢打。',
+    keywords: ['魔龙', '套装', '副本', '打造', '材料', '套装效果']
+  },
+  {
+    name: '金翅大鹏',
+    activity: '坐骑竞速 / 周年庆活动',
+    time: '开服第30天或特殊活动期间',
+    price: '活动期间礼包约1998-3998元',
+    review: '传说级坐骑，速度属性冠绝全服，配合限定外观，社交展示价值极高。',
+    boost: '移动速度提升30%以上，野外战场中具有追击和逃脱的决定性优势，部分版本附带飞行模式。',
+    planSuperR: '活动首发直接购买完整礼包，拿到全服唯一或稀缺限定称号。',
+    planBigR: '购买活动进度礼包，解锁坐骑本体，放弃限定附属增强件。',
+    planMidR: '参与坐骑碎片活动慢慢积累，预计需2-3个活动周期才能合成。',
+    planSmallR: '不建议为此消费，速度类坐骑对小R战力提升有限，性价比低。',
+    gsApplication: '坐骑活动期间可在全服制造话题，大R玩家骑乘展示时GS及时配合吹捧，刺激其他玩家跟进消费。',
+    gsTier: '超R/大R的展示性消费，对实战有加成但非必须，社交价值是核心卖点。',
+    keywords: ['金翅', '大鹏', '坐骑', '速度', '飞行', '追击', '限定']
+  },
+  {
+    name: '玄冥铠甲',
+    activity: '锻造大赛 / 充值累计活动',
+    time: '开服第20天起',
+    price: '锻造材料礼包约1298元 / 散件购买',
+    review: '顶级防御铠甲，同级护甲中防御上限最高，是重甲职业的核心竞争力来源。',
+    boost: '物理防御和魔法防御双维度大幅提升，穿戴后在PvP中承伤比例明显降低。',
+    planSuperR: '一次性购买完整锻造礼包，直接成型，不参与材料竞争。',
+    planBigR: '分批购买核心材料，配合日常锻造积分，约14天内完成。',
+    planMidR: '锻造大赛期间集中冲刺，利用积分奖励抵消部分消费。',
+    planSmallR: '锻造积分日常任务慢慢推进，免费路线约需45天。',
+    gsApplication: '适合在服内爆发较多PK纠纷时作为推荐话题，引导受伤玩家提升防御解决痛点，从负面情绪转化为消费动力。',
+    gsTier: '中R以上战士/法师优先，是后期防御体系的核心。',
+    keywords: ['玄冥', '铠甲', '防御', '重甲', '护甲', '锻造', '物防', '魔防']
+  },
+  {
+    name: '神龙祝福',
+    activity: '节日庆典 / 神龙召唤活动',
+    time: '开服特定节点（如满月/百天）',
+    price: '活动专属，礼包约698-1998元',
+    review: '全服BUFF类道具，开启后为全服玩家提供属性加成，超R用于刷存在感的利器。',
+    boost: '激活后触发全服广播，同时为全服在线玩家提供一定时间的属性加成（经验/掉宝率/攻击加成）。',
+    planSuperR: '节日期间主动激活，借助全服广播刷存在感，维持服内影响力，消费本身就是目的。',
+    planBigR: '可选择性购买，主要看该节点有无竞争大R，避免被比下去。',
+    planMidR: '不建议主动购买，坐享超R/大R激活的BUFF收益即可。',
+    planSmallR: '免费享受全服BUFF，合理利用加成时段刷副本/爆宝。',
+    gsApplication: '激活时GS应立即在频道配合渲染氛围（"xxx太豪了！"/"大家快抓住BUFF时间刷副本！"），让激活者获得充分的正向反馈，巩固大R的消费意愿。',
+    gsTier: '超R专属体验，社交货币价值远大于战力价值，是维系顶级玩家荣誉感的工具。',
+    keywords: ['神龙', '祝福', 'BUFF', '全服', '广播', '节日', '加成', '经验']
+  },
 ];
 
 // Generate 60 days of calendar data
@@ -174,7 +264,7 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
       });
       setEditingEventId(null);
       setEditValues(null);
-      logUsage('calendar_edit', `Updated calendar day ${id}`, '/knowledge');
+      logUsage('calendar_edit', `Updated calendar day ${id}`);
       await loadCalendar();
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `maintenance_calendar/${id}`);
@@ -189,7 +279,6 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
       return;
     }
 
-    logUsage('search', `Searched for: ${searchQuery}`, '/knowledge');
     if (activeTab !== 'items') onTabChange('items');
 
     // 先走本地库快速响应（多词拆分 + 8字段加权评分）
@@ -233,8 +322,19 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
         }
       }
       setCozeResult(result);
+      const cozeHit = result && result !== '未找到数据' && !result.includes('暂时不可用');
+      if (localResults.length > 0 || cozeHit) {
+        logUsage('kb_search_hit', searchQuery);
+      } else {
+        logUsage('kb_search_miss', searchQuery);
+      }
     } catch (err) {
       setCozeResult('检索服务暂时不可用，请稍后重试');
+      if (localResults.length === 0) {
+        logUsage('kb_search_miss', searchQuery);
+      } else {
+        logUsage('kb_search_hit', searchQuery);
+      }
     } finally {
       setIsSearching(false);
     }

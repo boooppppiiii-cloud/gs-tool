@@ -39,6 +39,8 @@ const ACTION_LABELS: Record<string, string> = {
   advice_rating: '处置建议评分',
   simulation_msg_rating: '模拟回复评分',
   kb_item_rating: '知识库满意度',
+  kb_search_hit: '知识库命中',
+  kb_search_miss: '知识库未命中',
 };
 
 const FEATURE_CATEGORIES: Record<string, string> = {
@@ -52,6 +54,8 @@ const FEATURE_CATEGORIES: Record<string, string> = {
   case_view: '案例管理',
   delete_case: '案例管理',
   tab_switch: '导航',
+  kb_search_hit: '知识库检索',
+  kb_search_miss: '知识库检索',
 };
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#06b6d4'];
@@ -231,6 +235,8 @@ export default function AdminDashboard() {
       </div>
 
       <FeedbackSummary logs={logs} />
+
+      <KbSearchStats logs={logs} />
 
       <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -542,11 +548,72 @@ function FeedbackSummary({ logs }: { logs: UsageLog[] }) {
   );
 }
 
+function KbSearchStats({ logs }: { logs: UsageLog[] }) {
+  const hitLogs = logs.filter(l => l.action === 'kb_search_hit');
+  const missLogs = logs.filter(l => l.action === 'kb_search_miss');
+  const totalSearches = hitLogs.length + missLogs.length;
+  if (totalSearches === 0) return null;
+
+  const hitRate = Math.round((hitLogs.length / totalSearches) * 100);
+  const missTerms = [...new Set(missLogs.map(l => l.details).filter(Boolean))];
+
+  return (
+    <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
+      <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+        <BookOpen className="w-5 h-5 text-indigo-600" />
+        知识库搜索命中率
+      </h3>
+
+      <div className="flex items-center gap-6">
+        <div className="text-center">
+          <p className="text-5xl font-black tabular-nums" style={{ color: hitRate >= 70 ? '#10b981' : hitRate >= 40 ? '#f59e0b' : '#ef4444' }}>
+            {hitRate}%
+          </p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">命中率</p>
+        </div>
+        <div className="flex-1 space-y-3">
+          <div className="flex items-center gap-3">
+            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-700 shrink-0">命中</span>
+            <div className="flex-1 bg-slate-100 rounded-full h-2">
+              <div className="h-2 rounded-full bg-emerald-500 transition-all" style={{ width: `${hitRate}%` }} />
+            </div>
+            <span className="text-xs font-black text-slate-500 tabular-nums w-16 text-right">{hitLogs.length}/{totalSearches}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-rose-100 text-rose-700 shrink-0">未命中</span>
+            <div className="flex-1 bg-slate-100 rounded-full h-2">
+              <div className="h-2 rounded-full bg-rose-400 transition-all" style={{ width: `${100 - hitRate}%` }} />
+            </div>
+            <span className="text-xs font-black text-slate-500 tabular-nums w-16 text-right">{missLogs.length}/{totalSearches}</span>
+          </div>
+        </div>
+      </div>
+
+      {missTerms.length > 0 && (
+        <div className="space-y-3 pt-4 border-t border-slate-100">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">未命中搜索词（共 {missTerms.length} 个独立词条）</p>
+          <div className="flex flex-wrap gap-2">
+            {missTerms.slice(0, 30).map(term => (
+              <span key={term} className="px-3 py-1 bg-rose-50 border border-rose-100 rounded-xl text-xs font-black text-rose-600">
+                {term}
+              </span>
+            ))}
+          </div>
+          {missTerms.length > 30 && (
+            <p className="text-[10px] text-slate-400 font-bold">还有 {missTerms.length - 30} 个未显示</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function getActionColor(action: string) {
   if (action.startsWith('analysis')) return 'bg-indigo-100 text-indigo-700';
   if (action === 'login' || action === 'session_start') return 'bg-emerald-100 text-emerald-700';
   if (action === 'tab_switch') return 'bg-slate-100 text-slate-600';
-  if (action === 'search') return 'bg-amber-100 text-amber-700';
+  if (action === 'search' || action === 'kb_search_hit') return 'bg-amber-100 text-amber-700';
+  if (action === 'kb_search_miss') return 'bg-rose-100 text-rose-700';
   if (action.startsWith('delete')) return 'bg-rose-100 text-rose-700';
   if (action.startsWith('simulation')) return 'bg-purple-100 text-purple-700';
   if (action.startsWith('case')) return 'bg-blue-100 text-blue-700';
