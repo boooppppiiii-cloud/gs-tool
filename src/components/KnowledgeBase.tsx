@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Scroll, FileText, Search, Sparkles, ChevronRight, AlertTriangle, Package, Zap, Edit2, Check, X, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { logUsage } from '../services/analyticsService';
@@ -8,7 +8,6 @@ const ADMIN_EMAIL = '1463432441@qq.com';
 
 interface ItemData {
   name: string;
-  keywords: string[];
 }
 
 interface CalendarEvent {
@@ -20,17 +19,11 @@ interface CalendarEvent {
   dayNumber?: number;
 }
 
-// Item names known to exist in the Coze knowledge base — used for search matching and quick-access homepage cards.
-// Content is always fetched live from Coze; no fabricated data stored here.
-const ITEM_DATABASE: ItemData[] = [
-  { name: '麻痹戒指',  keywords: ['控制', '麻痹', 'PK', '胜率', '戒指'] },
-  { name: '圣灵披风',  keywords: ['披风', '防御', '生存', '肉', '坦克', '血量', '圣灵'] },
-  { name: '屠龙刀',    keywords: ['屠龙', '武器', '攻击', '战力', '神兵'] },
-  { name: '霸王神兽',  keywords: ['神兽', '坐骑', '霸王', '宠物', '骑乘'] },
-  { name: '魔龙套装',  keywords: ['魔龙', '套装', '副本', '打造', '材料'] },
-  { name: '金翅大鹏',  keywords: ['金翅', '大鹏', '坐骑', '速度', '飞行', '限定'] },
-  { name: '玄冥铠甲',  keywords: ['玄冥', '铠甲', '防御', '重甲', '护甲', '锻造'] },
-  { name: '神龙祝福',  keywords: ['神龙', '祝福', 'BUFF', '全服', '广播', '节日'] },
+const KB_CATEGORIES: ItemData[] = [
+  { name: '神技宝库' },
+  { name: '神秘商店' },
+  { name: '秘宝商店' },
+  { name: '祈愿宝库' },
 ];
 
 // Generate 60 days of calendar data
@@ -81,7 +74,6 @@ interface KnowledgeBaseProps {
 
 export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<ItemData[] | null>(null);
   const [cozeResult, setCozeResult] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
@@ -150,33 +142,12 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
 
   const doSearch = async (query: string) => {
     if (!query.trim()) {
-      setSearchResults(null);
       setCozeResult(null);
       return;
     }
 
     if (activeTab !== 'items') onTabChange('items');
 
-    // 本地名称+关键词快速匹配，用于呈现相关道具列表
-    const terms = query.toLowerCase().split(/[\s,，·・]+/).filter(Boolean);
-    const scored = ITEM_DATABASE.map(item => {
-      let score = 0;
-      const nameParts = item.name.split(/[·・\\/\s]+/).filter(p => p.length > 0);
-      const fields = [
-        { text: item.name, w: 10 },
-        ...nameParts.map(part => ({ text: part, w: 10 })),
-        { text: item.keywords.join(' '), w: 6 },
-      ];
-      for (const term of terms) {
-        for (const { text, w } of fields) {
-          if (text?.toLowerCase().includes(term)) score += w;
-        }
-      }
-      return { item, score };
-    }).filter(r => r.score > 0).sort((a, b) => b.score - a.score);
-    setSearchResults(scored.map(r => r.item));
-
-    // Coze 知识库检索：先用完整词搜，未命中再逐个拆分词搜索
     setIsSearching(true);
     setCozeResult('');
     try {
@@ -189,15 +160,11 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
         }
       }
       setCozeResult(result);
-      const cozeHit = result && result !== '未找到数据' && !result.includes('暂时不可用');
-      if (scored.length > 0 || cozeHit) {
-        logUsage('kb_search_hit', query);
-      } else {
-        logUsage('kb_search_miss', query);
-      }
+      const hit = result && result !== '未找到数据' && !result.includes('暂时不可用');
+      logUsage(hit ? 'kb_search_hit' : 'kb_search_miss', query);
     } catch (err) {
       setCozeResult('检索服务暂时不可用，请稍后重试');
-      logUsage(scored.length > 0 ? 'kb_search_hit' : 'kb_search_miss', query);
+      logUsage('kb_search_miss', query);
     } finally {
       setIsSearching(false);
     }
@@ -245,7 +212,7 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
 
         {activeTab === 'items' && (
           <div className="space-y-8">
-            {/* 主内容：Coze知识库直查结果 */}
+            {/* Coze检索结果 */}
             {(isSearching || cozeResult !== null) && (
               <CozeResultCard
                 query={searchQuery}
@@ -254,52 +221,33 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
               />
             )}
 
-            {searchResults ? (
-              searchResults.length > 1 ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-indigo-500 adventure-icon" />
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                      本地匹配到 {searchResults.length} 个相关道具，点击精确查询：
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {searchResults.map((item, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => { setSearchQuery(item.name); doSearch(item.name); }}
-                        className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 text-left flex items-center justify-between group"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-slate-900 group-hover:text-indigo-600 transition-all">
-                            <FileText className="w-5 h-5" />
-                          </div>
-                          <h4 className="text-lg font-black text-slate-800 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{item.name}</h4>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-slate-900 group-hover:translate-x-1 transition-all" />
-                      </button>
-                    ))}
-                  </div>
+            {/* 知识库检索目录 */}
+            {cozeResult === null && !isSearching && (
+              <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
+                <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50">
+                  <h3 className="text-base font-black text-slate-700 flex items-center gap-2 uppercase tracking-widest">
+                    <FileText className="w-4 h-4 text-indigo-600" />
+                    知识库检索目录
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium mt-1">点击分类直接查询 · 或在上方搜索框输入具体道具名称</p>
                 </div>
-              ) : null
-            ) : (
-              /* 首页快捷入口 — 仅展示道具名称和关键词标签，点击后从Coze获取真实内容 */
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {ITEM_DATABASE.map((item, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => { setSearchQuery(item.name); doSearch(item.name); }}
-                    className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 text-left group"
-                  >
-                    <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-slate-900 group-hover:text-indigo-600 transition-all mb-6 border border-slate-200">
-                      <FileText className="w-6 h-6" />
-                    </div>
-                    <h4 className="text-xl font-black text-slate-800 mb-2 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{item.name}</h4>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {item.keywords.map(k => <span key={k} className="text-[10px] px-2 py-1 bg-slate-100 text-slate-500 rounded-lg group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors border border-slate-200">#{k}</span>)}
-                    </div>
-                  </button>
-                ))}
+                <div className="divide-y divide-slate-50">
+                  {KB_CATEGORIES.map((cat, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => { setSearchQuery(cat.name); doSearch(cat.name); }}
+                      className="w-full px-8 py-5 flex items-center justify-between hover:bg-slate-50/80 transition-colors group text-left"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-8 h-8 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-400 group-hover:bg-slate-900 group-hover:text-indigo-500 transition-all border border-indigo-100">
+                          <Scroll className="w-4 h-4" />
+                        </div>
+                        <span className="text-base font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{cat.name}</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-600 group-hover:translate-x-1 transition-all" />
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
