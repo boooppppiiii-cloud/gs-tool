@@ -351,7 +351,7 @@ export default function App() {
           </div>
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-1.5 hover:bg-slate-100 rounded-lg lg:flex hidden transition-colors shrink-0"
+            className="p-1.5 hover:bg-slate-100 rounded-lg flex transition-colors shrink-0"
           >
             {isSidebarOpen ? <CloseIcon className="w-4 h-4 text-slate-400" /> : <Menu className="w-4 h-4 text-slate-400" />}
           </button>
@@ -390,7 +390,7 @@ export default function App() {
                       <button
                         key={child.id}
                         onClick={() => setSubTab(item.id, child.id)}
-                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
                           isChildActive
                             ? 'bg-amber-50 text-indigo-600'
                             : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'
