@@ -223,23 +223,6 @@ export default function App() {
     }
   };
 
-  const handleUpdatePortrait = async (profileId: string, roleName: string, portrait: { paymentHabits: string; personality: string; gameHabits: string; realLifePersona: string; summary: string }) => {
-    const profile = serverProfiles.find(p => p.id === profileId);
-    if (!profile) return;
-    const updatedPortraits = {
-      ...(profile.persistentPortraits || {}),
-      [roleName]: { ...portrait, lastUpdated: new Date().toISOString() },
-    };
-    setServerProfiles(prev => prev.map(p =>
-      p.id === profileId ? { ...p, persistentPortraits: updatedPortraits } : p
-    ));
-    try {
-      await dataService.updateServerProfile(profileId, { persistentPortraits: updatedPortraits });
-    } catch (err) {
-      console.error('[画像编辑] 保存失败', err);
-    }
-  };
-
   const handleUpdateCase = async (id: string, updates: Partial<AnalysisCase>) => {
     try {
       await dataService.updateCase(id, updates);
@@ -453,7 +436,7 @@ export default function App() {
         </header>
 
         <div className="px-8 pb-12 pt-8 overflow-y-auto flex-1">
-           {activeTab === 'home' && <HomeView serverProfiles={serverProfiles} onUpdatePortrait={handleUpdatePortrait} />}
+           {activeTab === 'home' && <HomeView serverProfiles={serverProfiles} />}
            
            {activeTab === 'server' && (
              <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-5 duration-500">

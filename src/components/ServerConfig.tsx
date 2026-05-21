@@ -20,6 +20,12 @@ interface Props {
 export default function ServerConfig({ profiles, activeProfileId, onProfilesChange, onSelectProfile, onSaveProfile, onDeleteProfile, onUpdateProfile }: Props) {
   const activeProfile = profiles.find(p => p.id === activeProfileId);
 
+  const [editingPortraitKey, setEditingPortraitKey] = React.useState<string | null>(null);
+  const [portraitEditValues, setPortraitEditValues] = React.useState<{
+    summary: string; paymentHabits: string; personality: string;
+    gameHabits: string; realLifePersona: string;
+  } | null>(null);
+
   const addProfile = () => {
     const newProfile: ServerProfile = {
       id: Date.now().toString(),
@@ -240,29 +246,113 @@ export default function ServerConfig({ profiles, activeProfileId, onProfilesChan
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
               <BookOpen className="w-3 h-3" /> 历史画像沉淀 ({Object.keys(activeProfile.persistentPortraits || {}).length})
             </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-3">
               {Object.entries(activeProfile.persistentPortraits || {}).map(([roleName, p]) => {
                 const portrait = p as any;
+                const isEditingThis = editingPortraitKey === roleName;
                 return (
-                  <div key={roleName} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between group">
-                    <div className="flex items-center gap-3">
-                      <UserCircle className="w-8 h-8 text-indigo-200" />
-                      <div>
-                        <p className="text-sm font-bold text-slate-800">{roleName}</p>
-                        <p className="text-[10px] text-slate-400">更新于 {new Date(portrait.lastUpdated).toLocaleDateString()}</p>
+                  <div key={roleName} className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
+                    {/* Header row */}
+                    <div className="p-4 flex items-center justify-between group">
+                      <div className="flex items-center gap-3">
+                        <UserCircle className="w-8 h-8 text-indigo-200 shrink-0" />
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">{roleName}</p>
+                          <p className="text-[10px] text-slate-400">更新于 {new Date(portrait.lastUpdated).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {!isEditingThis && (
+                          <button
+                            onClick={() => {
+                              setEditingPortraitKey(roleName);
+                              setPortraitEditValues({
+                                summary: portrait.summary || '',
+                                paymentHabits: portrait.paymentHabits || '',
+                                personality: portrait.personality || '',
+                                gameHabits: portrait.gameHabits || '',
+                                realLifePersona: portrait.realLifePersona || '',
+                              });
+                            }}
+                            className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
+                            title="编辑画像"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            const newPortraits = { ...activeProfile.persistentPortraits };
+                            delete newPortraits[roleName];
+                            updateProfile(activeProfile.id, { persistentPortraits: newPortraits });
+                            onUpdateProfile(activeProfile.id, { persistentPortraits: newPortraits });
+                            if (editingPortraitKey === roleName) setEditingPortraitKey(null);
+                          }}
+                          className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
+                          title="删除画像"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
-                    <button 
-                      onClick={() => {
-                        const newPortraits = { ...activeProfile.persistentPortraits };
-                        delete newPortraits[roleName];
-                        updateProfile(activeProfile.id, { persistentPortraits: newPortraits });
-                        onUpdateProfile(activeProfile.id, { persistentPortraits: newPortraits });
-                      }}
-                      className="p-2 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+
+                    {/* Inline edit form */}
+                    {isEditingThis && portraitEditValues && (
+                      <div className="px-4 pb-4 space-y-3 border-t border-slate-200">
+                        <div className="pt-3 space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">一句话总结</label>
+                          <textarea
+                            rows={2}
+                            value={portraitEditValues.summary}
+                            onChange={e => setPortraitEditValues(v => v && ({ ...v, summary: e.target.value }))}
+                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                          />
+                        </div>
+                        {([
+                          { field: 'paymentHabits' as const, label: '付费习惯' },
+                          { field: 'personality' as const,   label: '行为特征' },
+                          { field: 'gameHabits' as const,    label: '游戏偏好' },
+                          { field: 'realLifePersona' as const, label: '现实身份' },
+                        ]).map(({ field, label }) => (
+                          <div key={field} className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</label>
+                            <textarea
+                              rows={2}
+                              value={portraitEditValues[field]}
+                              onChange={e => setPortraitEditValues(v => v && ({ ...v, [field]: e.target.value }))}
+                              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                            />
+                          </div>
+                        ))}
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            onClick={() => { setEditingPortraitKey(null); setPortraitEditValues(null); }}
+                            className="px-4 py-2 text-sm font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                          >
+                            取消
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (!portraitEditValues) return;
+                              const updated = {
+                                ...activeProfile.persistentPortraits,
+                                [roleName]: {
+                                  ...portraitEditValues,
+                                  lastUpdated: new Date().toISOString(),
+                                },
+                              };
+                              updateProfile(activeProfile.id, { persistentPortraits: updated });
+                              onUpdateProfile(activeProfile.id, { persistentPortraits: updated });
+                              setEditingPortraitKey(null);
+                              setPortraitEditValues(null);
+                            }}
+                            className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
+                          >
+                            <Check className="w-3.5 h-3.5" /> 保存
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
