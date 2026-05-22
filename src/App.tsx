@@ -499,19 +499,7 @@ export default function App() {
                            <h2 className="text-3xl font-black text-slate-900 tracking-tight">分析报告已生成</h2>
                            <button onClick={() => setAnalysisResult(null)} className="px-6 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-xs hover:bg-indigo-100 transition-all">重新分析</button>
                         </div>
-                                                 <AnalysisReport 
-                           result={analysisResult} 
-                           onRemovePlayer={(roleName) => {
-                             setAnalysisResult(prev => {
-                               if (!prev) return null;
-                               return {
-                                 ...prev,
-                                 playerReports: prev.playerReports.filter(p => p.roleName !== roleName),
-                                 identifiedKeyPlayers: prev.identifiedKeyPlayers.filter(p => p !== roleName)
-                               };
-                             });
-                           }}
-                         />
+                                                 <AnalysisReport result={analysisResult} />
                      </div>
                    )}
                  </div>

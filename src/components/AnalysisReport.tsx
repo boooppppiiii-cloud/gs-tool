@@ -18,7 +18,6 @@ import {
   CheckCircle2,
   Clock,
   FileDown,
-  Trash2,
   Shield,
   Sword,
   Scroll,
@@ -38,7 +37,7 @@ interface Props {
 
 const COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 
-export default function AnalysisReport({ result: rawResult, onRemovePlayer, onUpdateReport }: Props & { onRemovePlayer: (roleName: string) => void, onUpdateReport?: (newResult: AnalysisResult) => void }) {
+export default function AnalysisReport({ result: rawResult }: Props) {
   const result: AnalysisResult = {
     ...rawResult,
     identifiedKeyPlayers: rawResult.identifiedKeyPlayers ?? [],
@@ -213,23 +212,6 @@ export default function AnalysisReport({ result: rawResult, onRemovePlayer, onUp
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xl font-bold text-slate-800">{player.roleName}</h4>
-                      <button 
-                        onClick={() => {
-                          onRemovePlayer(player.roleName);
-                          if (onUpdateReport) {
-                            const newResult = {
-                              ...result,
-                              playerReports: result.playerReports.filter(p => p.roleName !== player.roleName),
-                              identifiedKeyPlayers: result.identifiedKeyPlayers.filter(p => p !== player.roleName)
-                            };
-                            onUpdateReport(newResult);
-                          }
-                        }}
-                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
-                        title="从报告中移除"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
                     </div>
                     <p className="text-sm text-indigo-600 font-medium">专家判定：重点运营对象</p>
                   </div>
