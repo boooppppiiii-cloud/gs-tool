@@ -71,13 +71,16 @@ export default function CaseGallery({ cases, user, filter, onFilterChange, onVot
   const [isAutoEntryOpen, setIsAutoEntryOpen] = React.useState(false);
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
-  const [editForm, setEditForm] = React.useState({ 
+  const [editForm, setEditForm] = React.useState({
     title: '',
     tags: [] as string[],
     serverName: '',
     gsName: '',
     playerName: '',
+    mergeStage: '',
+    caseBackground: '',
     outburstReason: '',
+    disposalPlan: '',
     gsAction: '',
     caseResult: ''
   });
@@ -100,13 +103,16 @@ export default function CaseGallery({ cases, user, filter, onFilterChange, onVot
   const startEdit = (c: AnalysisCase, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingId(c.id);
-    setEditForm({ 
+    setEditForm({
       title: c.title,
       tags: c.tags || [],
       serverName: c.serverName,
       gsName: c.gsName || '',
       playerName: c.playerName || '',
+      mergeStage: c.mergeStage || '',
+      caseBackground: c.caseBackground || '',
       outburstReason: c.outburstReason || '',
+      disposalPlan: c.disposalPlan || '',
       gsAction: c.gsAction || '',
       caseResult: c.caseResult || ''
     });
@@ -262,202 +268,218 @@ export default function CaseGallery({ cases, user, filter, onFilterChange, onVot
             {/* Content */}
             <div className="p-6 space-y-6 flex-1">
               {editingId === c.id ? (
-                <div onClick={e => e.stopPropagation()} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div onClick={e => e.stopPropagation()} className="space-y-5">
+                  {/* 基础信息 */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">区服</p>
-                      <input 
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 ring-indigo-500"
-                        value={editForm.serverName}
-                        onChange={e => setEditForm({...editForm, serverName: e.target.value})}
-                      />
+                      <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 ring-indigo-500"
+                        value={editForm.serverName} onChange={e => setEditForm({...editForm, serverName: e.target.value})} />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">GS</p>
-                      <input 
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 ring-indigo-500"
-                        value={editForm.gsName}
-                        onChange={e => setEditForm({...editForm, gsName: e.target.value})}
-                        placeholder="GS角色名"
-                      />
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">GS角色名</p>
+                      <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 ring-indigo-500"
+                        value={editForm.gsName} onChange={e => setEditForm({...editForm, gsName: e.target.value})} placeholder="GS角色名" />
                     </div>
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">玩家</p>
-                      <input 
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 ring-indigo-500"
-                        value={editForm.playerName}
-                        onChange={e => setEditForm({...editForm, playerName: e.target.value})}
-                        placeholder="玩家角色名"
-                      />
+                      <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 ring-indigo-500"
+                        value={editForm.playerName} onChange={e => setEditForm({...editForm, playerName: e.target.value})} placeholder="玩家角色名" />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">案例类型 (多选)</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {CASE_TAGS.map(tag => (
-                          <button
-                            key={tag}
-                            onClick={() => toggleTag(tag)}
-                            className={`px-2 py-1 rounded-lg text-[9px] font-bold transition-all border ${
-                              editForm.tags.includes(tag) 
-                                ? `${TAG_COLORS[tag] || 'bg-indigo-600 border-indigo-600'} text-white shadow-sm` 
-                                : 'bg-white text-slate-400 border-slate-200 hover:border-indigo-300'
-                            }`}
-                          >
-                            {tag}
-                          </button>
-                        ))}
-                      </div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">合服阶段</p>
+                      <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 ring-indigo-500"
+                        value={editForm.mergeStage} onChange={e => setEditForm({...editForm, mergeStage: e.target.value})}>
+                        <option value="">请选择</option>
+                        <option value="新服">新服</option>
+                        <option value="双合">双合</option>
+                        <option value="三合">三合</option>
+                        <option value="多合">多合</option>
+                        <option value="其他">其他</option>
+                      </select>
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl space-y-2">
-                       <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">玩家爆发负面原因 (初步显示的内容)</p>
-                       <textarea 
-                         className="w-full bg-white border border-rose-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 ring-rose-500 h-20 resize-none shadow-sm font-medium"
-                         value={editForm.outburstReason}
-                         onChange={e => setEditForm({...editForm, outburstReason: e.target.value})}
-                       />
-                    </div>
-
-                    <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl space-y-2">
-                       <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">GS 具体处置动作</p>
-                       <textarea 
-                         className="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 ring-indigo-500 h-24 resize-none shadow-sm"
-                         value={editForm.gsAction}
-                         onChange={e => setEditForm({...editForm, gsAction: e.target.value})}
-                       />
-                    </div>
-
-                    <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl space-y-2">
-                       <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">案例结果</p>
-                       <textarea 
-                         className="w-full bg-white border border-emerald-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 ring-emerald-500 h-20 resize-none shadow-sm"
-                         value={editForm.caseResult}
-                         onChange={e => setEditForm({...editForm, caseResult: e.target.value})}
-                       />
+                  {/* 案例类型 */}
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">案例类型（多选）</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {CASE_TAGS.map(tag => (
+                        <button key={tag} onClick={() => toggleTag(tag)}
+                          className={`px-2 py-1 rounded-lg text-[9px] font-bold transition-all border ${
+                            editForm.tags.includes(tag)
+                              ? `${TAG_COLORS[tag] || 'bg-indigo-600 border-indigo-600'} text-white shadow-sm`
+                              : 'bg-white text-slate-400 border-slate-200 hover:border-indigo-300'
+                          }`}>
+                          {tag}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                    <button 
-                      onClick={() => setEditingId(null)} 
-                      className="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-300 transition-all active:scale-95"
-                    >
+                  {/* 案例背景 */}
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">案例背景</p>
+                    <textarea className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 ring-indigo-500 h-20 resize-none font-medium"
+                      value={editForm.caseBackground} onChange={e => setEditForm({...editForm, caseBackground: e.target.value})} placeholder="简要描述案例背景..." />
+                  </div>
+
+                  {/* 负面触发点 */}
+                  <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl space-y-2">
+                    <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">负面触发点（卡片预览内容）</p>
+                    <textarea className="w-full bg-white border border-rose-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 ring-rose-500 h-20 resize-none font-medium"
+                      value={editForm.outburstReason} onChange={e => setEditForm({...editForm, outburstReason: e.target.value})} />
+                  </div>
+
+                  {/* 处置策略 */}
+                  <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-2">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">处置策略</p>
+                    <textarea className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 ring-indigo-500 h-20 resize-none font-medium"
+                      value={editForm.disposalPlan} onChange={e => setEditForm({...editForm, disposalPlan: e.target.value})} />
+                  </div>
+
+                  {/* 具体处置动作 */}
+                  <div className="p-4 bg-amber-50 border-2 border-amber-200 rounded-2xl space-y-2">
+                    <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">具体处置动作（重点）</p>
+                    <textarea className="w-full bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 ring-amber-400 h-28 resize-none font-medium"
+                      value={editForm.gsAction} onChange={e => setEditForm({...editForm, gsAction: e.target.value})} />
+                  </div>
+
+                  {/* 案例结果评估 */}
+                  <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl space-y-2">
+                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">案例结果评估</p>
+                    <textarea className="w-full bg-white border border-emerald-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 ring-emerald-500 h-20 resize-none font-medium"
+                      value={editForm.caseResult} onChange={e => setEditForm({...editForm, caseResult: e.target.value})} />
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+                    <button onClick={() => setEditingId(null)}
+                      className="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-300 transition-all active:scale-95">
                       取消修改
                     </button>
-                    <button 
-                      onClick={(e) => handleSaveEdit(c.id, e)} 
-                      className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"
-                    >
+                    <button onClick={(e) => handleSaveEdit(c.id, e)}
+                      className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95">
                       提交更新
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {/* Summary view fields */}
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest leading-none flex items-center gap-2">
-                      <Sparkles className="w-3 h-3" /> 玩家爆发负面原因
-                    </p>
-                    <div className={`p-4 bg-rose-50 border border-rose-100 rounded-2xl text-xs text-rose-700 font-bold leading-relaxed ${expandedId === c.id ? '' : 'line-clamp-3'}`}>
-                      {toStr(c.outburstReason) || '暂无说明'}
-                    </div>
-                  </div>
+                <div className="space-y-5">
+                  {/* 折叠预览 */}
+                  {expandedId !== c.id && (
+                    <>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest leading-none flex items-center gap-2">
+                          <Sparkles className="w-3 h-3" /> 负面触发点
+                        </p>
+                        <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-xs text-rose-700 font-bold leading-relaxed line-clamp-3">
+                          {toStr(c.outburstReason) || '暂无说明'}
+                        </div>
+                      </div>
+                      <div className="pt-2 flex justify-end">
+                        <span className="text-[10px] font-bold text-indigo-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                          查看完整案例 <Share2 className="w-3 h-3" />
+                        </span>
+                      </div>
+                    </>
+                  )}
 
-                  {/* Expanded fields */}
+                  {/* 展开详情 */}
                   {expandedId === c.id && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-slate-100 animate-in slide-in-from-top-4 duration-500">
-                      <div className="space-y-6">
-                        <section className="space-y-4">
-                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">基础信息</h4>
-                          <div className="grid grid-cols-2 gap-4">
-                             <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">区服</p>
-                                <p className="text-xs font-bold text-slate-800">{c.serverName}</p>
-                             </div>
-                             <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">GS</p>
-                                <p className="text-xs font-bold text-slate-800">{c.gsName || '系统默认'}</p>
-                             </div>
-                             <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">玩家</p>
-                                <p className="text-xs font-bold text-slate-800">{c.playerName || '匿名玩家'}</p>
-                             </div>
-                             <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">入库时间</p>
-                                <p className="text-xs font-bold text-slate-800">{new Date(c.timestamp).toLocaleDateString()}</p>
-                             </div>
-                          </div>
-                        </section>
+                    <div className="space-y-5 pt-2 border-t border-slate-100 animate-in slide-in-from-top-4 duration-500">
+                      {/* 基础信息 */}
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <span className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700">
+                          区服：{c.serverName}
+                        </span>
+                        <span className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700">
+                          GS：{c.gsName || '系统默认'}
+                        </span>
+                        <span className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700">
+                          玩家：{c.playerName || '匿名'}
+                        </span>
+                        {c.mergeStage && (
+                          <span className="px-3 py-1.5 bg-amber-50 border border-amber-100 rounded-xl font-bold text-amber-700">
+                            合服阶段：{c.mergeStage}
+                          </span>
+                        )}
+                        <span className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-400">
+                          {new Date(c.timestamp).toLocaleDateString()}
+                        </span>
+                      </div>
 
-                        {c.context && c.context.length > 0 && (
-                          <section className="space-y-4">
-                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center justify-between">
-                              溯源上下文
-                              <Clock className="w-3 h-3 text-slate-300" />
-                            </h4>
-                            <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 max-h-[300px] overflow-y-auto">
-                              {c.context.map((msg, midx) => (
-                                <div key={midx} className="space-y-1">
-                                  <div className="flex items-center justify-between gap-2">
-                                     <span className={`text-[10px] font-bold ${msg.roleName === c.playerName ? 'text-indigo-600' : 'text-slate-400'}`}>{msg.roleName}</span>
-                                     <span className="text-[9px] text-slate-300 font-medium tracking-tighter">{msg.time}</span>
-                                  </div>
-                                  <div className={`p-3 rounded-2xl text-xs leading-relaxed ${msg.roleName === c.playerName ? 'bg-white border border-slate-200' : 'bg-slate-200/50 text-slate-600'}`}>
-                                    {msg.content}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </section>
+                      {/* 案例背景 */}
+                      {c.caseBackground && (
+                        <div className="space-y-1.5">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">案例背景</p>
+                          <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm text-slate-600 leading-relaxed">
+                            {toStr(c.caseBackground)}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 负面触发点 */}
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">负面触发点</p>
+                        <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-sm text-rose-800 font-medium leading-relaxed">
+                          {toStr(c.outburstReason) || '暂无说明'}
+                        </div>
+                        {c.triggerPoint && (
+                          <div className="p-4 bg-orange-50 border border-orange-100 rounded-2xl text-sm text-orange-900 font-medium leading-relaxed">
+                            {toStr(c.triggerPoint)}
+                          </div>
                         )}
                       </div>
 
-                      <div className="space-y-6">
-                        <section className="space-y-4">
-                           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">分析与处置</h4>
-                           <div className="space-y-4">
-                             {c.triggerPoint && (
-                               <div className="p-4 bg-orange-50 border border-orange-100 rounded-2xl">
-                                 <p className="text-[10px] font-bold text-orange-400 uppercase mb-2">负面触发点</p>
-                                 <p className="text-sm text-orange-900 font-medium leading-relaxed">
-                                   {toStr(c.triggerPoint)}
-                                 </p>
-                               </div>
-                             )}
-                             <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl">
-                               <p className="text-[10px] font-bold text-indigo-400 uppercase mb-2 text-indigo-600 font-black">GS具体处置动作</p>
-                               <p className="text-sm text-slate-700 leading-relaxed font-bold">
-                                 {toStr(c.gsAction) || '未填写'}
-                               </p>
-                             </div>
-                             {c.disposalPlan && (
-                               <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-                                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">GS 处置方案详情</p>
-                                 <p className="text-xs text-slate-600 leading-relaxed">
-                                   {toStr(c.disposalPlan)}
-                                 </p>
-                               </div>
-                             )}
-                             <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl">
-                               <p className="text-[10px] font-bold text-emerald-400 uppercase mb-2">案例结果</p>
-                               <p className="text-sm text-slate-700 leading-relaxed font-medium">
-                                 {toStr(c.caseResult) || '跟进中'}
-                               </p>
-                             </div>
-                           </div>
-                        </section>
-                      </div>
-                    </div>
-                  )}
+                      {/* 溯源上下文 */}
+                      {c.context && c.context.length > 0 && (
+                        <div className="space-y-1.5">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <MessageSquare className="w-3 h-3" /> 溯源上下文
+                          </p>
+                          <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100 max-h-60 overflow-y-auto">
+                            {c.context.map((msg, midx) => (
+                              <div key={midx} className="space-y-0.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className={`text-[9px] font-bold ${msg.roleName === c.playerName ? 'text-indigo-600' : 'text-slate-400'}`}>{msg.roleName}</span>
+                                  <span className="text-[9px] text-slate-300">{msg.time}</span>
+                                </div>
+                                <div className={`p-2.5 rounded-xl text-xs leading-relaxed ${msg.roleName === c.playerName ? 'bg-white border border-slate-200' : 'bg-slate-200/50 text-slate-600'}`}>
+                                  {msg.content}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
-                  {!expandedId && (
-                    <div className="pt-4 flex justify-end">
-                       <span className="text-[10px] font-bold text-indigo-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                         详情全部内容 <Share2 className="w-3 h-3" rotate={90} />
-                       </span>
+                      {/* 处置策略 */}
+                      {c.disposalPlan && (
+                        <div className="space-y-1.5">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">处置策略</p>
+                          <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm text-slate-700 leading-relaxed">
+                            {toStr(c.disposalPlan)}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 具体处置动作（重点） */}
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest flex items-center gap-2">
+                          <Zap className="w-3 h-3" /> 具体处置动作
+                        </p>
+                        <div className="p-5 bg-amber-50 border-2 border-amber-200 rounded-2xl text-sm text-slate-800 font-bold leading-relaxed whitespace-pre-line">
+                          {toStr(c.gsAction) || '未填写'}
+                        </div>
+                      </div>
+
+                      {/* 案例结果评估 */}
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">案例结果评估</p>
+                        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-sm text-slate-700 leading-relaxed font-medium">
+                          {toStr(c.caseResult) || '跟进中'}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

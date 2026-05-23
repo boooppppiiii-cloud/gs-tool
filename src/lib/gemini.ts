@@ -99,6 +99,7 @@ ${rechargeData}
 - 视角要求（强制）：以区服内老玩家身份与其交流，自然、真实、有人情味。
 - 严禁客服腔：禁止"亲爱的玩家"、"感谢您的支持"、"我们会积极优化"等官方话术。
 - 参考背景信息中 GS 人设与区服生态，确保语气风格符合角色设定。
+- 每条负面爆发须生成：title（15字内案例标题）、tags（1-3个关键标签）、mergeStage（从聊天推断合服阶段，无法推断填"未知"）、caseBackground（3-5句话案例背景）、gsAdvice.resultEvaluation（预期处置效果）、gsAdvice.resultTags（1-2个结果标签，如"付费转化"、"流失挽回"、"关系维护"等）。
 
 ## 任务五：充值分析（仅基于 Sheet2 充值数据）
 - 逐行累加每位玩家充值金额，GS账号跳过。
@@ -122,15 +123,21 @@ ${rechargeData}
       },
       "negativeOutbursts": [
         {
+          "title": "案例标题（15字内）",
+          "tags": ["标签1", "标签2"],
+          "mergeStage": "从聊天推断合服阶段，无法推断填'未知'",
+          "caseBackground": "3-5句话概述案例背景（仅基于聊天数据，不推测）",
           "trigger": "爆发负面的详细原因（仅基于聊天内容）",
           "triggerPoint": "具体触发点（结合游戏机制归因）",
           "context": [
             { "roleName": "发言人", "content": "原文消息内容", "time": "原文时间戳，无则填'原文无时间戳'" }
           ],
           "gsAdvice": {
-            "action": "具体引导动作",
+            "action": "具体引导动作（分步列举，每步以序号开头）",
             "reason": "原因分析",
-            "disposalPlan": "处置方案（如参考案例须注明来源）"
+            "disposalPlan": "处置策略（分步骤说明整体思路）",
+            "resultEvaluation": "预期处置效果或可能的案例结果",
+            "resultTags": ["结果标签1", "结果标签2"]
           }
         }
       ]
@@ -167,6 +174,11 @@ ${rechargeData}
       negativeOutbursts: (p.negativeOutbursts ?? []).map((o: any) => ({
         ...o,
         context: o.context ?? [],
+        tags: o.tags ?? [],
+        gsAdvice: {
+          ...o.gsAdvice,
+          resultTags: o.gsAdvice?.resultTags ?? [],
+        },
       })),
     })),
     rechargeReport: {

@@ -53,11 +53,13 @@ export default function AutoEntryModal({ isOpen, onClose, user, onSuccess }: Pro
 ${text}
 
 必须严格返回 JSON 对象（不要 markdown 包裹），包含字段：
-- title: 案例一句话简述
-- core_scenario: 触发事件的核心场景或玩家语录
+- title: 案例一句话简述（15字内）
+- merge_stage: 从文本中提取合服阶段（如新服、双合、三合、多合），无法提取则填""
+- case_background: 从文本中提取案例背景（3-5句话，无则填""）
+- core_scenario: 触发事件的核心场景或玩家语录（即负面触发点）
 - player_portrait: 玩家心理剖析
-- gs_discourse: GS的具体介入身份与话术
-- reusable_strategy: 可复用策略总结`;
+- gs_discourse: GS的具体介入身份与话术（即具体处置动作，分步骤描述）
+- reusable_strategy: 可复用策略总结（即处置策略）`;
 
       const res = await fetch('/api/gemini/chat/completions', {
         method: 'POST',
@@ -88,6 +90,8 @@ ${text}
         serverName: '批量录入',
         gsName: 'AI 专家',
         playerName: '案例玩家',
+        mergeStage: toStr(result.merge_stage),
+        caseBackground: toStr(result.case_background),
         outburstReason: toStr(result.core_scenario),
         triggerPoint: toStr(result.player_portrait),
         context: [],

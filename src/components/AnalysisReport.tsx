@@ -244,123 +244,158 @@ export default function AnalysisReport({ result: rawResult }: Props) {
         </h3>
 
         <div className="space-y-8 text-neutral-900">
-          {result.playerReports.map((player) => 
-            player.negativeOutbursts.map((outburst, idx) => (
-              <div key={`${player.roleName}-${idx}`} className="bg-white border border-slate-200 rounded-[40px] overflow-hidden shadow-sm hover:shadow-md transition-all">
-                <div className="px-8 py-5 bg-rose-50 border-b border-rose-100 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <AlertTriangle className="w-5 h-5 text-rose-600 adventure-icon" />
-                    <span className="font-black text-rose-900 uppercase tracking-tight">{player.roleName} - {outburst.trigger}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 bg-rose-200 text-rose-700 text-[10px] font-bold rounded-full uppercase tracking-tighter shadow-sm">
-                      负面状态捕获
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8 bg-slate-50/50">
-                  {/* WeChat Bubbles */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <MessageSquare className="w-3 h-3" /> 溯源上下文 (IM 原始记录)
-                      </p>
-                      <span className="text-[10px] text-slate-400 font-medium italic">最近 3-5 条相关对话回溯</span>
-                    </div>
-                    <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-                      {outburst.context.map((msg, midx) => (
-                        <div key={midx} className={`flex ${msg.roleName === player.roleName ? 'justify-start' : 'justify-end'} gap-3 items-start`}>
-                          <div className={`max-w-[85%] space-y-1 ${msg.roleName === player.roleName ? 'items-start' : 'items-end'}`}>
-                            <div className="flex items-center gap-2 px-1">
-                              <span className="text-[10px] text-slate-400 font-bold tracking-tighter">{msg.time}</span>
-                            </div>
-                            <div className={`p-4 rounded-3xl text-sm leading-relaxed shadow-sm relative ${
-                              msg.roleName === player.roleName 
-                                ? 'bg-white border border-slate-100 rounded-tl-none text-slate-800' 
-                                : 'bg-indigo-600 text-white rounded-tr-none'
-                            }`}>
-                              <p>{msg.content}</p>
-                              {msg.roleName === player.roleName && (
-                                <div className="absolute -left-2 top-0 w-2 h-2 bg-white border-l border-t border-slate-100 -rotate-45" />
-                              )}
-                              {msg.roleName !== player.roleName && (
-                                <div className="absolute -right-2 top-0 w-2 h-2 bg-indigo-600 -rotate-45" />
-                              )}
-                            </div>
-                          </div>
+          {result.playerReports.map((player) =>
+            player.negativeOutbursts.map((outburst, idx) => {
+              const ratingKey = `${player.roleName}-${idx}`;
+              const rated = adviceRatings[ratingKey];
+              return (
+                <div key={`${player.roleName}-${idx}`} className="bg-white border border-slate-200 rounded-[40px] overflow-hidden shadow-sm hover:shadow-md transition-all">
+                  {/* ── 标题 + 标签 ── */}
+                  <div className="px-8 py-6 bg-rose-50 border-b border-rose-100">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 adventure-icon" />
+                          <h4 className="text-lg font-black text-slate-900 leading-snug">
+                            {outburst.title ?? outburst.trigger}
+                          </h4>
                         </div>
-                      ))}
+                        {outburst.tags && outburst.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pl-6">
+                            {outburst.tags.map(tag => (
+                              <span key={tag} className="px-2.5 py-0.5 bg-rose-200 text-rose-700 text-[10px] font-black rounded-full uppercase tracking-tight">
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <span className="px-3 py-1 bg-rose-200 text-rose-700 text-[10px] font-bold rounded-full uppercase tracking-tighter shadow-sm shrink-0">
+                        负面状态捕获
+                      </span>
                     </div>
                   </div>
 
-                  {/* GS Advice */}
-                  <div className="flex flex-col gap-6">
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                        <Activity className="w-3 h-3" /> 负面触发点归因
+                  <div className="p-8 space-y-6">
+                    {/* ── 基础信息 ── */}
+                    <div className="flex flex-wrap items-center gap-3 text-sm">
+                      <span className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700">
+                        <UserCheck className="w-3.5 h-3.5 text-indigo-400" /> 玩家：{player.roleName}
+                      </span>
+                      {outburst.mergeStage && outburst.mergeStage !== '未知' && (
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-100 rounded-xl font-bold text-amber-700">
+                          合服阶段：{outburst.mergeStage}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* ── 案例背景 ── */}
+                    {outburst.caseBackground && (
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">案例背景</p>
+                        <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                          <p className="text-sm text-slate-600 leading-relaxed">{outburst.caseBackground}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── 负面触发点 + 溯源上下文 ── */}
+                    <div className="space-y-3">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <Activity className="w-3 h-3" /> 负面触发点
                       </p>
                       <div className="p-4 bg-orange-50 border border-orange-100 rounded-2xl">
-                         <p className="text-sm text-orange-900 font-medium leading-relaxed">
-                           {outburst.triggerPoint}
-                         </p>
+                        <p className="text-sm text-orange-900 font-medium leading-relaxed">{outburst.triggerPoint}</p>
+                      </div>
+
+                      {outburst.context.length > 0 && (
+                        <div className="space-y-3 mt-3">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <MessageSquare className="w-3 h-3" /> 溯源上下文
+                          </p>
+                          <div className="space-y-3 max-h-60 overflow-y-auto bg-slate-50/60 rounded-2xl p-4 border border-slate-100">
+                            {outburst.context.map((msg, midx) => (
+                              <div key={midx} className={`flex ${msg.roleName === player.roleName ? 'justify-start' : 'justify-end'} gap-2 items-start`}>
+                                <div className={`max-w-[80%] space-y-0.5 ${msg.roleName === player.roleName ? '' : 'items-end'}`}>
+                                  <div className="flex items-center gap-2 px-1">
+                                    <span className="text-[9px] text-slate-400 font-bold">{msg.roleName}</span>
+                                    <span className="text-[9px] text-slate-300">{msg.time}</span>
+                                  </div>
+                                  <div className={`p-3 rounded-2xl text-xs leading-relaxed ${
+                                    msg.roleName === player.roleName
+                                      ? 'bg-white border border-slate-100 text-slate-800'
+                                      : 'bg-indigo-600 text-white'
+                                  }`}>
+                                    {msg.content}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── 处置策略 ── */}
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">处置策略</p>
+                      <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                        <p className="text-sm text-slate-700 leading-relaxed">{outburst.gsAdvice.disposalPlan}</p>
                       </div>
                     </div>
 
-                    <div className="flex-1 bg-white p-6 rounded-2xl border border-indigo-100 shadow-sm space-y-6">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">核心动作推荐</span>
-                          {(() => {
-                            const ratingKey = `${player.roleName}-${idx}`;
-                            const rated = adviceRatings[ratingKey];
-                            return (
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => rateAdvice(ratingKey, 'up', player.roleName, outburst.trigger)}
-                                  className={`p-1 rounded-lg transition-colors ${rated === 'up' ? 'text-emerald-600 bg-emerald-50' : rated ? 'text-slate-200' : 'text-slate-300 hover:text-emerald-500 hover:bg-emerald-50'}`}
-                                  disabled={!!rated}
-                                  title="这条建议有用"
-                                >
-                                  <ThumbsUp className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => rateAdvice(ratingKey, 'down', player.roleName, outburst.trigger)}
-                                  className={`p-1 rounded-lg transition-colors ${rated === 'down' ? 'text-rose-600 bg-rose-50' : rated ? 'text-slate-200' : 'text-slate-300 hover:text-rose-500 hover:bg-rose-50'}`}
-                                  disabled={!!rated}
-                                  title="这条建议没用"
-                                >
-                                  <ThumbsDown className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                        <div className="p-4 bg-indigo-50 border-l-4 border-l-indigo-600 rounded-r-xl text-indigo-800 font-bold">
-                          {outburst.gsAdvice.action}
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest uppercase">GS 处置方案</span>
-                        <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
-                          <p className="text-sm text-slate-700 leading-relaxed font-bold">
-                            {outburst.gsAdvice.disposalPlan}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">专家归因分析</span>
-                        <p className="text-sm text-slate-500 leading-relaxed italic">
-                          {outburst.gsAdvice.reason}
+                    {/* ── 具体处置动作（重点显示）── */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest flex items-center gap-2">
+                          <Zap className="w-3 h-3" /> 具体处置动作
                         </p>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => rateAdvice(ratingKey, 'up', player.roleName, outburst.trigger)}
+                            className={`p-1 rounded-lg transition-colors ${rated === 'up' ? 'text-emerald-600 bg-emerald-50' : rated ? 'text-slate-200' : 'text-slate-300 hover:text-emerald-500 hover:bg-emerald-50'}`}
+                            disabled={!!rated}
+                            title="这条建议有用"
+                          >
+                            <ThumbsUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => rateAdvice(ratingKey, 'down', player.roleName, outburst.trigger)}
+                            className={`p-1 rounded-lg transition-colors ${rated === 'down' ? 'text-rose-600 bg-rose-50' : rated ? 'text-slate-200' : 'text-slate-300 hover:text-rose-500 hover:bg-rose-50'}`}
+                            disabled={!!rated}
+                            title="这条建议没用"
+                          >
+                            <ThumbsDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="p-5 bg-amber-50 border-2 border-amber-200 rounded-2xl">
+                        <p className="text-sm text-slate-800 leading-relaxed font-bold whitespace-pre-line">{outburst.gsAdvice.action}</p>
+                      </div>
+                    </div>
+
+                    {/* ── 案例结果评估 ── */}
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">案例结果评估</p>
+                      <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl space-y-3">
+                        <p className="text-sm text-slate-700 leading-relaxed">
+                          {outburst.gsAdvice.resultEvaluation ?? outburst.gsAdvice.reason}
+                        </p>
+                        {outburst.gsAdvice.resultTags && outburst.gsAdvice.resultTags.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {outburst.gsAdvice.resultTags.map(tag => (
+                              <span key={tag} className="px-2.5 py-0.5 bg-emerald-200 text-emerald-800 text-[10px] font-black rounded-full">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </section>
