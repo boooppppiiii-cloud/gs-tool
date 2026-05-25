@@ -141,7 +141,13 @@ async function startServer() {
       if (!response.ok) return res.status(safeStatus).json({ error: rawText });
       const data = JSON.parse(rawText);
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      res.json({ choices: [{ message: { content: text, role: 'assistant' } }] });
+      res.json({
+        choices: [{ message: { content: text, role: 'assistant' } }],
+        usage: {
+          prompt_tokens: data.usageMetadata?.promptTokenCount ?? 0,
+          completion_tokens: data.usageMetadata?.candidatesTokenCount ?? 0,
+        },
+      });
     } catch (err) {
       console.error('[Gemini] 网络错误:', err);
       if (!res.headersSent) res.status(502).json({ error: 'Gemini 代理请求失败', detail: String(err) });

@@ -1,6 +1,7 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle2, Clock, ChevronDown, ChevronRight, ServerCrash, Archive, Layers, BookOpen } from 'lucide-react';
-import { ServerProfile, MonthHistory, AnalysisCase, ExecutionRecord } from '../types';
+import { AlertTriangle, CheckCircle2, Clock, ChevronDown, ChevronRight, ServerCrash, Archive, Layers, BookOpen, X } from 'lucide-react';
+import { ServerProfile, MonthHistory, AnalysisCase, ExecutionRecord, PlayerBehaviorReport } from '../types';
+import PortraitTableCard from './PortraitTableCard';
 
 interface Props {
   serverProfiles: ServerProfile[];
@@ -36,6 +37,7 @@ const STATUS_STYLES = {
 
 export default function HomeView({ serverProfiles, history, cases, executionRecords, dismissedOutbursts = [], onTicketClick }: Props) {
   const [expandedEcology, setExpandedEcology] = React.useState<string | null>(null);
+  const [expandedPortrait, setExpandedPortrait] = React.useState<PlayerBehaviorReport | null>(null);
 
   const tickets: FlatTicket[] = React.useMemo(() => {
     const flat: FlatTicket[] = [];
@@ -70,7 +72,7 @@ export default function HomeView({ serverProfiles, history, cases, executionReco
   const doneCount = tickets.filter(t => getTicketStatus(t) === '已完成').length;
 
   const profilesWithEcology = serverProfiles.filter(p => p.serverEcology);
-  const recentCases = cases.slice(0, 6);
+  const recentCases = cases.filter(c => c.isPublic).slice(0, 6);
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 pb-12">
@@ -129,6 +131,42 @@ export default function HomeView({ serverProfiles, history, cases, executionReco
                 {expandedEcology === profile.id && (
                   <div className="px-5 pb-4 border-t border-slate-100 bg-slate-50/40">
                     <p className="text-sm text-slate-600 leading-relaxed pt-3">{profile.serverEcology}</p>
+                    {(() => {
+                      const allRecords = history.flatMap(m => m.records);
+                      const latestRecord = allRecords
+                        .filter(r => (r.serverConfig as any)?.name === profile.name || (r.serverConfig as any)?.id === profile.id)
+                        .sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0];
+                      const portraits = (latestRecord?.result?.playerReports ?? [])
+                        .filter(p => p.portraitTable?.isKeyPlayer);
+                      if (portraits.length === 0) return null;
+                      return (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">重点玩家画像 ({portraits.length} 人)</p>
+                          {portraits.map(p => {
+                            const pt = p.portraitTable!;
+                            return (
+                              <button key={p.roleName} onClick={() => setExpandedPortrait(p)}
+                                className="w-full text-left bg-white border border-slate-200 rounded-xl p-3 space-y-1.5 hover:border-indigo-300 hover:bg-indigo-50/20 transition-colors">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-black text-slate-800 text-sm">{p.roleName}</span>
+                                    <span className="text-[9px] font-black px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full border border-amber-200">重点玩家</span>
+                                  </div>
+                                  <span className="text-xs font-black text-indigo-600">{Math.round(pt.overallCompletion * 100)}%</span>
+                                </div>
+                                <p className="text-xs text-slate-500 line-clamp-2 italic">{p.portrait.summary || '暂无总结'}</p>
+                                <div className="flex items-center gap-4 text-xs">
+                                  <span className="text-slate-500">累计充值：<span className="font-bold text-indigo-600">¥{pt.basicData.totalRecharge.toLocaleString()}</span></span>
+                                  {pt.basicData.anomalySignals && pt.basicData.anomalySignals !== '无' && (
+                                    <span className="text-rose-500 font-medium">⚠ {pt.basicData.anomalySignals}</span>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -196,7 +234,7 @@ export default function HomeView({ serverProfiles, history, cases, executionReco
         {recentCases.length === 0 ? (
           <div className="text-center py-12 text-slate-400">
             <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
-            <p className="text-sm font-medium">暂无案例，前往优秀案例库查看或新建</p>
+            <p className="text-sm font-medium">暂无优秀案例，等待组长将案例转为优秀案例后显示</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -216,6 +254,23 @@ export default function HomeView({ serverProfiles, history, cases, executionReco
           </div>
         )}
       </div>
+
+      {expandedPortrait && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => setExpandedPortrait(null)}>
+          <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-8"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <p className="text-lg font-black text-slate-900">玩家画像详情</p>
+              <button onClick={() => setExpandedPortrait(null)}
+                className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+            <PortraitTableCard player={expandedPortrait} onUpdatePortrait={undefined} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

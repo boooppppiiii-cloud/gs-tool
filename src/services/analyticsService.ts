@@ -1,6 +1,6 @@
 import { db } from '../lib/firebase';
 
-interface UsageLog {
+export interface UsageLog {
   id: string;
   userId: string;
   username: string;
@@ -8,17 +8,21 @@ interface UsageLog {
   details: string;
   path: string;
   timestamp: string;
+  group?: string;
   chatCount?: number;
   negativeCount?: number;
   keyPlayerCount?: number;
   sessionDuration?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  apiLatencyMs?: number;
+  uploadedChatRows?: number;
+  uploadedRechargeRows?: number;
 }
-
-const STORAGE_KEY = 'gs_analytics';
-const MAX_LOGS = 2000;
 
 let _sessionStart: number | null = null;
 let _currentUser: { id: string; username: string } | null = null;
+let _currentGroup: string | null = null;
 
 export function initAnalyticsUser(uid: string, username: string) {
   _currentUser = { id: uid, username };
@@ -26,15 +30,24 @@ export function initAnalyticsUser(uid: string, username: string) {
   logUsage('session_start', `Session started for ${username}`);
 }
 
-function loadLogs(): UsageLog[] {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+export function setAnalyticsGroup(group: string) {
+  _currentGroup = group;
 }
 
-function saveLogs(logs: UsageLog[]): void {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(logs)); } catch (e) { console.error('[Analytics] 写入失败', e); }
-}
-
-export function logUsage(action: string, details: string = '', chatCount?: number, negativeCount?: number, keyPlayerCount?: number) {
+export function logUsage(
+  action: string,
+  details: string = '',
+  chatCount?: number,
+  negativeCount?: number,
+  keyPlayerCount?: number,
+  extra?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    apiLatencyMs?: number;
+    uploadedChatRows?: number;
+    uploadedRechargeRows?: number;
+  }
+) {
   try {
     const id = `log_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const log: UsageLog = {
@@ -45,30 +58,30 @@ export function logUsage(action: string, details: string = '', chatCount?: numbe
       details,
       path: window.location.pathname,
       timestamp: new Date().toISOString(),
+      ...(_currentGroup !== null && { group: _currentGroup }),
       ...(chatCount !== undefined && { chatCount }),
       ...(negativeCount !== undefined && { negativeCount }),
       ...(keyPlayerCount !== undefined && { keyPlayerCount }),
       ...(_sessionStart !== null && { sessionDuration: Date.now() - _sessionStart }),
+      ...(extra?.inputTokens !== undefined && { inputTokens: extra.inputTokens }),
+      ...(extra?.outputTokens !== undefined && { outputTokens: extra.outputTokens }),
+      ...(extra?.apiLatencyMs !== undefined && { apiLatencyMs: extra.apiLatencyMs }),
+      ...(extra?.uploadedChatRows !== undefined && { uploadedChatRows: extra.uploadedChatRows }),
+      ...(extra?.uploadedRechargeRows !== undefined && { uploadedRechargeRows: extra.uploadedRechargeRows }),
     };
-    const logs = loadLogs();
-    logs.unshift(log);
-    if (logs.length > MAX_LOGS) logs.length = MAX_LOGS;
-    saveLogs(logs);
-    // 异步上云（fire-and-forget，失败静默）
-    db.collection('usage_logs').doc(log.id).set(log).catch(() => {});
+
+    (db.collection('usage_logs') as any).add({ _id: id, ...log }).catch((e: unknown) => {
+      console.error('[Analytics] 云端写入失败', e);
+    });
   } catch (e) {
     console.error('[Analytics] 记录失败', e);
   }
 }
 
-export function getAnalyticsLogs(): UsageLog[] {
-  return loadLogs();
-}
-
 export async function fetchAllAnalyticsLogs(): Promise<UsageLog[]> {
   const res = await db.collection('usage_logs')
     .orderBy('timestamp', 'desc')
-    .limit(500)
+    .limit(1000)
     .get();
   return (res.data || []) as UsageLog[];
 }

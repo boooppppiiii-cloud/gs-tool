@@ -21,7 +21,7 @@ export interface RechargeRecord {
 export interface ServerProfile {
   id: string;
   name: string;
-  keyPlayers: string[];
+  keyPlayers?: string[];
   openingDate: string;
   mergeStage?: string;
   gsName?: string;
@@ -67,6 +67,7 @@ export interface ExecutionRecord {
   updatedAt: string;
   ownerId: string;
   group?: string;
+  caseContent?: string;
 }
 
 export interface ServerContext extends ServerProfile {}
@@ -87,6 +88,7 @@ export interface AnalysisResult {
   rechargeReport: RechargeReport;
   serverEcology: string; // AI generated ecology summary
   gsCommunicationReports?: GsCommunicationReport[];
+  _usage?: { inputTokens: number; outputTokens: number };
 }
 
 export interface PortraitItem {

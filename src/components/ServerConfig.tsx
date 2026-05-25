@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Server, Users, Calendar, Plus, X, Trash2, Edit2, Check, ChevronRight, UserCircle, Map, Search, BookOpen, Clock } from 'lucide-react';
+import { Server, Calendar, Plus, X, Trash2, Edit2, Check, ChevronRight, UserCircle, Map, Search, Clock } from 'lucide-react';
 import { ServerProfile } from '../types';
 
 interface Props {
@@ -19,12 +19,6 @@ interface Props {
 
 export default function ServerConfig({ profiles, activeProfileId, onProfilesChange, onSelectProfile, onSaveProfile, onDeleteProfile, onUpdateProfile }: Props) {
   const activeProfile = profiles.find(p => p.id === activeProfileId);
-
-  const [editingPortraitKey, setEditingPortraitKey] = React.useState<string | null>(null);
-  const [portraitEditValues, setPortraitEditValues] = React.useState<{
-    summary: string; paymentHabits: string; personality: string;
-    gameHabits: string; realLifePersona: string;
-  } | null>(null);
 
   const addProfile = () => {
     const newProfile: ServerProfile = {
@@ -258,126 +252,6 @@ export default function ServerConfig({ profiles, activeProfileId, onProfilesChan
             </div>
           </div>
           
-          <div className="pt-6 border-t border-slate-100 space-y-4">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <BookOpen className="w-3 h-3" /> 历史画像沉淀 ({Object.keys(activeProfile.persistentPortraits || {}).length})
-            </label>
-            <div className="space-y-3">
-              {Object.entries(activeProfile.persistentPortraits || {}).map(([roleName, p]) => {
-                const portrait = p as any;
-                const isEditingThis = editingPortraitKey === roleName;
-                return (
-                  <div key={roleName} className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
-                    {/* Header row */}
-                    <div className="p-4 flex items-center justify-between group">
-                      <div className="flex items-center gap-3">
-                        <UserCircle className="w-8 h-8 text-indigo-200 shrink-0" />
-                        <div>
-                          <p className="text-sm font-bold text-slate-800">{roleName}</p>
-                          <p className="text-[10px] text-slate-400">更新于 {new Date(portrait.lastUpdated).toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {!isEditingThis && (
-                          <button
-                            onClick={() => {
-                              setEditingPortraitKey(roleName);
-                              setPortraitEditValues({
-                                summary: portrait.summary || '',
-                                paymentHabits: portrait.paymentHabits || '',
-                                personality: portrait.personality || '',
-                                gameHabits: portrait.gameHabits || '',
-                                realLifePersona: portrait.realLifePersona || '',
-                              });
-                            }}
-                            className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
-                            title="编辑画像"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => {
-                            const newPortraits = { ...activeProfile.persistentPortraits };
-                            delete newPortraits[roleName];
-                            updateProfile(activeProfile.id, { persistentPortraits: newPortraits });
-                            onUpdateProfile(activeProfile.id, { persistentPortraits: newPortraits });
-                            if (editingPortraitKey === roleName) setEditingPortraitKey(null);
-                          }}
-                          className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
-                          title="删除画像"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Inline edit form */}
-                    {isEditingThis && portraitEditValues && (
-                      <div className="px-4 pb-4 space-y-3 border-t border-slate-200">
-                        <div className="pt-3 space-y-1.5">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">一句话总结</label>
-                          <textarea
-                            rows={2}
-                            value={portraitEditValues.summary}
-                            onChange={e => setPortraitEditValues(v => v && ({ ...v, summary: e.target.value }))}
-                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
-                          />
-                        </div>
-                        {([
-                          { field: 'paymentHabits' as const, label: '付费习惯' },
-                          { field: 'personality' as const,   label: '行为特征' },
-                          { field: 'gameHabits' as const,    label: '游戏偏好' },
-                          { field: 'realLifePersona' as const, label: '现实身份' },
-                        ]).map(({ field, label }) => (
-                          <div key={field} className="space-y-1.5">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</label>
-                            <textarea
-                              rows={2}
-                              value={portraitEditValues[field]}
-                              onChange={e => setPortraitEditValues(v => v && ({ ...v, [field]: e.target.value }))}
-                              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
-                            />
-                          </div>
-                        ))}
-                        <div className="flex gap-2 pt-1">
-                          <button
-                            onClick={() => { setEditingPortraitKey(null); setPortraitEditValues(null); }}
-                            className="px-4 py-2 text-sm font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                          >
-                            取消
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (!portraitEditValues) return;
-                              const updated = {
-                                ...activeProfile.persistentPortraits,
-                                [roleName]: {
-                                  ...portraitEditValues,
-                                  lastUpdated: new Date().toISOString(),
-                                },
-                              };
-                              updateProfile(activeProfile.id, { persistentPortraits: updated });
-                              onUpdateProfile(activeProfile.id, { persistentPortraits: updated });
-                              setEditingPortraitKey(null);
-                              setPortraitEditValues(null);
-                            }}
-                            className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
-                          >
-                            <Check className="w-3.5 h-3.5" /> 保存
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {Object.keys(activeProfile.persistentPortraits || {}).length === 0 && (
-                <p className="text-[10px] text-slate-400 italic">暂无历史画像沉淀</p>
-              )}
-            </div>
-          </div>
-
           <div className="pt-6 mt-6 border-t-2 border-dashed border-slate-100">
             <button 
               onClick={() => {
@@ -394,102 +268,8 @@ export default function ServerConfig({ profiles, activeProfileId, onProfilesChan
             </p>
           </div>
           
-          <div className="space-y-4">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <Users className="w-3 h-3" /> 手动重点关注玩家 ({activeProfile.keyPlayers.length})
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                id="new-player-input"
-                placeholder="输入玩家角色名..."
-                className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    const input = e.currentTarget;
-                    const val = input.value.trim();
-                    if (val && !activeProfile.keyPlayers.includes(val)) {
-                      const newPlayers = [...activeProfile.keyPlayers, val];
-                      updateProfile(activeProfile.id, { keyPlayers: newPlayers });
-                      onUpdateProfile(activeProfile.id, { keyPlayers: newPlayers });
-                      input.value = '';
-                    }
-                  }
-                }}
-              />
-              <button 
-                onClick={() => {
-                  const input = document.getElementById('new-player-input') as HTMLInputElement;
-                  const val = input.value.trim();
-                  if (val && !activeProfile.keyPlayers.includes(val)) {
-                    const newPlayers = [...activeProfile.keyPlayers, val];
-                    updateProfile(activeProfile.id, { keyPlayers: newPlayers });
-                    onUpdateProfile(activeProfile.id, { keyPlayers: newPlayers });
-                    input.value = '';
-                  }
-                }}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold shadow-sm hover:bg-indigo-700 transition-all"
-              >
-                添加
-              </button>
-            </div>
-            
-            <div className="flex flex-wrap gap-2">
-              {activeProfile.keyPlayers.map(player => (
-                <div key={player} className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 group">
-                  {player}
-                  <button 
-                    onClick={() => {
-                      const newPlayers = activeProfile.keyPlayers.filter(p => p !== player);
-                      updateProfile(activeProfile.id, { keyPlayers: newPlayers });
-                      onUpdateProfile(activeProfile.id, { keyPlayers: newPlayers });
-                    }}
-                    className="p-0.5 hover:bg-rose-100 hover:text-rose-600 rounded transition-colors"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-              {activeProfile.keyPlayers.length === 0 && (
-                <p className="text-[10px] text-slate-400 italic">暂无手动添加的重点玩家</p>
-              )}
-            </div>
-          </div>
-
-          <div className="pt-4 mt-4 border-t border-slate-100">
-             <div className="flex items-center gap-2 text-indigo-600">
-                <Sparkles className="w-4 h-4" />
-                <span className="text-xs font-bold">重点玩家将由 AI 自动扫描识别</span>
-             </div>
-             <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
-               系统会自动根据聊天活跃、充值权重及言论倾向筛选出 Top 1-3 的重点玩家进行深度分析。
-             </p>
-          </div>
         </div>
       )}
     </div>
-  );
-}
-
-function Sparkles(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
-      <path d="M5 3v4" />
-      <path d="M19 17v4" />
-      <path d="M3 5h4" />
-      <path d="M17 19h4" />
-    </svg>
   );
 }

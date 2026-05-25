@@ -35,7 +35,7 @@ ${gsAdviceAction}
   "rating": "综合评级，只能是以下四者之一：优/良/需改进/存在问题"
 }`;
 
-  const content = await chatCompletion([{ role: 'user', content: prompt }], true);
+  const { content } = await chatCompletion([{ role: 'user', content: prompt }], true);
   const raw = JSON.parse(content);
   return {
     summary: raw.summary ?? '',
@@ -80,7 +80,7 @@ ${params.disposalPlan || '（无）'}
   "reflection": "复盘反思：下次遇到类似情况可以改进的点，100字以内"
 }`;
 
-  const content = await chatCompletion([{ role: 'user', content: prompt }], true);
+  const { content } = await chatCompletion([{ role: 'user', content: prompt }], true);
   const raw = JSON.parse(content);
   return {
     title: raw.title ?? '',
@@ -90,7 +90,10 @@ ${params.disposalPlan || '（无）'}
   };
 }
 
-async function chatCompletion(messages: { role: string; content: string }[], jsonMode = false): Promise<string> {
+async function chatCompletion(
+  messages: { role: string; content: string }[],
+  jsonMode = false
+): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
   const res = await fetch('/api/gemini/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -108,7 +111,11 @@ async function chatCompletion(messages: { role: string; content: string }[], jso
     throw new Error(`Gemini API 错误: ${res.status} ${err.slice(0, 200)}`);
   }
   const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? '';
+  return {
+    content: data.choices?.[0]?.message?.content ?? '',
+    inputTokens: data.usage?.prompt_tokens ?? 0,
+    outputTokens: data.usage?.completion_tokens ?? 0,
+  };
 }
 
 export async function analyzeGameEcology(
@@ -366,12 +373,13 @@ GS角色名已在背景信息中标注（"角色名:xxx"），以此识别GS在�
 }
 `;
 
-  const content = await chatCompletion(
+  const { content, inputTokens, outputTokens } = await chatCompletion(
     [{ role: 'user', content: prompt }],
     true
   );
   const raw = JSON.parse(content);
   return {
+    _usage: { inputTokens, outputTokens },
     identifiedKeyPlayers: raw.identifiedKeyPlayers ?? [],
     playerReports: (raw.playerReports ?? []).map((p: any) => {
       const pt = p.portraitTable;

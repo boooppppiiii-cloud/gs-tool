@@ -5,8 +5,10 @@ import {
   CheckCircle2, Clock, Server, RefreshCw, MessageSquare, Zap, Activity,
   Shield, Users, Check, X, ThumbsDown,
 } from 'lucide-react';
-import { User as UserType, ExecutionRecord, LeaderReview, HistoryRecord, ServerProfile, AnalysisCase } from '../types';
+import { User as UserType, ExecutionRecord, LeaderReview, HistoryRecord, ServerProfile, AnalysisCase, PlayerBehaviorReport } from '../types';
 import * as dataService from '../lib/dataService';
+import { logUsage } from '../services/analyticsService';
+import PortraitTableCard from './PortraitTableCard';
 import { qualityCheckExecution } from '../lib/gemini';
 
 interface Props {
@@ -278,6 +280,7 @@ function DashboardTab({ profiles, history, execRecords, dismissedOutbursts, onDi
   const gsNames = [...new Set(profiles.map(p => p.gsName).filter(Boolean))] as string[];
   const [selectedGs, setSelectedGs] = React.useState(gsNames[0] ?? '');
   const [expandedServer, setExpandedServer] = React.useState<string | null>(null);
+  const [expandedPortrait, setExpandedPortrait] = React.useState<PlayerBehaviorReport | null>(null);
 
   const gsProfiles = profiles.filter(p => p.gsName === selectedGs);
 
@@ -372,7 +375,7 @@ function DashboardTab({ profiles, history, execRecords, dismissedOutbursts, onDi
                         .slice()
                         .sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0];
                       const keyPlayerPortraits = (latestHistory?.result?.playerReports ?? [])
-                        .filter(p => p.portraitTable?.isKeyPlayer || (profile.keyPlayers ?? []).includes(p.roleName));
+                        .filter(p => p.portraitTable?.isKeyPlayer);
                       if (keyPlayerPortraits.length === 0) return null;
                       return (
                         <div>
@@ -381,59 +384,25 @@ function DashboardTab({ profiles, history, execRecords, dismissedOutbursts, onDi
                           </p>
                           <div className="grid grid-cols-1 gap-2">
                             {keyPlayerPortraits.map(p => {
-                              const pt = p.portraitTable;
+                              const pt = p.portraitTable!;
                               return (
-                                <div key={p.roleName} className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+                                <button key={p.roleName} onClick={() => setExpandedPortrait(p)}
+                                  className="w-full text-left bg-white border border-slate-200 rounded-xl p-3 space-y-1.5 hover:border-indigo-300 hover:bg-indigo-50/20 transition-colors">
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                       <span className="font-black text-slate-800 text-sm">{p.roleName}</span>
-                                      {pt?.isKeyPlayer && (
-                                        <span className="text-[9px] font-black px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full border border-amber-200">
-                                          重点玩家
-                                        </span>
-                                      )}
+                                      <span className="text-[9px] font-black px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full border border-amber-200">重点玩家</span>
                                     </div>
-                                    {pt && (
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="text-[10px] text-slate-400">画像完成度</span>
-                                        <span className="text-xs font-black text-indigo-600">{Math.round(pt.overallCompletion * 100)}%</span>
-                                      </div>
+                                    <span className="text-xs font-black text-indigo-600">{Math.round(pt.overallCompletion * 100)}%</span>
+                                  </div>
+                                  <p className="text-xs text-slate-500 line-clamp-2 italic">{p.portrait.summary || '暂无总结'}</p>
+                                  <div className="flex items-center gap-4 text-xs">
+                                    <span className="text-slate-500">累计充值：<span className="font-bold text-indigo-600">¥{pt.basicData.totalRecharge.toLocaleString()}</span></span>
+                                    {pt.basicData.anomalySignals && pt.basicData.anomalySignals !== '无' && (
+                                      <span className="text-rose-500 font-medium">⚠ {pt.basicData.anomalySignals}</span>
                                     )}
                                   </div>
-                                  <p className="text-xs text-slate-600 leading-relaxed line-clamp-2 italic">
-                                    {p.portrait.summary || '暂无画像总结'}
-                                  </p>
-                                  {pt && (
-                                    <div className="flex items-center gap-4 text-xs">
-                                      <span className="text-slate-500">
-                                        累计充值：<span className="font-bold text-indigo-600">¥{pt.basicData.totalRecharge.toLocaleString()}</span>
-                                      </span>
-                                      {pt.basicData.anomalySignals && pt.basicData.anomalySignals !== '无' && (
-                                        <span className="text-rose-500 font-medium">⚠ {pt.basicData.anomalySignals}</span>
-                                      )}
-                                    </div>
-                                  )}
-                                  {pt && pt.dimensions.length > 0 && (
-                                    <div className="flex gap-2 flex-wrap">
-                                      {pt.dimensions.map(dim => (
-                                        <div key={dim.name} className="flex items-center gap-1">
-                                          <span className="text-[9px] text-slate-400">
-                                            {dim.name.replace(/^维度[一二三四五六七八九十]：/, '')}
-                                          </span>
-                                          <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                            <div
-                                              className="h-full bg-indigo-400 rounded-full"
-                                              style={{ width: `${Math.round(dim.completionRate * 100)}%` }}
-                                            />
-                                          </div>
-                                          <span className="text-[9px] text-indigo-500 font-bold">
-                                            {Math.round(dim.completionRate * 100)}%
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
+                                </button>
                               );
                             })}
                           </div>
@@ -467,6 +436,23 @@ function DashboardTab({ profiles, history, execRecords, dismissedOutbursts, onDi
               </div>
             );
           })}
+        </div>
+      )}
+
+      {expandedPortrait && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => setExpandedPortrait(null)}>
+          <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-8"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <p className="text-lg font-black text-slate-900">玩家画像详情</p>
+              <button onClick={() => setExpandedPortrait(null)}
+                className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+            <PortraitTableCard player={expandedPortrait} onUpdatePortrait={undefined} />
+          </div>
         </div>
       )}
     </div>
@@ -830,6 +816,21 @@ function ArchiveTab({ execRecords, history, profiles, userId, onRefresh }: {
   );
 }
 
+const CASE_TAGS = [
+  '区服矛盾调解', '大R负面解决', '大R预流失挽回', '付费活动引导',
+  '系统自动提取', '其他价值案例', '跨部门协作', '1-15天维护思路', '对抗号维护思路',
+];
+
+const CASE_FIELD_LABELS: Record<string, string> = {
+  title: '案例标题',
+  outburstReason: '玩家负面原因',
+  triggerPoint: '负面触发点',
+  caseBackground: '案例背景',
+  gsAction: 'GS处置动作',
+  disposalPlan: '处置方案',
+  caseResult: '案例结果',
+};
+
 const ArchiveCard = React.memo(function ArchiveCard({ record, histRecord, profile, isExpanded, onToggle, userId, onRefresh }: {
   record: ExecutionRecord;
   histRecord?: HistoryRecord & { userId: string };
@@ -839,9 +840,14 @@ const ArchiveCard = React.memo(function ArchiveCard({ record, histRecord, profil
   userId: string;
   onRefresh: () => void;
 }) {
-  const [aiCase, setAiCase] = React.useState<Partial<AnalysisCase> | null>(null);
+  const preloadedCase = React.useMemo(() => {
+    if (!record.caseContent) return null;
+    try { return JSON.parse(record.caseContent) as Partial<AnalysisCase>; } catch { return null; }
+  }, [record.caseContent]);
+
+  const [caseData, setCaseData] = React.useState<Partial<AnalysisCase> | null>(preloadedCase);
+  const [editTags, setEditTags] = React.useState<string[]>(preloadedCase?.tags ?? []);
   const [aiLoading, setAiLoading] = React.useState(false);
-  const [rating, setRating] = React.useState<'转为优秀案例' | '差案例复盘' | '不收录'>('转为优秀案例');
   const [archiving, setArchiving] = React.useState(false);
   const [archived, setArchived] = React.useState(false);
 
@@ -880,6 +886,7 @@ AI建议处置动作：${outburst?.ob.gsAdvice?.action ?? '未知'}
   "tags": ["标签1", "标签2"],
   "outburstReason": "玩家负面原因（50字内）",
   "triggerPoint": "负面触发点（30字内）",
+  "caseBackground": "案例背景（100字内，描述事件发生的背景）",
   "gsAction": "GS处置动作总结（100字内）",
   "disposalPlan": "处置策略总结（80字内）",
   "caseResult": "案例结果评估（50字内）"
@@ -891,38 +898,46 @@ AI建议处置动作：${outburst?.ob.gsAdvice?.action ?? '未知'}
       });
       const data = await res.json();
       const raw = JSON.parse(data.choices?.[0]?.message?.content ?? '{}');
-      setAiCase(raw);
+      setCaseData(raw);
+      setEditTags(raw.tags ?? []);
     } catch (e) { console.error(e); } finally { setAiLoading(false); }
   };
 
-  const handleArchive = async () => {
+  const handleArchive = async (asExcellent: boolean) => {
     setArchiving(true);
-    if (aiCase && rating !== '不收录') {
+    if (asExcellent && caseData) {
       const newCase: AnalysisCase = {
         id: `case_archive_${Date.now()}`,
-        title: aiCase.title ?? record.outburstTitle,
-        tags: aiCase.tags ?? [],
+        title: caseData.title ?? record.outburstTitle,
+        tags: editTags,
         serverName: record.serverProfileName,
         gsName: profile?.gsName ?? '',
         playerName: record.playerName,
         mergeStage: profile?.mergeStage,
-        outburstReason: aiCase.outburstReason ?? '',
-        triggerPoint: aiCase.triggerPoint ?? '',
+        caseBackground: caseData.caseBackground,
+        outburstReason: caseData.outburstReason ?? '',
+        triggerPoint: caseData.triggerPoint ?? '',
         context: outburst?.ob.context ?? [],
-        gsAction: aiCase.gsAction ?? '',
-        disposalPlan: aiCase.disposalPlan ?? '',
-        caseResult: aiCase.caseResult ?? '',
+        gsAction: caseData.gsAction ?? '',
+        disposalPlan: caseData.disposalPlan ?? '',
+        caseResult: caseData.caseResult ?? '',
         timestamp: new Date().toISOString(),
         views: 0, likes: 0, votedUserIds: [],
-        isPublic: rating === '转为优秀案例',
+        isPublic: true,
         ownerId: userId,
       };
       await dataService.saveManualCase(newCase);
+      logUsage('case_saved', `组长归档案例: ${newCase.title}`);
     }
     await dataService.updateExecutionRecord(record.id, { submissionStatus: '已完成' });
+    logUsage('ticket_review_complete', `工单结案: ${record.id}`);
     setArchived(true);
     setArchiving(false);
     onRefresh();
+  };
+
+  const toggleTag = (tag: string) => {
+    setEditTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
   };
 
   if (archived) return null;
@@ -947,8 +962,9 @@ AI建议处置动作：${outburst?.ob.gsAdvice?.action ?? '未知'}
               {record.description || '（无描述）'}
             </p>
           </Section>
-          <Section title="AI 生成完整案例">
-            {!aiCase ? (
+
+          <Section title="整合案例内容">
+            {!caseData ? (
               <button onClick={handleGenerateCase} disabled={aiLoading}
                 className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-40 transition-colors">
                 {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -956,30 +972,57 @@ AI建议处置动作：${outburst?.ob.gsAdvice?.action ?? '未知'}
               </button>
             ) : (
               <div className="space-y-3">
-                {Object.entries(aiCase).map(([k, v]) => (
-                  <div key={k}>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{k}</p>
-                    <p className="text-sm text-slate-700 bg-white border border-slate-200 rounded-xl px-4 py-2.5">{Array.isArray(v) ? v.join('、') : String(v)}</p>
-                  </div>
-                ))}
+                {(Object.keys(CASE_FIELD_LABELS) as (keyof typeof CASE_FIELD_LABELS)[]).map(k => {
+                  const v = (caseData as any)[k];
+                  if (!v) return null;
+                  return (
+                    <div key={k}>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{CASE_FIELD_LABELS[k]}</p>
+                      <p className="text-sm text-slate-700 bg-white border border-slate-200 rounded-xl px-4 py-2.5 leading-relaxed">{String(v)}</p>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </Section>
-          <Section title="案例定级">
-            <div className="space-y-3">
-              <select value={rating} onChange={e => setRating(e.target.value as any)}
-                className="px-3 py-2 text-sm font-semibold border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                <option value="转为优秀案例">转为优秀案例（公开）</option>
-                <option value="差案例复盘">差案例复盘（私有）</option>
-                <option value="不收录">不收录</option>
-              </select>
-              <button onClick={handleArchive} disabled={archiving || (!aiCase && rating !== '不收录')}
-                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-40 transition-colors shadow-lg shadow-emerald-100">
-                {archiving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                确认归档
-              </button>
-            </div>
-          </Section>
+
+          {caseData && (
+            <Section title="案例标签">
+              <div className="flex flex-wrap gap-2">
+                {CASE_TAGS.map(tag => (
+                  <button
+                    key={tag}
+                    onClick={() => toggleTag(tag)}
+                    className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+                      editTags.includes(tag)
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </Section>
+          )}
+
+          <div className="flex gap-3 pt-1">
+            <button
+              onClick={() => handleArchive(true)}
+              disabled={archiving || !caseData}
+              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-40 transition-colors shadow-lg shadow-emerald-100"
+            >
+              {archiving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              转为优秀案例
+            </button>
+            <button
+              onClick={() => handleArchive(false)}
+              disabled={archiving}
+              className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200 disabled:opacity-40 transition-colors"
+            >
+              不收录
+            </button>
+          </div>
         </div>
       )}
     </div>

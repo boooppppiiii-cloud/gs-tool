@@ -29,7 +29,7 @@ import HomeView from './components/HomeView';
 import KnowledgeBase from './components/KnowledgeBase';
 import ProfileView from './components/ProfileView';
 import Login from './components/Login';
-import AdminDashboard from './components/AdminDashboard';
+import AdminPortal from './components/AdminPortal';
 import PortalSelector from './components/PortalSelector';
 import LeaderPortal from './components/LeaderPortal';
 import { ServerProfile, ChatRecord, RechargeRecord, AnalysisResult, MonthHistory, HistoryRecord, AnalysisCase, User, ExecutionRecord, LeaderReview } from './types';
@@ -38,7 +38,7 @@ import { analyzeGameEcology } from './lib/gemini';
 import { auth } from './lib/firebase';
 import * as dataService from './lib/dataService';
 import { syncFromCloud } from './lib/dataService';
-import { logUsage, initAnalyticsUser } from './services/analyticsService';
+import { logUsage, initAnalyticsUser, setAnalyticsGroup } from './services/analyticsService';
 
 const ADMIN_EMAIL = '1463432441@qq.com';
 
@@ -101,6 +101,7 @@ export default function App() {
       const saved = localStorage.getItem(`member_group_${user.id}`);
       const group = saved && PRESET_GROUPS.includes(saved) ? saved : PRESET_GROUPS[0];
       setMemberGroup(group);
+      setAnalyticsGroup(group);
       // Ensure all existing records are tagged and synced to cloud on login
       dataService.setMemberGroupAndTagRecords(user.id, group);
     }
@@ -108,6 +109,7 @@ export default function App() {
   const handleGroupChange = (g: string) => {
     if (!user) return;
     setMemberGroup(g);
+    setAnalyticsGroup(g);
     localStorage.setItem(`member_group_${user.id}`, g);
     // Retag all records with new group and push to cloud
     dataService.setMemberGroupAndTagRecords(user.id, g);
@@ -235,7 +237,11 @@ export default function App() {
 
     setIsAnalyzing(true);
     setError(null);
-    logUsage('analysis_start', `Analyzing ${activeProfile.name}`);
+    logUsage('analysis_start', `Analyzing ${activeProfile.name}`, undefined, undefined, undefined, {
+      uploadedChatRows: chatData.length,
+      uploadedRechargeRows: rechargeData.length,
+    });
+    const _analysisStartTime = Date.now();
 
     try {
       const gsPersonaStr = activeProfile.gsPersona ? 
@@ -267,7 +273,13 @@ export default function App() {
       setCurrentHistoryId(null);
       const negativeCount = result.playerReports?.reduce((sum, r) => sum + (r.negativeOutbursts?.length || 0), 0) ?? 0;
       const keyPlayerCount = result.identifiedKeyPlayers?.length ?? 0;
-      logUsage('analysis_complete', `${activeProfile.name} 分析完成`, chatData.length, negativeCount, keyPlayerCount);
+      logUsage('analysis_complete', `${activeProfile.name} 分析完成`, chatData.length, negativeCount, keyPlayerCount, {
+        inputTokens: result._usage?.inputTokens,
+        outputTokens: result._usage?.outputTokens,
+        apiLatencyMs: Date.now() - _analysisStartTime,
+        uploadedChatRows: chatData.length,
+        uploadedRechargeRows: rechargeData.length,
+      });
 
       // Update persistent portraits and ecology
       let updatedProfile: ServerProfile | null = null;
@@ -422,11 +434,15 @@ export default function App() {
   }
 
   if (!activePortal) {
-    return <PortalSelector user={user} onSelect={handleSelectPortal} />;
+    return <PortalSelector user={user} isAdmin={isAdmin} onSelect={handleSelectPortal} />;
   }
 
   if (activePortal === 'admin') {
-    return <PlaceholderPortal portal="admin" user={user} onSwitchPortal={handleSwitchPortal} onLogout={handleLogout} />;
+    if (!isAdmin) {
+      setActivePortal(null);
+      return null;
+    }
+    return <AdminPortal user={user} onSwitchPortal={handleSwitchPortal} onLogout={handleLogout} />;
   }
 
   if (activePortal === 'leader') {
@@ -639,34 +655,8 @@ export default function App() {
                                      for (const rec of records) {
                                        await dataService.saveExecutionRecord({ ...rec, ownerId: user?.id ?? '' });
                                      }
+                                     logUsage('ticket_created', `创建工单 ${records.length} 条`);
                                      await loadUserData();
-                                   }}
-                                   onSaveCase={async (draft) => {
-                                     const activeProfile = serverProfiles.find(p => p.id === activeProfileId);
-                                     const id = `case_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                                     const newCase: AnalysisCase = {
-                                       id,
-                                       title: draft.title ?? '待完善案例',
-                                       tags: draft.tags ?? ['AI辅助整合'],
-                                       serverName: draft.serverName ?? activeProfile?.name ?? '',
-                                       gsName: draft.gsName ?? activeProfile?.gsName ?? '',
-                                       playerName: draft.playerName ?? '',
-                                       mergeStage: draft.mergeStage,
-                                       caseBackground: draft.caseBackground,
-                                       outburstReason: draft.outburstReason ?? '',
-                                       triggerPoint: draft.triggerPoint ?? '',
-                                       context: draft.context ?? [],
-                                       gsAction: draft.gsAction ?? '',
-                                       disposalPlan: draft.disposalPlan ?? '',
-                                       caseResult: draft.caseResult ?? '',
-                                       timestamp: new Date().toISOString(),
-                                       views: 0, likes: 0, votedUserIds: [],
-                                       isPublic: false,
-                                       ownerId: user!.id,
-                                     };
-                                     await dataService.saveManualCase(newCase);
-                                     const updated = await dataService.fetchCases(user!.id);
-                                     setCases(updated);
                                    }}
                                    onUpdatePortrait={(roleName, updates) => {
                                      const activeProfile = serverProfiles.find(p => p.id === activeProfileId);

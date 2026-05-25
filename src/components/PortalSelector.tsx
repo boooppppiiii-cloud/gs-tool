@@ -4,6 +4,7 @@ import { User } from '../types';
 
 interface Props {
   user: User;
+  isAdmin: boolean;
   onSelect: (portal: 'admin' | 'leader' | 'member') => void;
 }
 
@@ -49,7 +50,7 @@ const portals: {
   },
 ];
 
-export default function PortalSelector({ user, onSelect }: Props) {
+export default function PortalSelector({ user, isAdmin, onSelect }: Props) {
   const [hovered, setHovered] = React.useState<string | null>(null);
 
   return (
@@ -71,52 +72,64 @@ export default function PortalSelector({ user, onSelect }: Props) {
 
         {/* Portal Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {portals.map((p) => (
-            <button
-              key={p.id}
-              onMouseEnter={() => setHovered(p.id)}
-              onMouseLeave={() => setHovered(null)}
-              onClick={() => onSelect(p.id)}
-              className={`group relative text-left p-8 rounded-[28px] border-2 transition-all duration-200 focus:outline-none ${
-                hovered === p.id
-                  ? `${p.bg} ${p.border} shadow-xl -translate-y-1`
-                  : 'bg-white border-slate-200 shadow-sm hover:shadow-md'
-              }`}
-            >
-              {/* Icon */}
-              <div
-                className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-all duration-200 ${
-                  hovered === p.id ? `${p.bg} ${p.color}` : 'bg-slate-100 text-slate-400'
+          {portals.map((p) => {
+            const locked = p.id === 'admin' && !isAdmin;
+            return (
+              <button
+                key={p.id}
+                onMouseEnter={() => !locked && setHovered(p.id)}
+                onMouseLeave={() => setHovered(null)}
+                onClick={() => !locked && onSelect(p.id)}
+                disabled={locked}
+                className={`group relative text-left p-8 rounded-[28px] border-2 transition-all duration-200 focus:outline-none ${
+                  locked
+                    ? 'bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed'
+                    : hovered === p.id
+                    ? `${p.bg} ${p.border} shadow-xl -translate-y-1`
+                    : 'bg-white border-slate-200 shadow-sm hover:shadow-md'
                 }`}
               >
-                {p.icon}
-              </div>
+                {/* Icon */}
+                <div
+                  className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-all duration-200 ${
+                    locked
+                      ? 'bg-slate-100 text-slate-300'
+                      : hovered === p.id
+                      ? `${p.bg} ${p.color}`
+                      : 'bg-slate-100 text-slate-400'
+                  }`}
+                >
+                  {p.icon}
+                </div>
 
-              {/* Text */}
-              <div className="space-y-2 mb-6">
-                <h3 className={`text-2xl font-black transition-colors ${hovered === p.id ? p.color : 'text-slate-800'}`}>
-                  {p.label}
-                </h3>
-                <p className="text-sm font-bold text-slate-500">{p.desc}</p>
-                <p className="text-xs text-slate-400 leading-relaxed">{p.sub}</p>
-              </div>
+                {/* Text */}
+                <div className="space-y-2 mb-6">
+                  <h3 className={`text-2xl font-black transition-colors ${locked ? 'text-slate-400' : hovered === p.id ? p.color : 'text-slate-800'}`}>
+                    {p.label}
+                  </h3>
+                  <p className="text-sm font-bold text-slate-500">{locked ? '权限不足' : p.desc}</p>
+                  <p className="text-xs text-slate-400 leading-relaxed">{locked ? '仅超级管理员可访问此端口' : p.sub}</p>
+                </div>
 
-              {/* Arrow */}
-              <div
-                className={`flex items-center gap-1 text-xs font-bold transition-all ${
-                  hovered === p.id ? `${p.color} translate-x-1` : 'text-slate-300'
-                }`}
-              >
-                进入端口
-                <ChevronRight className="w-4 h-4" />
-              </div>
+                {/* Arrow */}
+                {!locked && (
+                  <div
+                    className={`flex items-center gap-1 text-xs font-bold transition-all ${
+                      hovered === p.id ? `${p.color} translate-x-1` : 'text-slate-300'
+                    }`}
+                  >
+                    进入端口
+                    <ChevronRight className="w-4 h-4" />
+                  </div>
+                )}
 
-              {/* Active indicator line */}
-              {hovered === p.id && (
-                <div className={`absolute bottom-0 left-8 right-8 h-0.5 rounded-full ${p.bg} border-b-2 ${p.border}`} />
-              )}
-            </button>
-          ))}
+                {/* Active indicator line */}
+                {hovered === p.id && !locked && (
+                  <div className={`absolute bottom-0 left-8 right-8 h-0.5 rounded-full ${p.bg} border-b-2 ${p.border}`} />
+                )}
+              </button>
+            );
+          })}
         </div>
 
         <p className="text-center text-xs text-slate-300 mt-10 font-medium">

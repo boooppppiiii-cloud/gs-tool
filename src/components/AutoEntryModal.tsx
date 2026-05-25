@@ -3,6 +3,7 @@ import { X, Upload, Sparkles, FileText, Loader2, CheckCircle2, AlertTriangle as 
 import { motion, AnimatePresence } from 'motion/react';
 import { AnalysisCase, User } from '../types';
 import * as dataService from '../lib/dataService';
+import { logUsage } from '../services/analyticsService';
 
 interface Props {
   isOpen: boolean;
@@ -107,6 +108,7 @@ ${text}
       };
 
       await dataService.saveManualCase(newCase);
+      logUsage('case_saved', `自动录入案例: ${newCase.title}`);
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : '处理过程中发生错误');

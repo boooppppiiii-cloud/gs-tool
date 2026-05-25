@@ -1,27 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { getAnalyticsLogs, fetchAllAnalyticsLogs } from '../services/analyticsService';
+import { fetchAllAnalyticsLogs, UsageLog } from '../services/analyticsService';
 import { cloudFetchAll, testCloudWrite } from '../lib/cloudSync';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
   LineChart, Line,
   PieChart, Pie, Legend,
 } from 'recharts';
-import { Shield, Activity, Clock, Zap, MousePointer2, TrendingUp, PieChart as PieChartIcon, MessageSquare, AlertTriangle, Users, ThumbsUp, ThumbsDown, BookOpen, Database, RefreshCw, CheckCircle2, BarChart2 } from 'lucide-react';
+import {
+  Shield, Activity, Clock, Zap, MousePointer2, TrendingUp, PieChart as PieChartIcon,
+  MessageSquare, AlertTriangle, Users, ThumbsUp, ThumbsDown, BookOpen, Database,
+  RefreshCw, CheckCircle2, BarChart2, DollarSign, Cpu,
+} from 'lucide-react';
 import { AnalysisCase, ExecutionRecord, HistoryRecord, LeaderReview } from '../types';
-
-interface UsageLog {
-  id: string;
-  userId: string;
-  username: string;
-  action: string;
-  details: string;
-  path: string;
-  timestamp: string;
-  chatCount?: number;
-  negativeCount?: number;
-  keyPlayerCount?: number;
-  sessionDuration?: number;
-}
 
 const ACTION_LABELS: Record<string, string> = {
   session_start: '会话开始',
@@ -43,6 +33,9 @@ const ACTION_LABELS: Record<string, string> = {
   kb_item_rating: '知识库满意度',
   kb_search_hit: '知识库命中',
   kb_search_miss: '知识库未命中',
+  ticket_created: '工单创建',
+  ticket_review_complete: '工单结案',
+  case_saved: '案例上传',
 };
 
 const FEATURE_CATEGORIES: Record<string, string> = {
@@ -55,12 +48,19 @@ const FEATURE_CATEGORIES: Record<string, string> = {
   case_vote: '案例管理',
   case_view: '案例管理',
   delete_case: '案例管理',
+  case_saved: '案例管理',
   tab_switch: '导航',
   kb_search_hit: '知识库检索',
   kb_search_miss: '知识库检索',
+  ticket_created: '工单流转',
+  ticket_review_complete: '工单流转',
 };
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#06b6d4'];
+
+// Gemini 2.5 Flash 参考价（USD/1M tokens，可按需更新）
+const INPUT_PRICE_PER_M = 0.30;
+const OUTPUT_PRICE_PER_M = 2.50;
 
 function formatDuration(ms: number): string {
   const mins = Math.floor(ms / 60000);
@@ -70,19 +70,34 @@ function formatDuration(ms: number): string {
   return `${mins}分钟`;
 }
 
+function getDayList(days: number): string[] {
+  const result: string[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    result.push(d.toISOString().slice(0, 10));
+  }
+  return result;
+}
+
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'usage' | 'business'>('usage');
+  const [activeTab, setActiveTab] = useState<'usage' | 'business' | 'analytics'>('usage');
   const [logs, setLogs] = useState<UsageLog[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const all = await fetchAllAnalyticsLogs();
+      setLogs(all);
+    } catch (e) {
+      console.error('[AdminDashboard] 日志拉取失败', e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const all = await fetchAllAnalyticsLogs();
-        setLogs(all.length > 0 ? all : getAnalyticsLogs());
-      } catch {
-        setLogs(getAnalyticsLogs());
-      }
-    };
     load();
     const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
@@ -121,12 +136,7 @@ export default function AdminDashboard() {
   };
 
   const getLineData = () => {
-    const days: string[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      days.push(d.toISOString().slice(0, 10));
-    }
+    const days = getDayList(7);
     return days.map(day => ({
       date: day.slice(5).replace('-', '/'),
       count: activeLogs.filter(l => l.timestamp.slice(0, 10) === day).length,
@@ -150,7 +160,7 @@ export default function AdminDashboard() {
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div>
         <h2 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-          <div className="w-10 h-10 bg-amber-50 border border-amber-200/60 rounded-xl flex items-center justify-center text-indigo-600 shadow-lg shadow-amber-100 adventure-icon-active">
+          <div className="w-10 h-10 bg-amber-50 border border-amber-200/60 rounded-xl flex items-center justify-center text-indigo-600 shadow-lg shadow-amber-100">
             <Shield className="w-6 h-6" />
           </div>
           后台管理系统
@@ -165,6 +175,7 @@ export default function AdminDashboard() {
         {([
           { key: 'usage', label: '使用统计', icon: <Activity className="w-4 h-4" /> },
           { key: 'business', label: '业务大盘', icon: <Database className="w-4 h-4" /> },
+          { key: 'analytics', label: '埋点监控', icon: <Cpu className="w-4 h-4" /> },
         ] as const).map(t => (
           <button
             key={t.key}
@@ -181,149 +192,397 @@ export default function AdminDashboard() {
       </div>
 
       {activeTab === 'business' && <BusinessDashboard />}
-      {activeTab === 'usage' && (<>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard icon={<MousePointer2 className="w-5 h-5" />} label="功能点击总次数" value={totalClicks} color="indigo" />
-        <StatCard icon={<MessageSquare className="w-5 h-5" />} label="累计分析聊天条数" value={totalChatCount} color="emerald" />
-        <StatCard icon={<Clock className="w-5 h-5" />} label="今日使用时长" value={todayDuration} color="amber" />
-        <StatCard icon={<Zap className="w-5 h-5" />} label="今日活跃次数" value={todayActiveCount} color="rose" />
-        <StatCard icon={<AlertTriangle className="w-5 h-5" />} label="累计输出负面案例" value={totalNegativeCount} color="orange" />
-        <StatCard icon={<Users className="w-5 h-5" />} label="累计重点玩家画像" value={totalKeyPlayerCount} color="purple" />
+      {activeTab === 'analytics' && <AnalyticsDashboard logs={logs} loading={loading} />}
+
+      {activeTab === 'usage' && (
+        <>
+          {loading && logs.length === 0 ? (
+            <div className="flex items-center justify-center py-24 text-slate-400">
+              <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+              <span className="text-sm font-bold">正在从云端加载数据…</span>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                <StatCard icon={<MousePointer2 className="w-5 h-5" />} label="功能点击总次数" value={totalClicks} color="indigo" />
+                <StatCard icon={<MessageSquare className="w-5 h-5" />} label="累计分析聊天条数" value={totalChatCount} color="emerald" />
+                <StatCard icon={<Clock className="w-5 h-5" />} label="今日使用时长" value={todayDuration} color="amber" />
+                <StatCard icon={<Zap className="w-5 h-5" />} label="今日活跃次数" value={todayActiveCount} color="rose" />
+                <StatCard icon={<AlertTriangle className="w-5 h-5" />} label="累计输出负面案例" value={totalNegativeCount} color="orange" />
+                <StatCard icon={<Users className="w-5 h-5" />} label="累计重点玩家画像" value={totalKeyPlayerCount} color="purple" />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
+                  <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6">
+                    <Activity className="w-5 h-5 text-indigo-600" />
+                    功能点击分布
+                  </h3>
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={barData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+                        <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                          {barData.map((_, index) => (
+                            <Cell key={`bar-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
+                  <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6">
+                    <TrendingUp className="w-5 h-5 text-emerald-600" />
+                    近7日活跃趋势
+                  </h3>
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={lineData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+                        <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                        <Line type="monotone" dataKey="count" name="操作次数" stroke="#6366f1" strokeWidth={3} dot={{ fill: '#6366f1', r: 4 }} activeDot={{ r: 6 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
+                <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6">
+                  <PieChartIcon className="w-5 h-5 text-amber-500" />
+                  功能使用占比
+                </h3>
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={90}
+                        label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                      >
+                        {pieData.map((_, index) => (
+                          <Cell key={`pie-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <FeedbackSummary logs={logs} />
+              <KbSearchStats logs={logs} />
+
+              <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                  <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-indigo-600" />
+                    实时流水追踪
+                  </h3>
+                  <span className="px-3 py-1 bg-indigo-100 text-indigo-700 text-[10px] font-black rounded-full uppercase tracking-widest animate-pulse">Live</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50/50">
+                        <th className="px-8 py-4 text-[10px] uppercase font-black text-slate-400 tracking-widest">时间</th>
+                        <th className="px-8 py-4 text-[10px] uppercase font-black text-slate-400 tracking-widest">账号</th>
+                        <th className="px-8 py-4 text-[10px] uppercase font-black text-slate-400 tracking-widest">行为</th>
+                        <th className="px-8 py-4 text-[10px] uppercase font-black text-slate-400 tracking-widest">详情</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {logs.slice(0, 100).map((log) => (
+                        <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-8 py-4 whitespace-nowrap">
+                            <span className="text-xs font-bold text-slate-500 tabular-nums">{log.timestamp.slice(11, 19)}</span>
+                          </td>
+                          <td className="px-8 py-4">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 bg-slate-100 rounded-md flex items-center justify-center text-[10px] font-black text-slate-400">
+                                {(log.username || 'U')[0].toUpperCase()}
+                              </div>
+                              <span className="text-sm font-black text-slate-700">{log.username}</span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-4">
+                            <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight ${getActionColor(log.action)}`}>
+                              {ACTION_LABELS[log.action] || log.action}
+                            </span>
+                          </td>
+                          <td className="px-8 py-4">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-bold text-slate-600 truncate max-w-xs">{log.details || '-'}</span>
+                              {log.chatCount !== undefined && (
+                                <span className="text-[10px] text-emerald-600 font-bold">{log.chatCount} 条聊天</span>
+                              )}
+                              {(log.negativeCount !== undefined || log.keyPlayerCount !== undefined) && (
+                                <span className="text-[10px] text-orange-500 font-bold">
+                                  {log.negativeCount ?? 0} 个负面案例 · {log.keyPlayerCount ?? 0} 位重点玩家
+                                </span>
+                              )}
+                              {log.inputTokens !== undefined && (
+                                <span className="text-[10px] text-purple-500 font-bold">
+                                  Token: {log.inputTokens}↑ {log.outputTokens}↓
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────
+// Analytics Dashboard — 4 charts for tracking data
+// ─────────────────────────────────────────────────────────
+
+function AnalyticsDashboard({ logs, loading }: { logs: UsageLog[]; loading: boolean }) {
+  if (loading && logs.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-24 text-slate-400">
+        <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+        <span className="text-sm font-bold">正在从云端加载埋点数据…</span>
+      </div>
+    );
+  }
+
+  const days14 = getDayList(14);
+
+  // Chart 1: 负面工单每日走势（折线图）
+  const dailyTicketData = days14.map(day => {
+    const dayLogs = logs.filter(l => l.action === 'analysis_complete' && l.timestamp.slice(0, 10) === day);
+    const tickets = dayLogs.reduce((sum, l) => sum + (l.negativeCount || 0), 0);
+    const analyses = dayLogs.length;
+    return { date: day.slice(5).replace('-', '/'), tickets, analyses };
+  });
+
+  // Chart 2: 工具使用流程完成度分布（饼图）
+  // 从 usage_logs 统计各阶段
+  const userSessions = new Set(logs.filter(l => l.action === 'excel_upload' || l.action === 'analysis_start').map(l => l.userId));
+  const uploadOnly = logs.filter(l => l.action === 'excel_upload').map(l => l.userId);
+  const completedAnalysis = new Set(logs.filter(l => l.action === 'analysis_complete').map(l => l.userId));
+  const createdTicket = new Set(logs.filter(l => l.action === 'ticket_created').map(l => l.userId));
+  const resolvedTicket = new Set(logs.filter(l => l.action === 'ticket_review_complete').map(l => l.userId));
+
+  const onlyUploaded = uploadOnly.filter(uid => !completedAnalysis.has(uid)).length;
+  const onlyAnalyzed = [...completedAnalysis].filter(uid => !createdTicket.has(uid)).length;
+  const onlyTicketed = [...createdTicket].filter(uid => !resolvedTicket.has(uid)).length;
+  const fullyResolved = resolvedTicket.size;
+  const totalFlow = onlyUploaded + onlyAnalyzed + onlyTicketed + fullyResolved || 1;
+
+  const funnelPieData = [
+    { name: '仅上传数据', value: onlyUploaded },
+    { name: '完成分析未建档', value: onlyAnalyzed },
+    { name: '建档未结案', value: onlyTicketed },
+    { name: '已完全结案', value: fullyResolved },
+  ].filter(d => d.value > 0);
+
+  // Chart 3: AI分析精准度走势（柱状图）— 按周
+  const weeks: string[] = [];
+  for (let i = 7; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i * 7);
+    weeks.push(d.toISOString().slice(0, 10));
+  }
+  const accuracyBarData = weeks.slice(0, -1).map((weekStart, i) => {
+    const weekEnd = weeks[i + 1];
+    const weekLogs = logs.filter(l => {
+      if (l.action !== 'analysis_feedback') return false;
+      const t = l.timestamp.slice(0, 10);
+      return t >= weekStart && t < weekEnd;
+    });
+    const parsed = weekLogs.map(l => { try { return JSON.parse(l.details); } catch { return null; } }).filter(Boolean);
+    return {
+      week: weekStart.slice(5).replace('-', '/'),
+      准确无遗漏: parsed.filter((x: any) => x?.accuracy === '准确无遗漏').length,
+      基本准确: parsed.filter((x: any) => x?.accuracy === '基本准确，有小错').length,
+      有明显遗漏: parsed.filter((x: any) => x?.accuracy === '有明显遗漏/误判').length,
+    };
+  });
+
+  // Chart 4: 每日 API 成本预估（折线图）
+  const apiCostData = days14.map(day => {
+    const dayLogs = logs.filter(l => l.action === 'analysis_complete' && l.timestamp.slice(0, 10) === day);
+    const cost = dayLogs.reduce((sum, l) => {
+      const i = l.inputTokens || 0;
+      const o = l.outputTokens || 0;
+      return sum + (i * INPUT_PRICE_PER_M + o * OUTPUT_PRICE_PER_M) / 1_000_000;
+    }, 0);
+    const totalTokens = dayLogs.reduce((sum, l) => sum + (l.inputTokens || 0) + (l.outputTokens || 0), 0);
+    return {
+      date: day.slice(5).replace('-', '/'),
+      cost: parseFloat(cost.toFixed(4)),
+      tokens: totalTokens,
+    };
+  });
+
+  const totalCost = apiCostData.reduce((s, d) => s + d.cost, 0);
+  const totalAnalyses = logs.filter(l => l.action === 'analysis_complete').length;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3 p-4 bg-purple-50 border border-purple-100 rounded-2xl">
+        <Cpu className="w-4 h-4 text-purple-500 shrink-0" />
+        <p className="text-xs font-bold text-purple-700">
+          埋点监控基于云端全量数据，所有用户行为均实时上报。Token 成本以 Gemini 2.5 Flash 参考价计算（Input: $0.30/M, Output: $2.50/M）。
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
-          <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6">
-            <Activity className="w-5 h-5 text-indigo-600" />
-            功能点击分布
-          </h3>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
-                <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                  {barData.map((_, index) => (
-                    <Cell key={`bar-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
-          <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6">
-            <TrendingUp className="w-5 h-5 text-emerald-600" />
-            近7日活跃趋势
-          </h3>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={lineData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
-                <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                <Line type="monotone" dataKey="count" name="操作次数" stroke="#6366f1" strokeWidth={3} dot={{ fill: '#6366f1', r: 4 }} activeDot={{ r: 6 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard icon={<AlertTriangle className="w-5 h-5" />} label="近14日新增工单" value={dailyTicketData.reduce((s, d) => s + d.tickets, 0)} color="orange" />
+        <StatCard icon={<BarChart2 className="w-5 h-5" />} label="累计分析次数" value={totalAnalyses} color="indigo" />
+        <StatCard icon={<DollarSign className="w-5 h-5" />} label="近14日API成本" value={`$${totalCost.toFixed(3)}`} color="emerald" />
+        <StatCard icon={<Users className="w-5 h-5" />} label="已结案流程用户数" value={fullyResolved} color="purple" />
       </div>
 
+      {/* Chart 1: 负面工单每日走势 */}
       <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
         <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6">
-          <PieChartIcon className="w-5 h-5 text-amber-500" />
-          功能使用占比
+          <AlertTriangle className="w-5 h-5 text-orange-500" />
+          负面工单每日走势（近14天）
         </h3>
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={pieData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={90}
-                label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-              >
-                {pieData.map((_, index) => (
-                  <Cell key={`pie-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
+            <LineChart data={dailyTicketData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
               <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
               <Legend />
-            </PieChart>
+              <Line type="monotone" dataKey="tickets" name="新增负面工单" stroke="#f59e0b" strokeWidth={3} dot={{ fill: '#f59e0b', r: 4 }} activeDot={{ r: 6 }} />
+              <Line type="monotone" dataKey="analyses" name="分析次数" stroke="#6366f1" strokeWidth={2} strokeDasharray="4 2" dot={{ fill: '#6366f1', r: 3 }} />
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      <FeedbackSummary logs={logs} />
-
-      <KbSearchStats logs={logs} />
-
-      <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden">
-
-        <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-indigo-600" />
-            实时流水追踪
+      {/* Chart 2 + Chart 3 side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Chart 2: 流程完成度分布 */}
+        <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
+          <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-2">
+            <PieChartIcon className="w-5 h-5 text-indigo-600" />
+            工具使用流程完成度
           </h3>
-          <span className="px-3 py-1 bg-indigo-100 text-indigo-700 text-[10px] font-black rounded-full uppercase tracking-widest animate-pulse">Live</span>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-6">按用户最终到达的流程阶段统计</p>
+          {funnelPieData.length > 0 ? (
+            <div className="h-56 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={funnelPieData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                  >
+                    {funnelPieData.map((_, index) => (
+                      <Cell key={`funnel-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-56 flex items-center justify-center text-slate-300 text-sm font-bold">暂无流程数据</div>
+          )}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/50">
-                <th className="px-8 py-4 text-[10px] uppercase font-black text-slate-400 tracking-widest">时间</th>
-                <th className="px-8 py-4 text-[10px] uppercase font-black text-slate-400 tracking-widest">账号</th>
-                <th className="px-8 py-4 text-[10px] uppercase font-black text-slate-400 tracking-widest">行为</th>
-                <th className="px-8 py-4 text-[10px] uppercase font-black text-slate-400 tracking-widest">详情</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {logs.slice(0, 100).map((log) => (
-                <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="px-8 py-4 whitespace-nowrap">
-                    <span className="text-xs font-bold text-slate-500 tabular-nums">{log.timestamp.slice(11, 19)}</span>
-                  </td>
-                  <td className="px-8 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 bg-slate-100 rounded-md flex items-center justify-center text-[10px] font-black text-slate-400">
-                        {(log.username || 'U')[0].toUpperCase()}
-                      </div>
-                      <span className="text-sm font-black text-slate-700">{log.username}</span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-4">
-                    <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight ${getActionColor(log.action)}`}>
-                      {ACTION_LABELS[log.action] || log.action}
-                    </span>
-                  </td>
-                  <td className="px-8 py-4">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-xs font-bold text-slate-600 truncate max-w-xs">{log.details || '-'}</span>
-                      {log.chatCount !== undefined && (
-                        <span className="text-[10px] text-emerald-600 font-bold">{log.chatCount} 条聊天</span>
-                      )}
-                      {(log.negativeCount !== undefined || log.keyPlayerCount !== undefined) && (
-                        <span className="text-[10px] text-orange-500 font-bold">
-                          {log.negativeCount ?? 0} 个负面案例 · {log.keyPlayerCount ?? 0} 位重点玩家
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+        {/* Chart 3: AI精准度走势 */}
+        <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
+          <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-2">
+            <BarChart2 className="w-5 h-5 text-emerald-600" />
+            AI分析精准度反馈走势
+          </h3>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-6">来自用户主动反馈（按周统计）</p>
+          {accuracyBarData.some(d => d.准确无遗漏 + d.基本准确 + d.有明显遗漏 > 0) ? (
+            <div className="h-56 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={accuracyBarData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="week" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+                  <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                  <Legend />
+                  <Bar dataKey="准确无遗漏" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="基本准确" stackId="a" fill="#f59e0b" />
+                  <Bar dataKey="有明显遗漏" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-56 flex items-center justify-center text-slate-300 text-sm font-bold">暂无精准度反馈数据</div>
+          )}
         </div>
       </div>
-      </>)}
+
+      {/* Chart 4: 每日 API 成本 */}
+      <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-emerald-600" />
+            每日 API 成本预估（近14天，USD）
+          </h3>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-slate-400">14天累计</span>
+            <span className="text-lg font-black text-emerald-600 tabular-nums">${totalCost.toFixed(3)}</span>
+          </div>
+        </div>
+        {apiCostData.some(d => d.cost > 0) ? (
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={apiCostData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} tickFormatter={(v) => `$${v}`} />
+                <Tooltip
+                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  formatter={(value: number, name: string) => [
+                    name === 'cost' ? `$${value}` : value.toLocaleString(),
+                    name === 'cost' ? 'API成本' : 'Token总量',
+                  ]}
+                />
+                <Legend formatter={(v) => v === 'cost' ? 'API成本 (USD)' : 'Token总量'} />
+                <Line type="monotone" dataKey="cost" name="cost" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4 }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="h-64 flex flex-col items-center justify-center text-slate-300 gap-2">
+            <DollarSign className="w-8 h-8" />
+            <p className="text-sm font-bold">暂无 Token 用量数据</p>
+            <p className="text-xs text-slate-300">完成一次专家分析后即可看到成本数据</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -375,7 +634,6 @@ function BusinessDashboard() {
 
   const { history, execRecords, cases, dismissed, reviews } = data;
 
-  // KPI computations
   const totalOutbursts = history.reduce((sum, r) =>
     sum + (r.result?.playerReports ?? []).reduce((s, p) => s + (p.negativeOutbursts?.length ?? 0), 0), 0
   );
@@ -392,7 +650,6 @@ function BusinessDashboard() {
     return ids.size;
   })();
 
-  // Monthly trend (last 6 months)
   const months: string[] = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date();
@@ -409,7 +666,6 @@ function BusinessDashboard() {
     return { month: m.slice(5), newOutbursts, resolved };
   });
 
-  // GS ranking
   const gsMap: Record<string, { analyses: number; tickets: number; resolved: number }> = {};
   history.forEach(r => {
     const gs = (r.serverConfig as any)?.gsName || r.userId || '未知';
@@ -427,7 +683,6 @@ function BusinessDashboard() {
     .sort((a, b) => b.tickets - a.tickets)
     .slice(0, 10);
 
-  // Knowledge base stats
   const totalLikes = cases.reduce((s, c) => s + (c.likes || 0), 0);
   const totalViews = cases.reduce((s, c) => s + (c.views || 0), 0);
 
@@ -443,7 +698,7 @@ function BusinessDashboard() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">云端业务数据（仅含部署后新增数据）</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">云端业务数据（全量，含所有用户）</p>
         <button
           onClick={loadData}
           disabled={loading}
@@ -454,14 +709,12 @@ function BusinessDashboard() {
         </button>
       </div>
 
-      {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {kpiCards.map(({ label, value, icon, color }) => (
           <StatCard key={label} icon={icon} label={label} value={value} color={color} />
         ))}
       </div>
 
-      {/* Monthly trend */}
       <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
         <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6">
           <TrendingUp className="w-5 h-5 text-indigo-600" />
@@ -482,7 +735,6 @@ function BusinessDashboard() {
         </div>
       </div>
 
-      {/* GS Ranking */}
       {gsRanking.length > 0 && (
         <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-8 py-6 border-b border-slate-100">
@@ -526,7 +778,6 @@ function BusinessDashboard() {
         </div>
       )}
 
-      {/* Knowledge base stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: '总案例数', value: cases.length, color: 'indigo' },
@@ -551,7 +802,7 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
   };
   return (
     <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm space-y-4">
-      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border ${colorMap[color]}`}>
+      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border ${colorMap[color] || colorMap.indigo}`}>
         {icon}
       </div>
       <div>
@@ -582,25 +833,21 @@ function RatingBar({ label, count, total, color }: { label: string; count: numbe
 }
 
 function FeedbackSummary({ logs }: { logs: UsageLog[] }) {
-  // 分析质量反馈
   const feedbackLogs = logs
     .filter(l => l.action === 'analysis_feedback')
     .map(l => { try { return JSON.parse(l.details) as FeedbackEntry; } catch { return null; } })
     .filter((x): x is FeedbackEntry => x !== null);
 
-  // 处置建议评分
   const adviceLogs = logs
     .filter(l => l.action === 'advice_rating')
     .map(l => { try { return JSON.parse(l.details) as { playerName: string; trigger: string; rating: 'up' | 'down' }; } catch { return null; } })
     .filter(Boolean) as { playerName: string; trigger: string; rating: 'up' | 'down' }[];
 
-  // 模拟回复评分
   const simLogs = logs
     .filter(l => l.action === 'simulation_msg_rating')
     .map(l => { try { return JSON.parse(l.details) as { msgIndex: number; rating: 'up' | 'down' }; } catch { return null; } })
     .filter(Boolean) as { msgIndex: number; rating: 'up' | 'down' }[];
 
-  // 知识库满意度
   const kbLogs = logs
     .filter(l => l.action === 'kb_item_rating')
     .map(l => { try { return JSON.parse(l.details) as { itemName: string; rating: 'yes' | 'no' }; } catch { return null; } })
@@ -609,7 +856,6 @@ function FeedbackSummary({ logs }: { logs: UsageLog[] }) {
   const hasAnyData = feedbackLogs.length > 0 || adviceLogs.length > 0 || simLogs.length > 0 || kbLogs.length > 0;
   if (!hasAnyData) return null;
 
-  // 分析质量反馈统计
   const total = feedbackLogs.length;
   const accuracyCounts: Record<string, number> = {};
   const usefulnessCounts: Record<string, number> = {};
@@ -623,7 +869,6 @@ function FeedbackSummary({ logs }: { logs: UsageLog[] }) {
     .map(f => f.missedChats!)
     .slice(0, 10);
 
-  // 处置建议评分统计
   const adviceUp = adviceLogs.filter(l => l.rating === 'up').length;
   const adviceDown = adviceLogs.filter(l => l.rating === 'down').length;
   const adviceTotal = adviceLogs.length;
@@ -633,11 +878,9 @@ function FeedbackSummary({ logs }: { logs: UsageLog[] }) {
     adviceByPlayer[l.playerName][l.rating]++;
   });
 
-  // 模拟回复统计
   const simUp = simLogs.filter(l => l.rating === 'up').length;
   const simTotal = simLogs.length;
 
-  // 知识库统计
   const kbYes = kbLogs.filter(l => l.rating === 'yes').length;
   const kbTotal = kbLogs.length;
   const kbMissItems = kbLogs.filter(l => l.rating === 'no').map(l => l.itemName);
@@ -660,7 +903,6 @@ function FeedbackSummary({ logs }: { logs: UsageLog[] }) {
         内测质量反馈汇总
       </h3>
 
-      {/* 分析质量反馈 */}
       {total > 0 && (
         <div className="space-y-4">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">分析报告质量（{total} 条）</p>
@@ -701,7 +943,6 @@ function FeedbackSummary({ logs }: { logs: UsageLog[] }) {
         </div>
       )}
 
-      {/* 处置建议评分 */}
       {adviceTotal > 0 && (
         <div className="space-y-4 border-t border-slate-100 pt-6">
           <div className="flex items-center justify-between">
@@ -739,7 +980,6 @@ function FeedbackSummary({ logs }: { logs: UsageLog[] }) {
         </div>
       )}
 
-      {/* 模拟回复评分 */}
       {simTotal > 0 && (
         <div className="space-y-3 border-t border-slate-100 pt-6">
           <div className="flex items-center justify-between">
@@ -763,7 +1003,6 @@ function FeedbackSummary({ logs }: { logs: UsageLog[] }) {
         </div>
       )}
 
-      {/* 知识库满意度 */}
       {kbTotal > 0 && (
         <div className="space-y-3 border-t border-slate-100 pt-6">
           <div className="flex items-center justify-between">
@@ -885,6 +1124,6 @@ function getActionColor(action: string) {
   if (action === 'kb_search_miss') return 'bg-rose-100 text-rose-700';
   if (action.startsWith('delete')) return 'bg-rose-100 text-rose-700';
   if (action.startsWith('simulation')) return 'bg-purple-100 text-purple-700';
-  if (action.startsWith('case')) return 'bg-blue-100 text-blue-700';
+  if (action.startsWith('case') || action === 'ticket_created' || action === 'ticket_review_complete') return 'bg-blue-100 text-blue-700';
   return 'bg-slate-100 text-slate-600';
 }
