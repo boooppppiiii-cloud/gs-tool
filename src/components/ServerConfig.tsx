@@ -161,6 +161,22 @@ export default function ServerConfig({ profiles, activeProfileId, onProfilesChan
                 className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
               />
             </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <Map className="w-3 h-3" /> 合服阶段
+              </label>
+              <select
+                value={activeProfile.mergeStage || ''}
+                onChange={(e) => updateProfile(activeProfile.id, { mergeStage: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+              >
+                <option value="">未设置</option>
+                {['零合','一合','二合','三合','四合','五合'].map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="pt-6 border-t border-slate-100 space-y-6">

@@ -1,5 +1,51 @@
 import { AnalysisResult, AnalysisCase } from "../types";
 
+export async function qualityCheckExecution(
+  outburstTitle: string,
+  outburstTrigger: string,
+  gsAdviceAction: string,
+  executionDescription: string,
+  category: '待推进' | '已解决'
+): Promise<{
+  summary: string;
+  consistencyCheck: string;
+  reasonabilityCheck: string;
+  riskPoints: string;
+  rating: '优' | '良' | '需改进' | '存在问题';
+}> {
+  const prompt = `你是一个游戏运营质量审计专家，负责核验GS（游戏运营人员）的工单执行质量。
+
+【原始负面事件】
+事件标题：${outburstTitle}
+负面触发点：${outburstTrigger}
+
+【AI建议的GS处置动作】
+${gsAdviceAction}
+
+【GS实际执行记录】
+分类：${category}
+执行描述：${executionDescription || '（无描述）'}
+
+请从以下四个维度进行综合质检，严格返回JSON对象（不要markdown包裹）：
+{
+  "summary": "执行情况一句话摘要（30字内）",
+  "consistencyCheck": "GS实际执行与建议方案的一致性评估（50字内）",
+  "reasonabilityCheck": "处置策略合理性与适当性评估（50字内）",
+  "riskPoints": "识别到的疑点、风险或改进建议（50字内，无风险填'暂无明显风险'）",
+  "rating": "综合评级，只能是以下四者之一：优/良/需改进/存在问题"
+}`;
+
+  const content = await chatCompletion([{ role: 'user', content: prompt }], true);
+  const raw = JSON.parse(content);
+  return {
+    summary: raw.summary ?? '',
+    consistencyCheck: raw.consistencyCheck ?? '',
+    reasonabilityCheck: raw.reasonabilityCheck ?? '',
+    riskPoints: raw.riskPoints ?? '',
+    rating: raw.rating ?? '良',
+  };
+}
+
 async function chatCompletion(messages: { role: string; content: string }[], jsonMode = false): Promise<string> {
   const res = await fetch('/api/gemini/chat/completions', {
     method: 'POST',

@@ -1,4 +1,4 @@
-import { ServerProfile, AnalysisResult, AnalysisCase, HistoryRecord, MonthHistory } from '../types';
+import { ServerProfile, AnalysisResult, AnalysisCase, HistoryRecord, MonthHistory, ExecutionRecord, LeaderReview } from '../types';
 
 // Module-level current user, set on login/logout
 let _currentUserId: string | null = null;
@@ -183,4 +183,66 @@ export async function saveManualCase(newCase: AnalysisCase) {
 
 export async function testConnection() {
   console.log('[LocalStorage] 后端就绪，使用本地存储（无需云端配置）');
+}
+
+// ---------------- Execution Records ----------------
+const EXEC_KEY = 'gs_execRecords';
+
+export async function fetchExecutionRecords(userId: string): Promise<ExecutionRecord[]> {
+  return load<ExecutionRecord>(EXEC_KEY).filter(r => r.ownerId === userId);
+}
+
+export async function saveExecutionRecord(record: ExecutionRecord): Promise<void> {
+  const uid = currentUid();
+  const records = load<ExecutionRecord>(EXEC_KEY);
+  const idx = records.findIndex(r => r.id === record.id);
+  const entry = { ...record, ownerId: uid, updatedAt: new Date().toISOString() };
+  if (idx >= 0) records[idx] = entry; else records.push(entry);
+  save(EXEC_KEY, records);
+}
+
+export async function updateExecutionRecord(id: string, updates: Partial<ExecutionRecord>): Promise<void> {
+  const records = load<ExecutionRecord>(EXEC_KEY);
+  const idx = records.findIndex(r => r.id === id);
+  if (idx >= 0) {
+    records[idx] = { ...records[idx], ...updates, updatedAt: new Date().toISOString() };
+    save(EXEC_KEY, records);
+  }
+}
+
+export async function deleteExecutionRecord(id: string): Promise<void> {
+  save(EXEC_KEY, load<ExecutionRecord>(EXEC_KEY).filter(r => r.id !== id));
+}
+
+// ---------------- All-user reads (for leader portal) ----------------
+export async function fetchAllServerProfiles(): Promise<ServerProfile[]> {
+  return load<ServerProfile>('gs_serverProfiles');
+}
+
+export async function fetchAllExecutionRecords(): Promise<ExecutionRecord[]> {
+  return load<ExecutionRecord>(EXEC_KEY);
+}
+
+export async function fetchAllHistory(): Promise<(HistoryRecord & { userId: string })[]> {
+  return load<HistoryRecord & { userId: string }>('gs_analysisHistory');
+}
+
+// ---------------- Leader Reviews ----------------
+const REVIEW_KEY = 'gs_leaderReviews';
+
+export async function fetchLeaderReviews(): Promise<LeaderReview[]> {
+  return load<LeaderReview>(REVIEW_KEY);
+}
+
+export async function saveLeaderReview(review: LeaderReview): Promise<void> {
+  const reviews = load<LeaderReview>(REVIEW_KEY);
+  const idx = reviews.findIndex(r => r.id === review.id);
+  if (idx >= 0) reviews[idx] = review; else reviews.push(review);
+  save(REVIEW_KEY, reviews);
+}
+
+export async function updateLeaderReview(id: string, updates: Partial<LeaderReview>): Promise<void> {
+  const reviews = load<LeaderReview>(REVIEW_KEY);
+  const idx = reviews.findIndex(r => r.id === id);
+  if (idx >= 0) { reviews[idx] = { ...reviews[idx], ...updates }; save(REVIEW_KEY, reviews); }
 }

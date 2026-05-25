@@ -1,137 +1,210 @@
 import React from 'react';
-import { Users, Clock } from 'lucide-react';
-
-import { ServerProfile } from '../types';
+import { AlertTriangle, CheckCircle2, Clock, ChevronDown, ChevronRight, ServerCrash, Archive, Layers, BookOpen } from 'lucide-react';
+import { ServerProfile, MonthHistory, AnalysisCase, ExecutionRecord } from '../types';
 
 interface Props {
   serverProfiles: ServerProfile[];
+  history: MonthHistory[];
+  cases: AnalysisCase[];
+  executionRecords: ExecutionRecord[];
 }
 
-export default function HomeView({ serverProfiles }: Props) {
-  const [expandedId, setExpandedId] = React.useState<string | null>(null);
+interface FlatTicket {
+  historyRecordId: string;
+  outburstIndex: number;
+  playerName: string;
+  title: string;
+  serverName: string;
+  date: string;
+  execRecord?: ExecutionRecord;
+}
+
+function getTicketStatus(ticket: FlatTicket): '待处理' | '待审核' | '已完成' {
+  if (!ticket.execRecord) return '待处理';
+  if (ticket.execRecord.submissionStatus === '已完成') return '已完成';
+  if (ticket.execRecord.submissionStatus === '待审核') return '待审核';
+  return '待处理';
+}
+
+const STATUS_STYLES = {
+  '待处理': { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200', dot: 'bg-orange-400' },
+  '待审核': { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200', dot: 'bg-blue-400' },
+  '已完成': { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200', dot: 'bg-emerald-400' },
+};
+
+export default function HomeView({ serverProfiles, history, cases, executionRecords }: Props) {
+  const [expandedEcology, setExpandedEcology] = React.useState<string | null>(null);
+
+  const tickets: FlatTicket[] = React.useMemo(() => {
+    const flat: FlatTicket[] = [];
+    let globalIndex = 0;
+    history.forEach(month => {
+      month.records.forEach(record => {
+        const serverName = (record.serverConfig as any)?.name ?? '未知区服';
+        (record.result?.playerReports ?? []).forEach(report => {
+          (report.negativeOutbursts ?? []).forEach(outburst => {
+            const idx = globalIndex++;
+            flat.push({
+              historyRecordId: record.id,
+              outburstIndex: idx,
+              playerName: report.roleName,
+              title: (outburst as any).title ?? outburst.trigger ?? '未知事件',
+              serverName,
+              date: record.timestamp,
+              execRecord: executionRecords.find(
+                r => r.historyRecordId === record.id && r.outburstIndex === idx
+              ),
+            });
+          });
+        });
+      });
+    });
+    return flat.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [history, executionRecords]);
+
+  const pendingCount = tickets.filter(t => getTicketStatus(t) === '待处理').length;
+  const reviewCount = tickets.filter(t => getTicketStatus(t) === '待审核').length;
+  const doneCount = tickets.filter(t => getTicketStatus(t) === '已完成').length;
+
+  const profilesWithEcology = serverProfiles.filter(p => p.serverEcology);
+  const recentCases = cases.slice(0, 6);
 
   return (
-    <div className="space-y-16 animate-in fade-in duration-700 font-sans pt-10">
-      {serverProfiles.map(profile => {
-        const portraits = Object.entries(profile.persistentPortraits || {});
+    <div className="space-y-10 animate-in fade-in duration-500 pb-12">
 
-        return (
-          <section key={profile.id} className="space-y-8 pb-12 border-b border-slate-100 last:border-0">
-            {/* Server Header */}
-            <div className="space-y-4 px-2">
-              <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">
-                {profile.name}
-              </h2>
-              {profile.serverEcology ? (
-                <div className="max-w-3xl">
-                  <p className="text-lg text-slate-500 font-medium leading-relaxed border-l-4 border-indigo-500 pl-6 py-2 bg-indigo-50/30 rounded-r-2xl">
-                    {profile.serverEcology}
-                  </p>
+      {/* ── 1. Work Status Banner ── */}
+      <div>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">当前工作状态</p>
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { label: '待处理' as const, count: pendingCount, icon: <AlertTriangle className="w-5 h-5" /> },
+            { label: '待审核' as const, count: reviewCount, icon: <Clock className="w-5 h-5" /> },
+            { label: '已完成' as const, count: doneCount, icon: <CheckCircle2 className="w-5 h-5" /> },
+          ].map(({ label, count, icon }) => {
+            const style = STATUS_STYLES[label];
+            return (
+              <div key={label} className={`rounded-2xl border ${style.border} ${style.bg} px-6 py-5 flex items-center justify-between`}>
+                <div>
+                  <p className={`text-[10px] font-bold uppercase tracking-widest ${style.text}`}>{label}</p>
+                  <p className={`text-4xl font-black mt-1 ${style.text}`}>{count}</p>
+                  <p className="text-xs text-slate-400 mt-1 font-medium">负面工单</p>
                 </div>
-              ) : (
-                <p className="text-sm text-slate-400 font-bold uppercase tracking-widest italic opacity-50">暂无区服生态分析数据</p>
-              )}
-            </div>
-
-            {/* Portraits Grid */}
-            {portraits.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 px-2 mb-6">
-                  <div className="w-8 h-8 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
-                    <Users className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-xl font-black text-slate-800 tracking-tight">重点玩家画像库</h3>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {portraits.map(([roleName, p]) => {
-                    const portrait = p as any;
-                    const cardKey = `${profile.id}-${roleName}`;
-                    const isExpanded = expandedId === cardKey;
-
-                    return (
-                      <div
-                        key={roleName}
-                        className={`bg-white rounded-[40px] border transition-all duration-500 overflow-hidden cursor-pointer group ${
-                          isExpanded
-                            ? 'ring-4 ring-indigo-500/10 border-indigo-200 shadow-2xl col-span-full md:col-span-2 lg:col-span-2 p-10'
-                            : 'border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 p-8'
-                        }`}
-                        onClick={() => setExpandedId(isExpanded ? null : cardKey)}
-                      >
-                        <div className="flex items-center justify-between mb-6">
-                          <div>
-                            <h4 className={`font-black text-slate-800 transition-colors ${isExpanded ? 'text-4xl mb-2' : 'text-xl group-hover:text-indigo-600'}`}>
-                              {roleName}
-                            </h4>
-                            {isExpanded && (
-                              <div className="flex items-center gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
-                                <Clock className="w-3 h-3" /> 最近更新：{new Date(portrait.lastUpdated).toLocaleDateString()}
-                              </div>
-                            )}
-                          </div>
-                          {!isExpanded && (
-                            <div className="text-[10px] text-slate-300 font-bold uppercase tracking-widest bg-slate-50 px-2 py-1 rounded-lg">
-                              点击查看详情
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Summary */}
-                        <p className={`text-slate-500 leading-relaxed italic border-indigo-100 mb-8 ${
-                          isExpanded ? 'text-xl border-l-8 pl-8 py-4 bg-indigo-50/20 rounded-r-3xl' : 'text-sm border-l-4 pl-4 line-clamp-2'
-                        }`}>
-                          "{portrait.summary}"
-                        </p>
-
-                        {/* Portrait Fields */}
-                        <div className={`grid gap-4 ${isExpanded ? 'grid-cols-2 mt-10' : 'grid-cols-2'}`}>
-                          <PortraitTag label="付费性格" value={portrait.paymentHabits} color="blue" large={isExpanded} />
-                          <PortraitTag label="行为特征" value={portrait.personality} color="purple" large={isExpanded} />
-                          <PortraitTag label="游戏偏好" value={portrait.gameHabits} color="emerald" large={isExpanded} />
-                          <PortraitTag label="现实身份" value={portrait.realLifePersona} color="indigo" large={isExpanded} />
-                        </div>
-
-                        {isExpanded && (
-                          <div className="mt-10 pt-10 border-t border-slate-100 flex items-center justify-end">
-                            <button
-                              className="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
-                              onClick={e => { e.stopPropagation(); setExpandedId(null); }}
-                            >
-                              收起详情
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                <div className={`${style.text} opacity-30`}>{icon}</div>
               </div>
-            )}
-          </section>
-        );
-      })}
-    </div>
-  );
-}
+            );
+          })}
+        </div>
+      </div>
 
-function colorClass(color: string): string {
-  const map: Record<string, string> = {
-    blue: 'bg-blue-50 text-blue-600 border-blue-100',
-    purple: 'bg-purple-50 text-purple-600 border-purple-100',
-    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-    indigo: 'bg-indigo-50 text-indigo-600 border-indigo-100',
-  };
-  return map[color] || '';
-}
+      {/* ── 2. Server Ecology Summaries ── */}
+      {profilesWithEcology.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <ServerCrash className="w-4 h-4 text-indigo-600" />
+            <p className="text-sm font-black text-slate-800">全部区服生态总结</p>
+            <span className="text-xs text-slate-400 font-medium">({profilesWithEcology.length} 个区服)</span>
+          </div>
+          <div className="space-y-2">
+            {profilesWithEcology.map(profile => (
+              <div key={profile.id} className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
+                <button
+                  onClick={() => setExpandedEcology(expandedEcology === profile.id ? null : profile.id)}
+                  className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-indigo-400" />
+                    <span className="text-sm font-bold text-slate-700">{profile.name}</span>
+                    {profile.mergeStage && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">{profile.mergeStage}</span>
+                    )}
+                  </div>
+                  {expandedEcology === profile.id
+                    ? <ChevronDown className="w-4 h-4 text-slate-400" />
+                    : <ChevronRight className="w-4 h-4 text-slate-400" />
+                  }
+                </button>
+                {expandedEcology === profile.id && (
+                  <div className="px-5 pb-4 border-t border-slate-100 bg-slate-50/40">
+                    <p className="text-sm text-slate-600 leading-relaxed pt-3">{profile.serverEcology}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-function PortraitTag({ label, value, color, large }: { label: string, value: string, color: string, large?: boolean }) {
-  return (
-    <div className={`rounded-2xl border ${colorClass(color)} font-bold group/tag ${
-      large ? 'p-6' : 'px-4 py-2 text-[10px]'
-    }`}>
-      <p className={`opacity-40 uppercase tracking-widest ${large ? 'text-xs mb-2' : 'mb-0.5'}`}>{label}</p>
-      <p className={large ? 'text-lg text-slate-800' : 'truncate'}>{value}</p>
+      {/* ── 3. Negative Ticket List ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <Layers className="w-4 h-4 text-indigo-600" />
+          <p className="text-sm font-black text-slate-800">负面工单</p>
+          <span className="text-xs text-slate-400 font-medium">({tickets.length} 条)</span>
+        </div>
+        {tickets.length === 0 ? (
+          <div className="text-center py-12 text-slate-400">
+            <Layers className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm font-medium">暂无负面工单，完成专家分析后将自动汇聚至此</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {tickets.map((ticket, i) => {
+              const status = getTicketStatus(ticket);
+              const style = STATUS_STYLES[status];
+              return (
+                <div key={i} className="flex items-center gap-4 px-5 py-3.5 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 transition-colors">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${style.dot}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-800 truncate">{ticket.title}</p>
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">
+                      {ticket.playerName} · {ticket.serverName}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-xs text-slate-400 font-medium hidden sm:block">
+                      {new Date(ticket.date).toLocaleDateString('zh-CN')}
+                    </span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${style.bg} ${style.text} ${style.border}`}>
+                      {status}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── 4. Case Archives ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <Archive className="w-4 h-4 text-indigo-600" />
+          <p className="text-sm font-black text-slate-800">案例沉淀</p>
+          <span className="text-xs text-slate-400 font-medium">最新 {recentCases.length} 条</span>
+        </div>
+        {recentCases.length === 0 ? (
+          <div className="text-center py-12 text-slate-400">
+            <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm font-medium">暂无案例，前往优秀案例库查看或新建</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {recentCases.map(c => (
+              <div key={c.id} className="px-5 py-4 bg-white border border-slate-200 rounded-2xl hover:border-amber-200 transition-colors">
+                <p className="text-sm font-bold text-slate-800 truncate">{c.title}</p>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {(c.tags ?? []).slice(0, 3).map(tag => (
+                    <span key={tag} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">{tag}</span>
+                  ))}
+                </div>
+                <p className="text-[10px] text-slate-400 font-medium mt-2">
+                  {new Date(c.timestamp).toLocaleDateString('zh-CN')}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

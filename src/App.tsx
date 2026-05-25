@@ -5,20 +5,20 @@
 
 import React from 'react';
 import { 
-  Shield, 
-  Menu, 
-  X as CloseIcon, 
-  Zap, 
-  Hammer, 
-  Sword, 
-  Scroll, 
-  Settings, 
-  LogOut, 
+  Shield,
+  Menu,
+  X as CloseIcon,
+  Zap,
+  Hammer,
+  Sword,
+  Scroll,
+  Settings,
+  LogOut,
   ChevronRight,
   Crown,
   PlayCircle,
   AlertTriangle as AlertTriangleIcon,
-  MessageSquare
+  LayoutGrid
 } from 'lucide-react';
 import ServerConfig from './components/ServerConfig';
 import ExcelUpload from './components/ExcelUpload';
@@ -27,11 +27,12 @@ import HistoryView from './components/HistoryView';
 import CaseGallery from './components/CaseGallery';
 import HomeView from './components/HomeView';
 import KnowledgeBase from './components/KnowledgeBase';
-import ChatSimulation from './components/ChatSimulation';
 import ProfileView from './components/ProfileView';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
-import { ServerProfile, ChatRecord, RechargeRecord, AnalysisResult, MonthHistory, HistoryRecord, AnalysisCase, User } from './types';
+import PortalSelector from './components/PortalSelector';
+import LeaderPortal from './components/LeaderPortal';
+import { ServerProfile, ChatRecord, RechargeRecord, AnalysisResult, MonthHistory, HistoryRecord, AnalysisCase, User, ExecutionRecord } from './types';
 import { analyzeGameEcology } from './lib/gemini';
 
 import { auth } from './lib/firebase';
@@ -42,7 +43,7 @@ const ADMIN_EMAIL = '1463432441@qq.com';
 
 export default function App() {
   const [user, setUser] = React.useState<User | null>(null);
-  const [activeTab, setActiveTab] = React.useState<'home' | 'server' | 'analysis' | 'gallery' | 'knowledge' | 'profile' | 'chat-simulation'>('home');
+  const [activeTab, setActiveTab] = React.useState<'home' | 'server' | 'analysis' | 'gallery' | 'knowledge' | 'profile'>('home');
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
 
   React.useEffect(() => {
@@ -68,6 +69,17 @@ export default function App() {
   const [knowledgeTab, setKnowledgeTab] = React.useState<'items' | 'calendar'>('items');
   const [history, setHistory] = React.useState<MonthHistory[]>([]);
   const [cases, setCases] = React.useState<AnalysisCase[]>([]);
+  const [executionRecords, setExecutionRecords] = React.useState<ExecutionRecord[]>([]);
+  const [activePortal, setActivePortal] = React.useState<'admin' | 'leader' | 'member' | null>(null);
+
+  const PRESET_GROUPS = ['第一组', '第二组', '第三组', '第四组', '第五组'];
+  const [memberGroup, setMemberGroup] = React.useState<string>(
+    localStorage.getItem('member_group') || '第一组'
+  );
+  const handleGroupChange = (g: string) => {
+    setMemberGroup(g);
+    localStorage.setItem('member_group', g);
+  };
 
   React.useEffect(() => {
     dataService.testConnection();
@@ -79,6 +91,8 @@ export default function App() {
         dataService.setCurrentUser(uid);
         initAnalyticsUser(uid, username);
         setUser({ id: uid, username, email: cbUser.email || undefined });
+        const saved = localStorage.getItem('portal_preference') as 'admin' | 'leader' | 'member' | null;
+        setActivePortal(saved ?? null);
       }
     });
     const unsubscribe = auth.onLoginStateChanged((state: any) => {
@@ -89,9 +103,12 @@ export default function App() {
         dataService.setCurrentUser(uid);
         initAnalyticsUser(uid, username);
         setUser({ id: uid, username, email: cbUser.email || undefined });
+        const saved = localStorage.getItem('portal_preference') as 'admin' | 'leader' | 'member' | null;
+        setActivePortal(saved ?? null);
       } else {
         dataService.setCurrentUser(null);
         setUser(null);
+        setActivePortal(null);
       }
     });
     return () => { if (typeof unsubscribe === 'function') unsubscribe(); };
@@ -106,14 +123,16 @@ export default function App() {
   const loadUserData = async () => {
     if (!user) return;
     try {
-      const [profiles, historyData, casesData] = await Promise.all([
+      const [profiles, historyData, casesData, execData] = await Promise.all([
         dataService.fetchServerProfiles(user.id),
         dataService.fetchHistory(user.id),
-        dataService.fetchCases(user.id)
+        dataService.fetchCases(user.id),
+        dataService.fetchExecutionRecords(user.id),
       ]);
       setServerProfiles(profiles);
       setHistory(historyData);
       setCases(casesData);
+      setExecutionRecords(execData);
     } catch (err) {
       console.error('Failed to load user data', err);
     }
@@ -285,7 +304,7 @@ export default function App() {
     }
   };
 
-  type TabId = 'home' | 'server' | 'analysis' | 'gallery' | 'knowledge' | 'chat-simulation' | 'profile';
+  type TabId = 'home' | 'server' | 'analysis' | 'gallery' | 'knowledge' | 'profile';
   type NavItem = { id: TabId; label: string; icon: React.ReactElement; children?: { id: string; label: string }[] };
 
   const navItems: NavItem[] = [
@@ -303,7 +322,6 @@ export default function App() {
       id: 'knowledge', label: '游戏知识库', icon: <Scroll className="w-5 h-5 transition-all" />,
       children: [{ id: 'items', label: '道具数据库' }, { id: 'calendar', label: '维护日历' }]
     },
-    { id: 'chat-simulation', label: '对话模拟', icon: <MessageSquare className="w-5 h-5 transition-all" /> },
     { id: 'profile', label: '个人中心', icon: <Shield className="w-5 h-5 transition-all" /> },
   ];
 
@@ -320,6 +338,19 @@ export default function App() {
     if (parentId === 'knowledge') setKnowledgeTab(childId as 'items' | 'calendar');
   };
 
+  const handleSelectPortal = (portal: 'admin' | 'leader' | 'member') => {
+    localStorage.setItem('portal_preference', portal);
+    setActivePortal(portal);
+  };
+
+  const handleSwitchPortal = () => setActivePortal(null);
+
+  const handleLogout = () => {
+    auth.signOut();
+    setUser(null);
+    setActivePortal(null);
+  };
+
   if (!user) {
     return <Login onLogin={(u) => {
       dataService.setCurrentUser(u.id);
@@ -327,6 +358,18 @@ export default function App() {
       setUser(u);
       logUsage('login', `User ${u.username} logged in`);
     }} />;
+  }
+
+  if (!activePortal) {
+    return <PortalSelector user={user} onSelect={handleSelectPortal} />;
+  }
+
+  if (activePortal === 'admin') {
+    return <PlaceholderPortal portal="admin" user={user} onSwitchPortal={handleSwitchPortal} onLogout={handleLogout} />;
+  }
+
+  if (activePortal === 'leader') {
+    return <LeaderPortal user={user} onSwitchPortal={handleSwitchPortal} onLogout={handleLogout} />;
   }
 
   return (
@@ -356,6 +399,21 @@ export default function App() {
             {isSidebarOpen ? <CloseIcon className="w-4 h-4 text-slate-400" /> : <Menu className="w-4 h-4 text-slate-400" />}
           </button>
         </div>
+
+        {/* 组员工作台信息 */}
+        {isSidebarOpen && (
+          <div className="px-4 py-3 border-b border-slate-100 bg-amber-50/40 space-y-1.5">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">组员工作台</p>
+            <p className="text-xs font-bold text-slate-700 truncate">{user.username}</p>
+            <select
+              value={memberGroup}
+              onChange={e => handleGroupChange(e.target.value)}
+              className="w-full text-xs font-semibold text-indigo-600 bg-white border border-amber-200 rounded-lg px-2 py-1 focus:outline-none"
+            >
+              {PRESET_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+          </div>
+        )}
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
@@ -408,9 +466,16 @@ export default function App() {
         </nav>
 
         {/* Footer */}
-        <div className="px-3 py-4 border-t border-slate-100">
+        <div className="px-3 py-4 border-t border-slate-100 space-y-0.5">
           <button
-            onClick={() => auth.signOut()}
+            onClick={handleSwitchPortal}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-amber-50 hover:text-indigo-600 transition-all ${!isSidebarOpen && 'justify-center'}`}
+          >
+            <LayoutGrid className="w-4 h-4 shrink-0" />
+            {isSidebarOpen && <span className="text-sm font-semibold">切换端口</span>}
+          </button>
+          <button
+            onClick={handleLogout}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all ${!isSidebarOpen && 'justify-center'}`}
           >
             <LogOut className="w-4 h-4 shrink-0" />
@@ -436,7 +501,7 @@ export default function App() {
         </header>
 
         <div className="px-8 pb-12 pt-8 overflow-y-auto flex-1">
-           {activeTab === 'home' && <HomeView serverProfiles={serverProfiles} />}
+           {activeTab === 'home' && <HomeView serverProfiles={serverProfiles} history={history} cases={cases} executionRecords={executionRecords} />}
            
            {activeTab === 'server' && (
              <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-5 duration-500">
@@ -499,7 +564,17 @@ export default function App() {
                            <h2 className="text-3xl font-black text-slate-900 tracking-tight">分析报告已生成</h2>
                            <button onClick={() => setAnalysisResult(null)} className="px-6 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-xs hover:bg-indigo-100 transition-all">重新分析</button>
                         </div>
-                                                 <AnalysisReport result={analysisResult} />
+                                                 <AnalysisReport
+                                   result={analysisResult}
+                                   executionRecords={executionRecords}
+                                   currentHistoryId={currentHistoryId}
+                                   onSaveRecords={async (records) => {
+                                     for (const rec of records) {
+                                       await dataService.saveExecutionRecord({ ...rec, ownerId: user?.id ?? '' });
+                                     }
+                                     await loadUserData();
+                                   }}
+                                 />
                      </div>
                    )}
                  </div>
@@ -523,11 +598,52 @@ export default function App() {
 
            {activeTab === 'knowledge' && <KnowledgeBase activeTab={knowledgeTab} onTabChange={setKnowledgeTab} />}
 
-           {activeTab === 'chat-simulation' && <ChatSimulation profiles={serverProfiles} />}
-
-           {activeTab === 'profile' && <ProfileView user={user} onLogout={() => auth.signOut()} />}
+           {activeTab === 'profile' && <ProfileView user={user} onLogout={handleLogout} />}
         </div>
       </main>
+    </div>
+  );
+}
+
+function PlaceholderPortal({
+  portal,
+  user,
+  onSwitchPortal,
+  onLogout,
+}: {
+  portal: 'admin' | 'leader';
+  user: { username: string };
+  onSwitchPortal: () => void;
+  onLogout: () => void;
+}) {
+  const isAdmin = portal === 'admin';
+  return (
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-8 px-6">
+      <div className="text-center space-y-4">
+        <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto ${isAdmin ? 'bg-rose-50 text-rose-400' : 'bg-amber-50 text-amber-400'}`}>
+          {isAdmin ? <Shield className="w-10 h-10" /> : <Crown className="w-10 h-10" />}
+        </div>
+        <h2 className="text-3xl font-black text-slate-900">{isAdmin ? '管理员端口' : '组长端口'}</h2>
+        <p className="text-slate-400 font-medium text-sm max-w-xs mx-auto leading-relaxed">
+          此端口功能建设中，敬请期待后续迭代更新。
+        </p>
+      </div>
+      <div className="flex gap-3">
+        <button
+          onClick={onSwitchPortal}
+          className="px-6 py-3 bg-amber-50 border border-amber-200 text-indigo-600 rounded-xl font-bold text-sm hover:bg-amber-100 transition-all flex items-center gap-2"
+        >
+          <LayoutGrid className="w-4 h-4" />
+          切换端口
+        </button>
+        <button
+          onClick={onLogout}
+          className="px-6 py-3 bg-rose-50 text-rose-500 rounded-xl font-bold text-sm hover:bg-rose-100 transition-all flex items-center gap-2"
+        >
+          <LogOut className="w-4 h-4" />
+          退出登录
+        </button>
+      </div>
     </div>
   );
 }

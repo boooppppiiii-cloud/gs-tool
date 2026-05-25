@@ -24,8 +24,13 @@ import {
   Crown,
   ThumbsUp,
   ThumbsDown,
+  ClipboardList,
+  Save,
+  Send,
+  BookmarkPlus,
 } from 'lucide-react';
-import { AnalysisResult, PlayerBehaviorReport } from '../types';
+import { AnalysisResult, PlayerBehaviorReport, ExecutionRecord } from '../types';
+import ExecutionRecordUpload from './ExecutionRecordUpload';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle } from 'docx';
 import { saveAs } from 'file-saver';
@@ -33,11 +38,14 @@ import { logUsage } from '../services/analyticsService';
 
 interface Props {
   result: AnalysisResult;
+  executionRecords?: ExecutionRecord[];
+  currentHistoryId?: string | null;
+  onSaveRecords?: (records: ExecutionRecord[]) => Promise<void>;
 }
 
 const COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 
-export default function AnalysisReport({ result: rawResult }: Props) {
+export default function AnalysisReport({ result: rawResult, executionRecords = [], currentHistoryId, onSaveRecords }: Props) {
   const result: AnalysisResult = {
     ...rawResult,
     identifiedKeyPlayers: rawResult.identifiedKeyPlayers ?? [],
@@ -59,6 +67,53 @@ export default function AnalysisReport({ result: rawResult }: Props) {
   };
 
   const [adviceRatings, setAdviceRatings] = useState<Record<string, 'up' | 'down'>>({});
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+  // Flatten all outbursts across player reports for execution record tracking
+  const allOutbursts = React.useMemo(() => {
+    const flat: { playerName: string; title: string; trigger: string }[] = [];
+    result.playerReports.forEach(p => {
+      (p.negativeOutbursts ?? []).forEach(o => {
+        flat.push({ playerName: p.roleName, title: (o as any).title ?? o.trigger, trigger: o.trigger });
+      });
+    });
+    return flat;
+  }, [result]);
+
+  const [localRecordPatches, setLocalRecordPatches] = useState<Record<number, Partial<ExecutionRecord>>>({});
+
+  const handleRecordChange = (index: number, data: Partial<ExecutionRecord>) => {
+    setLocalRecordPatches(prev => ({ ...prev, [index]: { ...(prev[index] ?? {}), ...data } }));
+  };
+
+  const handleSubmitRecords = async (status: '草稿' | '待审核' | '已完成' | '待归档') => {
+    if (!onSaveRecords || !currentHistoryId) return;
+    setSaveStatus('saving');
+    const now = new Date().toISOString();
+    const records: ExecutionRecord[] = allOutbursts.map((ob, i) => {
+      const patch = localRecordPatches[i] ?? {};
+      const existing = executionRecords.find(r => r.historyRecordId === currentHistoryId && r.outburstIndex === i);
+      return {
+        id: existing?.id ?? `exec_${Date.now()}_${i}`,
+        historyRecordId: currentHistoryId,
+        playerName: ob.playerName,
+        outburstIndex: i,
+        outburstTitle: ob.title,
+        serverProfileName: '',
+        category: patch.category ?? existing?.category ?? '待推进',
+        submissionStatus: status,
+        date: existing?.date ?? now.slice(0, 10),
+        description: patch.description ?? existing?.description ?? '',
+        attachments: patch.attachments ?? existing?.attachments ?? [],
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+        ownerId: '',
+      };
+    });
+    await onSaveRecords(records);
+    setSaveStatus('saved');
+    setTimeout(() => setSaveStatus('idle'), 2000);
+  };
 
   const rateAdvice = (key: string, rating: 'up' | 'down', playerName: string, trigger: string) => {
     if (adviceRatings[key]) return;
@@ -400,7 +455,61 @@ export default function AnalysisReport({ result: rawResult }: Props) {
         </div>
       </section>
 
-      {/* 3. Recharge & Visualization */}
+      {/* 3. Execution Record Upload */}
+      {allOutbursts.length > 0 && (
+        <section className="space-y-6">
+          <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <ClipboardList className="w-6 h-6 text-indigo-600" />
+            执行记录上传
+          </h3>
+          <div className="space-y-3">
+            {allOutbursts.map((ob, i) => (
+              <ExecutionRecordUpload
+                key={i}
+                outburstIndex={i}
+                playerName={ob.playerName}
+                outburstTitle={ob.title}
+                existing={executionRecords.find(r => r.historyRecordId === currentHistoryId && r.outburstIndex === i)}
+                onChange={handleRecordChange}
+              />
+            ))}
+          </div>
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-3 pt-2">
+            <button
+              onClick={() => handleSubmitRecords('草稿')}
+              disabled={saveStatus === 'saving' || !onSaveRecords}
+              className="flex items-center gap-2 px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 disabled:opacity-40 transition-all"
+            >
+              <Save className="w-4 h-4" />
+              暂存草稿
+            </button>
+            <button
+              onClick={() => handleSubmitRecords('待审核')}
+              disabled={saveStatus === 'saving' || !onSaveRecords}
+              className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-40 transition-all shadow-lg shadow-indigo-100"
+            >
+              <Send className="w-4 h-4" />
+              提交核实
+            </button>
+            <button
+              onClick={() => handleSubmitRecords('待归档')}
+              disabled={saveStatus === 'saving' || !onSaveRecords}
+              className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-40 transition-all shadow-lg shadow-emerald-100"
+            >
+              <BookmarkPlus className="w-4 h-4" />
+              生成案例
+            </button>
+            {saveStatus === 'saved' && (
+              <span className="flex items-center gap-1 text-emerald-600 text-sm font-bold">
+                ✓ 已保存
+              </span>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* 4. Recharge & Visualization */}
       <section className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-8">
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-bold text-slate-800 flex items-center gap-3">

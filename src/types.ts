@@ -23,6 +23,7 @@ export interface ServerProfile {
   name: string;
   keyPlayers: string[];
   openingDate: string;
+  mergeStage?: string;
   gsName?: string;
   gsPersona?: {
     age?: string;
@@ -43,6 +44,23 @@ export interface ServerProfile {
       lastUpdated: string;
     };
   };
+  ownerId: string;
+}
+
+export interface ExecutionRecord {
+  id: string;
+  historyRecordId: string;
+  playerName: string;
+  outburstIndex: number;
+  outburstTitle: string;
+  serverProfileName: string;
+  category: '待推进' | '已解决';
+  submissionStatus: '草稿' | '待审核' | '已完成' | '待归档';
+  date: string;
+  description: string;
+  attachments: { name: string; type: string; dataUrl: string }[];
+  createdAt: string;
+  updatedAt: string;
   ownerId: string;
 }
 
@@ -133,6 +151,17 @@ export interface AnalysisCase {
   isHot?: boolean;
   isPublic: boolean;
   ownerId: string;
+}
+
+export interface LeaderReview {
+  id: string;
+  executionRecordId: string;
+  isGsCaused: boolean | null;
+  comment: string;
+  decision: '打回' | '继续推进' | '结案' | null;
+  aiCheckResult?: string;
+  reviewedAt: string;
+  reviewerId: string;
 }
 
 export interface HistoryRecord {
