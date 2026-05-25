@@ -245,6 +245,64 @@ export async function fetchAllHistory(group?: string): Promise<(HistoryRecord & 
   return group ? all.filter(r => r.group === group) : all;
 }
 
+// Tag all existing records for a user with their new group, then push to cloud.
+// Call this whenever a member sets or confirms their group.
+export async function setMemberGroupAndTagRecords(userId: string, group: string): Promise<void> {
+  const profiles = load<ServerProfile>('gs_serverProfiles');
+  profiles.forEach(p => {
+    if (p.ownerId === userId) { p.group = group; cloudSet('serverProfiles', p.id, p); }
+  });
+  save('gs_serverProfiles', profiles);
+
+  const execs = load<ExecutionRecord>(EXEC_KEY);
+  execs.forEach(r => {
+    if (r.ownerId === userId) { r.group = group; cloudSet('execRecords', r.id, r); }
+  });
+  save(EXEC_KEY, execs);
+
+  const history = load<HistoryRecord & { userId: string }>('gs_analysisHistory');
+  history.forEach(r => {
+    if (r.userId === userId) { (r as any).group = group; cloudSet('analysisHistory', r.id, r); }
+  });
+  save('gs_analysisHistory', history);
+
+  // Publish user's group membership to cloud so leader can discover it
+  cloudSet('userProfiles', userId, { userId, group, updatedAt: new Date().toISOString() });
+}
+
+// Leader portal fetches: pull from CloudBase by group field, merge with any
+// local records that already carry the group tag (same-device fallback).
+function mergeById<T extends { id: string }>(local: T[], cloud: T[]): T[] {
+  const map = new Map<string, T>();
+  local.forEach(x => map.set(x.id, x));
+  cloud.forEach(x => map.set(x.id, x)); // cloud wins on conflict
+  return Array.from(map.values());
+}
+
+export async function fetchAllServerProfilesForLeader(group: string): Promise<ServerProfile[]> {
+  const [cloudItems, localItems] = await Promise.all([
+    cloudFetchWhere<ServerProfile>('serverProfiles', 'group', group),
+    Promise.resolve(load<ServerProfile>('gs_serverProfiles').filter(p => p.group === group)),
+  ]);
+  return mergeById(localItems, cloudItems);
+}
+
+export async function fetchAllExecutionRecordsForLeader(group: string): Promise<ExecutionRecord[]> {
+  const [cloudItems, localItems] = await Promise.all([
+    cloudFetchWhere<ExecutionRecord>('execRecords', 'group', group),
+    Promise.resolve(load<ExecutionRecord>(EXEC_KEY).filter(r => r.group === group)),
+  ]);
+  return mergeById(localItems, cloudItems);
+}
+
+export async function fetchAllHistoryForLeader(group: string): Promise<(HistoryRecord & { userId: string })[]> {
+  const [cloudItems, localItems] = await Promise.all([
+    cloudFetchWhere<HistoryRecord & { userId: string }>('analysisHistory', 'group', group),
+    Promise.resolve(load<HistoryRecord & { userId: string }>('gs_analysisHistory').filter(r => r.group === group)),
+  ]);
+  return mergeById(localItems, cloudItems) as (HistoryRecord & { userId: string })[];
+}
+
 // ---------------- Leader Reviews ----------------
 const REVIEW_KEY = 'gs_leaderReviews';
 

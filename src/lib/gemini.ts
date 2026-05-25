@@ -46,6 +46,50 @@ ${gsAdviceAction}
   };
 }
 
+export async function generateCaseSummary(params: {
+  playerName: string;
+  outburstTrigger: string;
+  triggerPoint: string;
+  contextText: string;
+  executionDescription: string;
+  executionReflection: string;
+  disposalPlan: string;
+}): Promise<{ title: string; outburstReason: string; summary: string; reflection: string }> {
+  const prompt = `你是一个游戏运营案例撰写专家，帮助GS将一次负面事件处置过程整理为可复用的案例经验。
+
+【玩家及负面事件】
+玩家：${params.playerName}
+负面原因：${params.outburstTrigger}
+触发点：${params.triggerPoint}
+
+【聊天上下文片段】
+${params.contextText || '（无）'}
+
+【GS执行记录】
+执行描述：${params.executionDescription || '（无）'}
+复盘反思：${params.executionReflection || '（无）'}
+
+【AI建议处置方案】
+${params.disposalPlan || '（无）'}
+
+请根据以上信息，严格返回JSON（不要markdown包裹）：
+{
+  "title": "案例标题，15字以内，精炼概括事件与处置结果",
+  "outburstReason": "负面原因精炼摘要，50字以内",
+  "summary": "经验总结：本次处置的核心策略与成效，100字以内",
+  "reflection": "复盘反思：下次遇到类似情况可以改进的点，100字以内"
+}`;
+
+  const content = await chatCompletion([{ role: 'user', content: prompt }], true);
+  const raw = JSON.parse(content);
+  return {
+    title: raw.title ?? '',
+    outburstReason: raw.outburstReason ?? params.outburstTrigger,
+    summary: raw.summary ?? '',
+    reflection: raw.reflection ?? '',
+  };
+}
+
 async function chatCompletion(messages: { role: string; content: string }[], jsonMode = false): Promise<string> {
   const res = await fetch('/api/gemini/chat/completions', {
     method: 'POST',
@@ -136,11 +180,43 @@ ${rechargeData}
 - 基于聊天活跃度、充值金额（来自Sheet2）、言论影响力，筛选1-3位最值得关注的玩家。
 - GS账号不纳入重点玩家范围。
 
-## 任务二：生成玩家画像（字段来源严格区分）
+## 任务二：重点玩家结构化画像分析
+
+**重点玩家提取标准：开服三天内充值达500元**（结合背景信息中开服日期与Sheet2充值数据判断，isKeyPlayer=true；未达标则 isKeyPlayer=false）。
+
+对每位玩家同时输出两套画像：
+
+### 2A. 基础兼容画像（portrait，来源规则不变）
 - paymentHabits：只能来自 Sheet2 充值数据。
 - personality / gameHabits：只能来自 Sheet1 聊天行为。
 - realLifePersona：只能来自聊天中明确透露的现实信息，无则填"数据中无记录"。
 - summary：一句话（30字内），基于以上已填字段综合。
+
+### 2B. 结构化画像表格（portraitTable）
+
+**数据版基础信息**（只能从已有数据中提取，不推断）：
+- totalRecharge：从Sheet2逐笔累加该玩家历史总充值
+- recentActivity：近7日充值活跃度描述（无充值数据填"数据中无记录"）
+- anomalySignals：近期是否有异常资源抛售/频繁下线/负面退游情绪（基于Sheet1，无则填"未检测到异常信号"）
+
+**三个维度（每个词条必须单独判断是否有数据支撑）**：
+
+维度一：现实属性（只能来自Sheet1聊天数据）
+①年龄段（从聊天内容中提取，无则obtained=false，value="数据中无记录"，evidence=""）
+②大致职业（同上）
+③核心在线时段（从聊天时间规律分析，无则obtained=false）
+④生活状态/情绪锚点（近期现实压力，从聊天中明确提及的内容提取，无则obtained=false）
+
+维度二：江湖地位（只能来自Sheet1聊天数据）
+①同盟与从属（帮会地位与跟随者，从聊天行为提取，无则obtained=false）
+②宿敌与仇恨（敌对玩家或帮会，从聊天内容提取，无则obtained=false）
+
+维度三：消费心理（来自Sheet2充值数据+Sheet1聊天数据，来源混用须注明）
+①核心驱动（战力追求/面子/复仇等，无法判断则obtained=false）
+②消费偏好（买断式/概率抽取，从充值数据提取，无则obtained=false）
+③敏感点/雷区（从聊天中明确表达的反感/投诉提取，无则obtained=false）
+
+铁律：每个词条 value 只填数据中有据可查的内容；无数据支撑则 obtained=false，value="数据中无记录"，evidence=""。completionRate = 该维度中 obtained=true 的词条数 ÷ 总词条数（保留两位小数）。
 
 ## 任务三：负面爆发核查（仅基于 Sheet1 聊天数据）
 - 识别明确出现在聊天记录中的负面情绪/投诉/发泄行为。
@@ -196,6 +272,44 @@ GS角色名已在背景信息中标注（"角色名:xxx"），以此识别GS在�
         "gameHabits": "来自Sheet1的游戏行为偏好",
         "realLifePersona": "来自聊天明确透露的现实信息，无则填'数据中无记录'",
         "summary": "一句话总结（30字内）"
+      },
+      "portraitTable": {
+        "isKeyPlayer": true或false,
+        "basicData": {
+          "totalRecharge": 数字,
+          "recentActivity": "近7日充值活跃度",
+          "anomalySignals": "异常信号描述或'未检测到异常信号'"
+        },
+        "dimensions": [
+          {
+            "name": "维度一：现实属性",
+            "completionRate": 0.75,
+            "items": [
+              { "label": "年龄段", "value": "提取内容或'数据中无记录'", "evidence": "依据原文或''", "obtained": true或false },
+              { "label": "大致职业", "value": "...", "evidence": "...", "obtained": true或false },
+              { "label": "核心在线时段", "value": "...", "evidence": "...", "obtained": true或false },
+              { "label": "生活状态/情绪锚点", "value": "...", "evidence": "...", "obtained": true或false }
+            ]
+          },
+          {
+            "name": "维度二：江湖地位",
+            "completionRate": 0.5,
+            "items": [
+              { "label": "同盟与从属", "value": "...", "evidence": "...", "obtained": true或false },
+              { "label": "宿敌与仇恨", "value": "...", "evidence": "...", "obtained": true或false }
+            ]
+          },
+          {
+            "name": "维度三：消费心理",
+            "completionRate": 0.67,
+            "items": [
+              { "label": "核心驱动", "value": "...", "evidence": "...", "obtained": true或false },
+              { "label": "消费偏好", "value": "...", "evidence": "...", "obtained": true或false },
+              { "label": "敏感点/雷区", "value": "...", "evidence": "...", "obtained": true或false }
+            ]
+          }
+        ],
+        "overallCompletion": 0.67
       },
       "negativeOutbursts": [
         {
@@ -259,18 +373,42 @@ GS角色名已在背景信息中标注（"角色名:xxx"），以此识别GS在�
   const raw = JSON.parse(content);
   return {
     identifiedKeyPlayers: raw.identifiedKeyPlayers ?? [],
-    playerReports: (raw.playerReports ?? []).map((p: any) => ({
-      ...p,
-      negativeOutbursts: (p.negativeOutbursts ?? []).map((o: any) => ({
-        ...o,
-        context: o.context ?? [],
-        tags: o.tags ?? [],
-        gsAdvice: {
-          ...o.gsAdvice,
-          resultTags: o.gsAdvice?.resultTags ?? [],
+    playerReports: (raw.playerReports ?? []).map((p: any) => {
+      const pt = p.portraitTable;
+      const parsedPortraitTable = pt ? {
+        isKeyPlayer: pt.isKeyPlayer ?? false,
+        basicData: {
+          totalRecharge: pt.basicData?.totalRecharge ?? 0,
+          recentActivity: pt.basicData?.recentActivity ?? '数据中无记录',
+          anomalySignals: pt.basicData?.anomalySignals ?? '未检测到异常信号',
         },
-      })),
-    })),
+        dimensions: (pt.dimensions ?? []).map((d: any) => ({
+          name: d.name ?? '',
+          completionRate: d.completionRate ?? 0,
+          items: (d.items ?? []).map((item: any) => ({
+            label: item.label ?? '',
+            value: item.value ?? '数据中无记录',
+            evidence: item.evidence ?? '',
+            obtained: item.obtained ?? false,
+          })),
+        })),
+        overallCompletion: pt.overallCompletion ?? 0,
+      } : undefined;
+
+      return {
+        ...p,
+        portraitTable: parsedPortraitTable,
+        negativeOutbursts: (p.negativeOutbursts ?? []).map((o: any) => ({
+          ...o,
+          context: o.context ?? [],
+          tags: o.tags ?? [],
+          gsAdvice: {
+            ...o.gsAdvice,
+            resultTags: o.gsAdvice?.resultTags ?? [],
+          },
+        })),
+      };
+    }),
     rechargeReport: {
       totalPaid: raw.rechargeReport?.totalPaid ?? 0,
       totalUnpaid: raw.rechargeReport?.totalUnpaid ?? 0,

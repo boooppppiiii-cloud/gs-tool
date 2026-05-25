@@ -63,9 +63,9 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
   const loadData = React.useCallback(async () => {
     setLoading(true);
     const [profiles, execs, hist, reviews, dismissed] = await Promise.all([
-      dataService.fetchAllServerProfiles(leaderGroup),
-      dataService.fetchAllExecutionRecords(leaderGroup),
-      dataService.fetchAllHistory(leaderGroup),
+      dataService.fetchAllServerProfilesForLeader(leaderGroup),
+      dataService.fetchAllExecutionRecordsForLeader(leaderGroup),
+      dataService.fetchAllHistoryForLeader(leaderGroup),
       dataService.fetchLeaderReviews(),
       dataService.fetchDismissedOutbursts(),
     ]);

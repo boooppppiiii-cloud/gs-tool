@@ -80,13 +80,18 @@ export default function App() {
   React.useEffect(() => {
     if (user) {
       const saved = localStorage.getItem(`member_group_${user.id}`);
-      setMemberGroup(saved && PRESET_GROUPS.includes(saved) ? saved : PRESET_GROUPS[0]);
+      const group = saved && PRESET_GROUPS.includes(saved) ? saved : PRESET_GROUPS[0];
+      setMemberGroup(group);
+      // Ensure all existing records are tagged and synced to cloud on login
+      dataService.setMemberGroupAndTagRecords(user.id, group);
     }
   }, [user?.id]);
   const handleGroupChange = (g: string) => {
     if (!user) return;
     setMemberGroup(g);
     localStorage.setItem(`member_group_${user.id}`, g);
+    // Retag all records with new group and push to cloud
+    dataService.setMemberGroupAndTagRecords(user.id, g);
   };
   const handleDisplayNameChange = (name: string) => {
     if (!user) return;
@@ -601,11 +606,53 @@ export default function App() {
                                    result={analysisResult}
                                    executionRecords={executionRecords}
                                    currentHistoryId={currentHistoryId}
+                                   serverName={serverProfiles.find(p => p.id === activeProfileId)?.name}
+                                   gsName={serverProfiles.find(p => p.id === activeProfileId)?.gsName}
                                    onSaveRecords={async (records) => {
                                      for (const rec of records) {
                                        await dataService.saveExecutionRecord({ ...rec, ownerId: user?.id ?? '' });
                                      }
                                      await loadUserData();
+                                   }}
+                                   onSaveCase={async (draft) => {
+                                     const activeProfile = serverProfiles.find(p => p.id === activeProfileId);
+                                     const id = `case_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                                     const newCase: AnalysisCase = {
+                                       id,
+                                       title: draft.title ?? '待完善案例',
+                                       tags: draft.tags ?? ['AI辅助整合'],
+                                       serverName: draft.serverName ?? activeProfile?.name ?? '',
+                                       gsName: draft.gsName ?? activeProfile?.gsName ?? '',
+                                       playerName: draft.playerName ?? '',
+                                       mergeStage: draft.mergeStage,
+                                       caseBackground: draft.caseBackground,
+                                       outburstReason: draft.outburstReason ?? '',
+                                       triggerPoint: draft.triggerPoint ?? '',
+                                       context: draft.context ?? [],
+                                       gsAction: draft.gsAction ?? '',
+                                       disposalPlan: draft.disposalPlan ?? '',
+                                       caseResult: draft.caseResult ?? '',
+                                       timestamp: new Date().toISOString(),
+                                       views: 0, likes: 0, votedUserIds: [],
+                                       isPublic: false,
+                                       ownerId: user!.id,
+                                     };
+                                     await dataService.saveManualCase(newCase);
+                                     const updated = await dataService.fetchCases(user!.id);
+                                     setCases(updated);
+                                   }}
+                                   onUpdatePortrait={(roleName, updates) => {
+                                     const activeProfile = serverProfiles.find(p => p.id === activeProfileId);
+                                     if (!activeProfile) return;
+                                     const existing = activeProfile.persistentPortraits?.[roleName] ?? {} as any;
+                                     const newPortraits = {
+                                       ...(activeProfile.persistentPortraits ?? {}),
+                                       [roleName]: { ...existing, ...updates },
+                                     };
+                                     dataService.updateServerProfile(activeProfile.id, { persistentPortraits: newPortraits });
+                                     setServerProfiles(prev => prev.map(p =>
+                                       p.id === activeProfile.id ? { ...p, persistentPortraits: newPortraits } : p
+                                     ));
                                    }}
                                  />
                      </div>

@@ -42,6 +42,8 @@ export interface ServerProfile {
       gameHabits: string;
       realLifePersona: string;
       summary: string;
+      occupation?: string;
+      combatRanking?: string;
       lastUpdated: string;
     };
   };
@@ -87,15 +89,40 @@ export interface AnalysisResult {
   gsCommunicationReports?: GsCommunicationReport[];
 }
 
+export interface PortraitItem {
+  label: string;    // 信息词条
+  value: string;    // 玩家具体信息（仅来自数据）
+  evidence: string; // 信息依据
+  obtained: boolean;
+}
+
+export interface PortraitDimension {
+  name: string;           // e.g. "维度一：现实属性"
+  items: PortraitItem[];
+  completionRate: number; // obtained / total, 0-1
+}
+
+export interface PortraitTable {
+  isKeyPlayer: boolean;   // 开服3天内充值≥500元
+  basicData: {
+    totalRecharge: number;
+    recentActivity: string;
+    anomalySignals: string;
+  };
+  dimensions: PortraitDimension[];
+  overallCompletion: number; // total obtained / total items
+}
+
 export interface PlayerBehaviorReport {
   roleName: string;
   portrait: {
-    paymentHabits: string;      // 付费习惯
-    personality: string;      // 人物性格
-    gameHabits: string;       // 游戏习惯
-    realLifePersona: string;  // 现实人设
-    summary: string;          // 简短完整画像
+    paymentHabits: string;
+    personality: string;
+    gameHabits: string;
+    realLifePersona: string;
+    summary: string;
   };
+  portraitTable?: PortraitTable;
   negativeOutbursts: {
     title?: string;          // AI 生成的案例标题
     tags?: string[];         // AI 生成的标签
