@@ -28,8 +28,15 @@ import {
   Save,
   Send,
   BookmarkPlus,
+  MessageCircle,
+  ArrowUpRight,
+  ArrowDownLeft,
+  XCircle,
+  Gamepad2,
+  Coffee,
+  AlertCircle,
 } from 'lucide-react';
-import { AnalysisResult, PlayerBehaviorReport, ExecutionRecord } from '../types';
+import { AnalysisResult, PlayerBehaviorReport, ExecutionRecord, GsCommunicationReport } from '../types';
 import ExecutionRecordUpload from './ExecutionRecordUpload';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle } from 'docx';
@@ -610,6 +617,10 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
         </div>
       </section>
 
+      {(result.gsCommunicationReports ?? []).length > 0 && (
+        <GsCommunicationSection reports={result.gsCommunicationReports!} />
+      )}
+
       <FeedbackPanel />
     </div>
   );
@@ -623,6 +634,128 @@ function PortraitDetail({ title, content, color }: { title: string; content: str
       </span>
       <p className="text-sm text-slate-600 leading-snug">{content}</p>
     </div>
+  );
+}
+
+function GsCommunicationSection({ reports }: { reports: GsCommunicationReport[] }) {
+  const totalActive = reports.reduce((s, r) => s + r.activeCount, 0);
+  const totalPassive = reports.reduce((s, r) => s + r.passiveCount, 0);
+  const totalBad = reports.reduce((s, r) => s + r.badCount, 0);
+  const totalInGame = reports.reduce((s, r) => s + r.contentTypes.inGame, 0);
+  const totalOutGame = reports.reduce((s, r) => s + r.contentTypes.outGame, 0);
+  const intervened = reports.filter(r => r.hasIntervened).length;
+  const needsIntervention = reports.filter(r => !r.hasIntervened && r.interventionSummary !== '无负面工单').length;
+
+  return (
+    <section className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <MessageCircle className="w-6 h-6 text-indigo-600" />
+          <h3 className="text-xl font-bold text-slate-800">GS 维护质量分析</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          {needsIntervention > 0 && (
+            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-600 text-[10px] font-black">
+              <AlertCircle className="w-3 h-3" /> {needsIntervention} 个负面未介入
+            </span>
+          )}
+          {intervened > 0 && (
+            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 text-[10px] font-black">
+              <CheckCircle2 className="w-3 h-3" /> {intervened} 个已介入
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Summary bar */}
+      <div className="px-8 py-5 border-b border-slate-100 bg-slate-50/40">
+        <div className="grid grid-cols-5 gap-4">
+          {[
+            { label: '主动沟通', value: totalActive, icon: <ArrowUpRight className="w-4 h-4" />, color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
+            { label: '被动沟通', value: totalPassive, icon: <ArrowDownLeft className="w-4 h-4" />, color: 'text-blue-600 bg-blue-50 border-blue-200' },
+            { label: '不良沟通', value: totalBad, icon: <XCircle className="w-4 h-4" />, color: 'text-rose-600 bg-rose-50 border-rose-200' },
+            { label: '游戏内', value: totalInGame, icon: <Gamepad2 className="w-4 h-4" />, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+            { label: '游戏外', value: totalOutGame, icon: <Coffee className="w-4 h-4" />, color: 'text-amber-600 bg-amber-50 border-amber-200' },
+          ].map(({ label, value, icon, color }) => (
+            <div key={label} className={`flex flex-col items-center gap-1.5 px-4 py-3 rounded-2xl border ${color}`}>
+              {icon}
+              <p className="text-2xl font-black tabular-nums">{value}</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest">{label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Per-player breakdown */}
+      <div className="divide-y divide-slate-50">
+        {reports.map(r => {
+          const hasNegative = r.interventionSummary !== '无负面工单';
+          const interventionStatus = !hasNegative
+            ? null
+            : r.hasIntervened
+            ? 'intervened'
+            : 'missing';
+
+          return (
+            <div key={r.roleName} className="px-8 py-5 flex flex-wrap items-start gap-6">
+              {/* Player name + intervention badge */}
+              <div className="w-28 shrink-0">
+                <p className="text-sm font-black text-slate-800 truncate">{r.roleName}</p>
+                {interventionStatus === 'intervened' && (
+                  <span className="mt-1 flex items-center gap-0.5 text-[10px] font-bold text-emerald-600">
+                    <CheckCircle2 className="w-3 h-3" /> GS已介入
+                  </span>
+                )}
+                {interventionStatus === 'missing' && (
+                  <span className="mt-1 flex items-center gap-0.5 text-[10px] font-bold text-rose-500">
+                    <AlertCircle className="w-3 h-3" /> 未介入
+                  </span>
+                )}
+              </div>
+
+              {/* Comm type chips */}
+              <div className="flex flex-wrap gap-2 flex-1">
+                {r.activeCount > 0 && (
+                  <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-black">
+                    <ArrowUpRight className="w-3 h-3" /> 主动 ×{r.activeCount}
+                  </span>
+                )}
+                {r.passiveCount > 0 && (
+                  <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black">
+                    <ArrowDownLeft className="w-3 h-3" /> 被动 ×{r.passiveCount}
+                  </span>
+                )}
+                {r.badCount > 0 && (
+                  <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-[10px] font-black">
+                    <XCircle className="w-3 h-3" /> 不良 ×{r.badCount}
+                  </span>
+                )}
+                {r.contentTypes.inGame > 0 && (
+                  <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-black">
+                    <Gamepad2 className="w-3 h-3" /> 游戏内 ×{r.contentTypes.inGame}
+                  </span>
+                )}
+                {r.contentTypes.outGame > 0 && (
+                  <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black">
+                    <Coffee className="w-3 h-3" /> 游戏外 ×{r.contentTypes.outGame}
+                  </span>
+                )}
+                {r.activeCount === 0 && r.passiveCount === 0 && r.badCount === 0 && (
+                  <span className="text-[10px] text-slate-400 font-medium italic">无沟通记录</span>
+                )}
+              </div>
+
+              {/* Intervention summary */}
+              {r.interventionSummary && r.interventionSummary !== '无负面工单' && (
+                <p className="w-full text-xs text-slate-500 leading-relaxed mt-0.5 italic">
+                  {r.interventionSummary}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

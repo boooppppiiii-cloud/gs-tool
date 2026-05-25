@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { getAnalyticsLogs, fetchAllAnalyticsLogs } from '../services/analyticsService';
+import { cloudFetchAll } from '../lib/cloudSync';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
   LineChart, Line,
   PieChart, Pie, Legend,
 } from 'recharts';
-import { Shield, Activity, Clock, Zap, MousePointer2, TrendingUp, PieChart as PieChartIcon, MessageSquare, AlertTriangle, Users, ThumbsUp, ThumbsDown, BookOpen } from 'lucide-react';
+import { Shield, Activity, Clock, Zap, MousePointer2, TrendingUp, PieChart as PieChartIcon, MessageSquare, AlertTriangle, Users, ThumbsUp, ThumbsDown, BookOpen, Database, RefreshCw, CheckCircle2, BarChart2 } from 'lucide-react';
+import { AnalysisCase, ExecutionRecord, HistoryRecord, LeaderReview } from '../types';
 
 interface UsageLog {
   id: string;
@@ -69,6 +71,7 @@ function formatDuration(ms: number): string {
 }
 
 export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState<'usage' | 'business'>('usage');
   const [logs, setLogs] = useState<UsageLog[]>([]);
 
   useEffect(() => {
@@ -150,10 +153,33 @@ export default function AdminDashboard() {
           <div className="w-10 h-10 bg-amber-50 border border-amber-200/60 rounded-xl flex items-center justify-center text-indigo-600 shadow-lg shadow-amber-100 adventure-icon-active">
             <Shield className="w-6 h-6" />
           </div>
-          后台管理打点系统
+          后台管理系统
         </h2>
-        <p className="text-slate-500 font-medium mt-1 uppercase tracking-widest text-[10px]">Real-time Usage Analytics & Tracking</p>
+        <p className="text-slate-500 font-medium mt-1 uppercase tracking-widest text-[10px]">Real-time Analytics & Business Dashboard</p>
       </div>
+
+      {/* Tab switcher */}
+      <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl w-fit">
+        {([
+          { key: 'usage', label: '使用统计', icon: <Activity className="w-4 h-4" /> },
+          { key: 'business', label: '业务大盘', icon: <Database className="w-4 h-4" /> },
+        ] as const).map(t => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-colors ${
+              activeTab === t.key
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {t.icon}{t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'business' && <BusinessDashboard />}
+      {activeTab === 'usage' && (<>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard icon={<MousePointer2 className="w-5 h-5" />} label="功能点击总次数" value={totalClicks} color="indigo" />
@@ -239,6 +265,7 @@ export default function AdminDashboard() {
       <KbSearchStats logs={logs} />
 
       <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden">
+
         <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
             <Clock className="w-5 h-5 text-indigo-600" />
@@ -293,6 +320,219 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
+      </div>
+      </>)}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────
+// Business Dashboard — reads from CloudBase collections
+// ─────────────────────────────────────────────────────────
+
+interface BizData {
+  history: (HistoryRecord & { userId: string })[];
+  execRecords: ExecutionRecord[];
+  cases: AnalysisCase[];
+  dismissed: { id: string; historyRecordId: string; outburstIndex: number }[];
+  reviews: LeaderReview[];
+}
+
+function BusinessDashboard() {
+  const [data, setData] = useState<BizData | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [history, execRecords, cases, dismissed, reviews] = await Promise.all([
+        cloudFetchAll<HistoryRecord & { userId: string }>('analysisHistory'),
+        cloudFetchAll<ExecutionRecord>('execRecords'),
+        cloudFetchAll<AnalysisCase>('cases'),
+        cloudFetchAll<{ id: string; historyRecordId: string; outburstIndex: number }>('dismissedOutbursts'),
+        cloudFetchAll<LeaderReview>('leaderReviews'),
+      ]);
+      setData({ history, execRecords, cases, dismissed, reviews });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadData(); }, []);
+
+  if (loading && !data) {
+    return (
+      <div className="flex items-center justify-center py-24 text-slate-400">
+        <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+        <span className="text-sm font-bold">正在从云端拉取数据…</span>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const { history, execRecords, cases, dismissed, reviews } = data;
+
+  // KPI computations
+  const totalOutbursts = history.reduce((sum, r) =>
+    sum + (r.result?.playerReports ?? []).reduce((s, p) => s + (p.negativeOutbursts?.length ?? 0), 0), 0
+  );
+  const resolvedCount = execRecords.filter(r => r.submissionStatus === '已完成').length;
+  const resolutionRate = totalOutbursts > 0 ? Math.round((resolvedCount / totalOutbursts) * 100) : 0;
+  const aiAccuracy = totalOutbursts > 0
+    ? Math.round(((totalOutbursts - dismissed.length) / totalOutbursts) * 100)
+    : 100;
+  const publicCases = cases.filter(c => c.isPublic).length;
+  const activeUsers30d = (() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    const ids = new Set(execRecords.filter(r => new Date(r.updatedAt) > cutoff).map(r => r.ownerId));
+    return ids.size;
+  })();
+
+  // Monthly trend (last 6 months)
+  const months: string[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    months.push(d.toISOString().slice(0, 7));
+  }
+  const trendData = months.map(m => {
+    const newOutbursts = history
+      .filter(r => r.timestamp?.slice(0, 7) === m)
+      .reduce((sum, r) =>
+        sum + (r.result?.playerReports ?? []).reduce((s, p) => s + (p.negativeOutbursts?.length ?? 0), 0), 0
+      );
+    const resolved = execRecords.filter(r => (r.updatedAt ?? '').slice(0, 7) === m && r.submissionStatus === '已完成').length;
+    return { month: m.slice(5), newOutbursts, resolved };
+  });
+
+  // GS ranking
+  const gsMap: Record<string, { analyses: number; tickets: number; resolved: number }> = {};
+  history.forEach(r => {
+    const gs = (r.serverConfig as any)?.gsName || r.userId || '未知';
+    if (!gsMap[gs]) gsMap[gs] = { analyses: 0, tickets: 0, resolved: 0 };
+    gsMap[gs].analyses++;
+    gsMap[gs].tickets += (r.result?.playerReports ?? []).reduce((s, p) => s + (p.negativeOutbursts?.length ?? 0), 0);
+  });
+  execRecords.forEach(r => {
+    const gs = r.ownerId || '未知';
+    if (!gsMap[gs]) gsMap[gs] = { analyses: 0, tickets: 0, resolved: 0 };
+    if (r.submissionStatus === '已完成') gsMap[gs].resolved++;
+  });
+  const gsRanking = Object.entries(gsMap)
+    .map(([name, v]) => ({ name, ...v, rate: v.tickets > 0 ? Math.round((v.resolved / v.tickets) * 100) : 0 }))
+    .sort((a, b) => b.tickets - a.tickets)
+    .slice(0, 10);
+
+  // Knowledge base stats
+  const totalLikes = cases.reduce((s, c) => s + (c.likes || 0), 0);
+  const totalViews = cases.reduce((s, c) => s + (c.views || 0), 0);
+
+  const kpiCards = [
+    { label: '总负面工单', value: totalOutbursts, icon: <AlertTriangle className="w-5 h-5" />, color: 'orange' },
+    { label: '已结案', value: resolvedCount, icon: <CheckCircle2 className="w-5 h-5" />, color: 'emerald' },
+    { label: '结案率', value: `${resolutionRate}%`, icon: <TrendingUp className="w-5 h-5" />, color: 'indigo' },
+    { label: 'AI准确率', value: `${aiAccuracy}%`, icon: <BarChart2 className="w-5 h-5" />, color: 'purple' },
+    { label: '公开案例', value: publicCases, icon: <BookOpen className="w-5 h-5" />, color: 'amber' },
+    { label: '近30日活跃用户', value: activeUsers30d, icon: <Users className="w-5 h-5" />, color: 'rose' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">云端业务数据（仅含部署后新增数据）</p>
+        <button
+          onClick={loadData}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          刷新
+        </button>
+      </div>
+
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        {kpiCards.map(({ label, value, icon, color }) => (
+          <StatCard key={label} icon={icon} label={label} value={value} color={color} />
+        ))}
+      </div>
+
+      {/* Monthly trend */}
+      <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
+        <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6">
+          <TrendingUp className="w-5 h-5 text-indigo-600" />
+          近6月趋势
+        </h3>
+        <div className="h-56 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={trendData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+              <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+              <Line type="monotone" dataKey="newOutbursts" name="新增负面工单" stroke="#f59e0b" strokeWidth={3} dot={{ fill: '#f59e0b', r: 4 }} />
+              <Line type="monotone" dataKey="resolved" name="结案数" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4 }} />
+              <Legend />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* GS Ranking */}
+      {gsRanking.length > 0 && (
+        <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-8 py-6 border-b border-slate-100">
+            <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+              <Users className="w-5 h-5 text-indigo-600" />
+              GS 执行排行
+            </h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/50">
+                  {['GS', '分析次数', '发现工单', '已结案', '结案率'].map(h => (
+                    <th key={h} className="px-6 py-3 text-[10px] uppercase font-black text-slate-400 tracking-widest">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {gsRanking.map((gs, i) => (
+                  <tr key={gs.name} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="px-6 py-3 flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-black flex items-center justify-center">{i + 1}</span>
+                      <span className="text-sm font-bold text-slate-700 truncate max-w-[120px]">{gs.name}</span>
+                    </td>
+                    <td className="px-6 py-3 text-sm font-black text-slate-600 tabular-nums">{gs.analyses}</td>
+                    <td className="px-6 py-3 text-sm font-black text-orange-600 tabular-nums">{gs.tickets}</td>
+                    <td className="px-6 py-3 text-sm font-black text-emerald-600 tabular-nums">{gs.resolved}</td>
+                    <td className="px-6 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 max-w-[80px] bg-slate-100 rounded-full h-1.5">
+                          <div className="h-1.5 rounded-full bg-emerald-500" style={{ width: `${gs.rate}%` }} />
+                        </div>
+                        <span className="text-xs font-black text-slate-500 tabular-nums">{gs.rate}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Knowledge base stats */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: '总案例数', value: cases.length, color: 'indigo' },
+          { label: '公开案例总点赞', value: totalLikes, color: 'amber' },
+          { label: '公开案例总阅读', value: totalViews, color: 'emerald' },
+        ].map(({ label, value, color }) => (
+          <StatCard key={label} icon={<BookOpen className="w-5 h-5" />} label={label} value={value} color={color} />
+        ))}
       </div>
     </div>
   );

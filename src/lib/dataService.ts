@@ -1,4 +1,5 @@
 import { ServerProfile, AnalysisResult, AnalysisCase, HistoryRecord, MonthHistory, ExecutionRecord, LeaderReview } from '../types';
+import { cloudSet, cloudDelete, cloudFetchAll, cloudFetchWhere } from './cloudSync';
 
 // Module-level current user, set on login/logout
 let _currentUserId: string | null = null;
@@ -28,6 +29,7 @@ export async function saveServerProfile(profile: ServerProfile) {
   const record = { ...profile, ownerId: uid };
   if (idx >= 0) profiles[idx] = record; else profiles.push(record);
   save('gs_serverProfiles', profiles);
+  cloudSet('serverProfiles', record.id, record);
 }
 
 export async function fetchServerProfiles(userId: string): Promise<ServerProfile[]> {
@@ -36,12 +38,13 @@ export async function fetchServerProfiles(userId: string): Promise<ServerProfile
 
 export async function deleteServerProfile(profileId: string) {
   save('gs_serverProfiles', load<ServerProfile>('gs_serverProfiles').filter(p => p.id !== profileId));
+  cloudDelete('serverProfiles', profileId);
 }
 
 export async function updateServerProfile(id: string, updates: Partial<ServerProfile>) {
   const profiles = load<ServerProfile>('gs_serverProfiles');
   const idx = profiles.findIndex(p => p.id === id);
-  if (idx >= 0) { profiles[idx] = { ...profiles[idx], ...updates }; save('gs_serverProfiles', profiles); }
+  if (idx >= 0) { profiles[idx] = { ...profiles[idx], ...updates }; save('gs_serverProfiles', profiles); cloudSet('serverProfiles', id, profiles[idx]); }
 }
 
 // ---------------- Analysis History ----------------
@@ -52,6 +55,7 @@ export async function saveAnalysisRecord(serverConfig: ServerProfile, result: An
   const history = load<typeof record>('gs_analysisHistory');
   history.unshift(record);
   save('gs_analysisHistory', history);
+  cloudSet('analysisHistory', id, record);
 
   if (result.playerReports) {
     for (const report of result.playerReports) {
@@ -79,6 +83,7 @@ export async function fetchHistory(userId: string): Promise<MonthHistory[]> {
 
 export async function deleteHistoryRecord(id: string) {
   save('gs_analysisHistory', load<HistoryRecord>('gs_analysisHistory').filter(r => r.id !== id));
+  cloudDelete('analysisHistory', id);
 }
 
 export async function updateHistoryRecord(id: string, updates: Partial<HistoryRecord>) {
@@ -123,6 +128,7 @@ function createCaseFromReport(serverConfig: ServerProfile, report: any, userId: 
   };
   cases.push(newCase);
   save('gs_cases', cases);
+  cloudSet('cases', newCase.id, newCase);
 }
 
 export async function fetchCases(userId: string): Promise<AnalysisCase[]> {
@@ -143,11 +149,12 @@ export async function fetchCases(userId: string): Promise<AnalysisCase[]> {
 export async function updateCase(id: string, updates: Partial<AnalysisCase>) {
   const cases = load<AnalysisCase>('gs_cases');
   const idx = cases.findIndex(c => c.id === id);
-  if (idx >= 0) { cases[idx] = { ...cases[idx], ...updates }; save('gs_cases', cases); }
+  if (idx >= 0) { cases[idx] = { ...cases[idx], ...updates }; save('gs_cases', cases); cloudSet('cases', id, cases[idx]); }
 }
 
 export async function deleteCase(id: string) {
   save('gs_cases', load<AnalysisCase>('gs_cases').filter(c => c.id !== id));
+  cloudDelete('cases', id);
 }
 
 export async function voteOnCase(id: string, userId: string) {
@@ -179,6 +186,7 @@ export async function saveManualCase(newCase: AnalysisCase) {
   const record = { ...newCase, ownerId: uid };
   if (idx >= 0) cases[idx] = record; else cases.push(record);
   save('gs_cases', cases);
+  cloudSet('cases', record.id, record);
 }
 
 export async function testConnection() {
@@ -199,6 +207,7 @@ export async function saveExecutionRecord(record: ExecutionRecord): Promise<void
   const entry = { ...record, ownerId: uid, updatedAt: new Date().toISOString() };
   if (idx >= 0) records[idx] = entry; else records.push(entry);
   save(EXEC_KEY, records);
+  cloudSet('execRecords', entry.id, entry);
 }
 
 export async function updateExecutionRecord(id: string, updates: Partial<ExecutionRecord>): Promise<void> {
@@ -207,11 +216,13 @@ export async function updateExecutionRecord(id: string, updates: Partial<Executi
   if (idx >= 0) {
     records[idx] = { ...records[idx], ...updates, updatedAt: new Date().toISOString() };
     save(EXEC_KEY, records);
+    cloudSet('execRecords', id, records[idx]);
   }
 }
 
 export async function deleteExecutionRecord(id: string): Promise<void> {
   save(EXEC_KEY, load<ExecutionRecord>(EXEC_KEY).filter(r => r.id !== id));
+  cloudDelete('execRecords', id);
 }
 
 // ---------------- All-user reads (for leader portal) ----------------
@@ -239,12 +250,13 @@ export async function saveLeaderReview(review: LeaderReview): Promise<void> {
   const idx = reviews.findIndex(r => r.id === review.id);
   if (idx >= 0) reviews[idx] = review; else reviews.push(review);
   save(REVIEW_KEY, reviews);
+  cloudSet('leaderReviews', review.id, review);
 }
 
 export async function updateLeaderReview(id: string, updates: Partial<LeaderReview>): Promise<void> {
   const reviews = load<LeaderReview>(REVIEW_KEY);
   const idx = reviews.findIndex(r => r.id === id);
-  if (idx >= 0) { reviews[idx] = { ...reviews[idx], ...updates }; save(REVIEW_KEY, reviews); }
+  if (idx >= 0) { reviews[idx] = { ...reviews[idx], ...updates }; save(REVIEW_KEY, reviews); cloudSet('leaderReviews', id, reviews[idx]); }
 }
 
 // ---------------- Dismissed Outbursts ----------------
@@ -259,5 +271,45 @@ export async function dismissOutburst(historyRecordId: string, outburstIndex: nu
   if (!list.some(d => d.historyRecordId === historyRecordId && d.outburstIndex === outburstIndex)) {
     list.push({ historyRecordId, outburstIndex });
     save(DISMISSED_KEY, list);
+    const doId = `do_${historyRecordId}_${outburstIndex}`;
+    cloudSet('dismissedOutbursts', doId, { id: doId, historyRecordId, outburstIndex });
+  }
+}
+
+// ---------------- Cloud → Local Sync ----------------
+function mergeToLocalStorage<T extends { id: string }>(key: string, cloudItems: T[]) {
+  if (cloudItems.length === 0) return;
+  const local = load<T>(key);
+  const map = new Map(local.map(x => [x.id, x]));
+  cloudItems.forEach(item => map.set(item.id, item));
+  save(key, Array.from(map.values()));
+}
+
+export async function syncFromCloud(userId: string): Promise<void> {
+  try {
+    const [profiles, historyItems, caseItems, execItems, reviewItems, dismissedItems] = await Promise.all([
+      cloudFetchWhere<ServerProfile>('serverProfiles', 'ownerId', userId),
+      cloudFetchWhere<HistoryRecord & { userId: string }>('analysisHistory', 'userId', userId),
+      cloudFetchAll<AnalysisCase>('cases'),
+      cloudFetchWhere<ExecutionRecord>('execRecords', 'ownerId', userId),
+      cloudFetchAll<LeaderReview>('leaderReviews'),
+      cloudFetchAll<{ id: string; historyRecordId: string; outburstIndex: number }>('dismissedOutbursts'),
+    ]);
+    mergeToLocalStorage('gs_serverProfiles', profiles);
+    mergeToLocalStorage('gs_analysisHistory', historyItems);
+    mergeToLocalStorage('gs_cases', caseItems);
+    mergeToLocalStorage('gs_execRecords', execItems);
+    mergeToLocalStorage('gs_leaderReviews', reviewItems);
+    // dismissedOutbursts: merge by composite key
+    const localD = load<{ historyRecordId: string; outburstIndex: number }>(DISMISSED_KEY);
+    dismissedItems.forEach(d => {
+      if (!localD.some(x => x.historyRecordId === d.historyRecordId && x.outburstIndex === d.outburstIndex)) {
+        localD.push({ historyRecordId: d.historyRecordId, outburstIndex: d.outburstIndex });
+      }
+    });
+    save(DISMISSED_KEY, localD);
+    console.log('[CloudSync] 数据同步完成');
+  } catch (e) {
+    console.warn('[CloudSync] 同步失败，使用本地数据', e);
   }
 }

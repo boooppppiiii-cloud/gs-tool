@@ -37,6 +37,7 @@ import { analyzeGameEcology } from './lib/gemini';
 
 import { auth } from './lib/firebase';
 import * as dataService from './lib/dataService';
+import { syncFromCloud } from './lib/dataService';
 import { logUsage, initAnalyticsUser } from './services/analyticsService';
 
 const ADMIN_EMAIL = '1463432441@qq.com';
@@ -74,7 +75,7 @@ export default function App() {
   const [activePortal, setActivePortal] = React.useState<'admin' | 'leader' | 'member' | null>(null);
   const [displayName, setDisplayName] = React.useState<string>('');
 
-  const PRESET_GROUPS = ['第一组', '第二组', '第三组', '第四组', '第五组'];
+  const PRESET_GROUPS = ['杭州三组', '杭州五组', '杭州对抗组', '山东一组', '山东对抗组', '山东对抗二组', '山东二组', '山东九组', '山东三组'];
   const [memberGroup, setMemberGroup] = React.useState<string>(
     localStorage.getItem('member_group') || '第一组'
   );
@@ -133,6 +134,7 @@ export default function App() {
   const loadUserData = async () => {
     if (!user) return;
     try {
+      await syncFromCloud(user.id);
       const [profiles, historyData, casesData, execData, dismissed] = await Promise.all([
         dataService.fetchServerProfiles(user.id),
         dataService.fetchHistory(user.id),
@@ -168,6 +170,23 @@ export default function App() {
     if (matchedProfile) {
       setActiveProfileId(matchedProfile.id);
     }
+  };
+
+  const buildHistoricalContext = (serverId: string): string => {
+    const serverRecords = history
+      .flatMap(m => m.records)
+      .filter(r => (r.serverConfig as any)?.id === serverId)
+      .slice(0, 2);
+    if (serverRecords.length === 0) return '';
+    return serverRecords.map(r => {
+      const reports = r.result?.playerReports ?? [];
+      return reports.map(p => {
+        const outburstSummaries = (p.negativeOutbursts ?? []).map((o: any) =>
+          `  - [${o.trigger}] 关键片段：${(o.context ?? []).slice(0, 3).map((c: any) => `${c.roleName}:${c.content}`).join('；')}`
+        ).join('\n');
+        return `玩家${p.roleName}（历史画像：${p.portrait?.summary ?? ''}）\n历史负面事件：\n${outburstSummaries || '  无'}`;
+      }).join('\n');
+    }).join('\n\n---\n\n');
   };
 
   const startAnalysis = async () => {
@@ -209,7 +228,10 @@ export default function App() {
         `${r.roleName}: ${r.amount} (${r.status}, ${r.method})`
       ).join('\n');
 
-      const result = await analyzeGameEcology(serverContextStr, chatSample, rechargeSample, cases.slice(0, 10), persistentPortraitsStr);
+      const refCases = cases.slice(0, 10);
+      const historicalCtx = buildHistoricalContext(activeProfile.id);
+      logUsage('analysis_with_cases', `引用案例数: ${refCases.length}`, undefined, undefined, refCases.length);
+      const result = await analyzeGameEcology(serverContextStr, chatSample, rechargeSample, refCases, persistentPortraitsStr, historicalCtx);
       setAnalysisResult(result);
       setCurrentHistoryId(null);
       const negativeCount = result.playerReports?.reduce((sum, r) => sum + (r.negativeOutbursts?.length || 0), 0) ?? 0;

@@ -67,11 +67,22 @@ export interface ExecutionRecord {
 
 export interface ServerContext extends ServerProfile {}
 
+export interface GsCommunicationReport {
+  roleName: string;
+  activeCount: number;
+  passiveCount: number;
+  badCount: number;
+  contentTypes: { inGame: number; outGame: number };
+  hasIntervened: boolean;
+  interventionSummary: string;
+}
+
 export interface AnalysisResult {
   identifiedKeyPlayers: string[]; // AI determined key players
   playerReports: PlayerBehaviorReport[];
   rechargeReport: RechargeReport;
   serverEcology: string; // AI generated ecology summary
+  gsCommunicationReports?: GsCommunicationReport[];
 }
 
 export interface PlayerBehaviorReport {

@@ -72,14 +72,21 @@ export async function analyzeGameEcology(
   chatData: string,
   rechargeData: string,
   referenceCases: AnalysisCase[] = [],
-  persistentPortraits: string = ""
+  persistentPortraits: string = "",
+  historicalContext: string = ""
 ): Promise<AnalysisResult> {
   const hotCasesStr = referenceCases.map(c =>
     `案例[${c.title}]: 玩家爆发负面原因:${c.outburstReason}, GS具体处置动作:${c.gsAction}, 案例结果:${c.caseResult}`
   ).join('\n');
 
+  const historicalSection = historicalContext
+    ? `# 该区服历史分析摘要（仅供参考，不可与本次数据混用，不得将历史事件归入本次结论）\n${historicalContext}\n\n`
+    : '';
+
   const prompt = `
 你是一个资深的《傲世传奇》游戏生态专家，负责对玩家聊天记录和充值数据进行客观分析。
+
+${historicalSection}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 【全局铁律——违反任何一条输出即视为无效】
@@ -153,6 +160,29 @@ ${rechargeData}
 - 每位玩家 totalPaid 等于其所有条目累加值。
 - 判定是否转端：依据充值记录中的渠道/平台字段，无相关字段则填 false 并在 conversionDetails 注明"充值数据中无转端字段"。
 
+## 任务六：GS维护质量分析（仅基于 Sheet1 聊天数据）
+
+GS角色名已在背景信息中标注（"角色名:xxx"），以此识别GS在聊天中的发言。
+
+### 沟通类型判定规则
+- **主动沟通**：①GS作为言论发起方；②高价值玩家作为承接方；③双方发言存在语义关联。
+- **被动沟通**：①GS作为承接方；②核心玩家作为发起方；③双方发言存在语义关联。
+- **不良沟通**：①GS作为发起方；②沟通频道为私聊（type字段含"私聊"或target字段指向特定玩家）；③高价值用户无承接回应。
+
+### 沟通单位计数规则
+当双方语义关联由存在转为消失（即话题转移或一方停止回应），本次沟通记为1个单位。不良沟通直接按次数计，无需等待语义消失。
+
+### 沟通内容分类
+- **游戏内沟通**：双方讨论装备/战力/游戏道具/游戏活动/充值活动/行会秩序。
+- **游戏外沟通**：谈论游戏外的生活话题。
+
+### 负面介入核查
+- 若某玩家存在负面爆发，检查GS与该玩家是否存在与该负面事件语义相关的互动记录。有则 hasIntervened=true，无则 false。
+- 无负面爆发的玩家：interventionSummary 填"无负面工单"，hasIntervened 填 false。
+
+### 覆盖范围
+对 identifiedKeyPlayers 中的每位玩家生成一条记录。若某玩家与GS完全没有互动，各计数填0。
+
 # 输出格式（严格JSON，不要任何 markdown 包裹）
 
 {
@@ -204,7 +234,21 @@ ${rechargeData}
     "paymentProfile": "整体付费画像（只基于Sheet2数据）",
     "rechargeData": [{ "name": "金额挡位", "value": 数字 }]
   },
-  "serverEcology": "区服生态总结约100字（只基于本次数据，不联想）"
+  "serverEcology": "区服生态总结约100字（只基于本次数据，不联想）",
+  "gsCommunicationReports": [
+    {
+      "roleName": "玩家名",
+      "activeCount": 主动沟通单位数（整数，无互动填0）,
+      "passiveCount": 被动沟通单位数（整数，无互动填0）,
+      "badCount": 不良沟通次数（整数，无不良沟通填0）,
+      "contentTypes": {
+        "inGame": 游戏内沟通单位数（整数）,
+        "outGame": 游戏外沟通单位数（整数）
+      },
+      "hasIntervened": true或false,
+      "interventionSummary": "一句话描述GS介入情况（无负面工单填'无负面工单'；有负面但无介入填'未发现介入记录'；有介入则描述介入方式）"
+    }
+  ]
 }
 `;
 
@@ -235,5 +279,14 @@ ${rechargeData}
       rechargeData: raw.rechargeReport?.rechargeData ?? [],
     },
     serverEcology: raw.serverEcology ?? '',
+    gsCommunicationReports: (raw.gsCommunicationReports ?? []).map((r: any) => ({
+      roleName: r.roleName ?? '',
+      activeCount: r.activeCount ?? 0,
+      passiveCount: r.passiveCount ?? 0,
+      badCount: r.badCount ?? 0,
+      contentTypes: { inGame: r.contentTypes?.inGame ?? 0, outGame: r.contentTypes?.outGame ?? 0 },
+      hasIntervened: r.hasIntervened ?? false,
+      interventionSummary: r.interventionSummary ?? '',
+    })),
   };
 }
