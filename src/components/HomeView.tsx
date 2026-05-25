@@ -7,6 +7,7 @@ interface Props {
   history: MonthHistory[];
   cases: AnalysisCase[];
   executionRecords: ExecutionRecord[];
+  onTicketClick?: (historyRecordId: string) => void;
 }
 
 interface FlatTicket {
@@ -32,7 +33,7 @@ const STATUS_STYLES = {
   '已完成': { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200', dot: 'bg-emerald-400' },
 };
 
-export default function HomeView({ serverProfiles, history, cases, executionRecords }: Props) {
+export default function HomeView({ serverProfiles, history, cases, executionRecords, onTicketClick }: Props) {
   const [expandedEcology, setExpandedEcology] = React.useState<string | null>(null);
 
   const tickets: FlatTicket[] = React.useMemo(() => {
@@ -151,8 +152,15 @@ export default function HomeView({ serverProfiles, history, cases, executionReco
             {tickets.map((ticket, i) => {
               const status = getTicketStatus(ticket);
               const style = STATUS_STYLES[status];
+              const clickable = !!onTicketClick;
               return (
-                <div key={i} className="flex items-center gap-4 px-5 py-3.5 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 transition-colors">
+                <div
+                  key={i}
+                  onClick={() => onTicketClick?.(ticket.historyRecordId)}
+                  className={`flex items-center gap-4 px-5 py-3.5 bg-white border border-slate-200 rounded-2xl transition-colors ${
+                    clickable ? 'cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30' : 'hover:border-slate-300'
+                  }`}
+                >
                   <div className={`w-2 h-2 rounded-full shrink-0 ${style.dot}`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-slate-800 truncate">{ticket.title}</p>
@@ -167,6 +175,7 @@ export default function HomeView({ serverProfiles, history, cases, executionReco
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${style.bg} ${style.text} ${style.border}`}>
                       {status}
                     </span>
+                    {clickable && <ChevronRight className="w-3.5 h-3.5 text-slate-300" />}
                   </div>
                 </div>
               );

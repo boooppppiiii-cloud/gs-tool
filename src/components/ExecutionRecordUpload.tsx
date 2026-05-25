@@ -14,6 +14,7 @@ export default function ExecutionRecordUpload({ outburstIndex, playerName, outbu
   const [isExpanded, setIsExpanded] = React.useState(false);
   const [category, setCategory] = React.useState<'待推进' | '已解决'>(existing?.category ?? '待推进');
   const [description, setDescription] = React.useState(existing?.description ?? '');
+  const [reflection, setReflection] = React.useState(existing?.reflection ?? '');
   const [attachments, setAttachments] = React.useState<{ name: string; type: string; dataUrl: string }[]>(existing?.attachments ?? []);
   const dateStr = existing?.date ?? new Date().toLocaleDateString('zh-CN');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -22,6 +23,7 @@ export default function ExecutionRecordUpload({ outburstIndex, playerName, outbu
     onChange(outburstIndex, {
       category,
       description,
+      reflection,
       attachments,
       date: dateStr,
       ...patch,
@@ -36,6 +38,11 @@ export default function ExecutionRecordUpload({ outburstIndex, playerName, outbu
   const handleDescriptionChange = (v: string) => {
     setDescription(v);
     notify({ description: v });
+  };
+
+  const handleReflectionChange = (v: string) => {
+    setReflection(v);
+    notify({ reflection: v });
   };
 
   const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,6 +127,22 @@ export default function ExecutionRecordUpload({ outburstIndex, playerName, outbu
               className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none leading-relaxed"
             />
           </div>
+
+          {/* Reflection — only shown for '已解决' */}
+          {category === '已解决' && (
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-1">
+                <FileText className="w-3 h-3" /> 案例结果与反思
+              </label>
+              <textarea
+                value={reflection}
+                onChange={e => handleReflectionChange(e.target.value)}
+                placeholder="记录此次处置的实际结果、玩家最终反应及后续跟进建议..."
+                rows={4}
+                className="w-full px-3 py-2.5 text-sm border border-emerald-200 rounded-xl bg-emerald-50/30 focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none leading-relaxed"
+              />
+            </div>
+          )}
 
           {/* Attachments */}
           <div className="space-y-2">

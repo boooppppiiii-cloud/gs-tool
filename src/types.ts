@@ -58,6 +58,7 @@ export interface ExecutionRecord {
   submissionStatus: '草稿' | '待审核' | '已完成' | '待归档';
   date: string;
   description: string;
+  reflection?: string;
   attachments: { name: string; type: string; dataUrl: string }[];
   createdAt: string;
   updatedAt: string;

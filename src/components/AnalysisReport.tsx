@@ -86,6 +86,12 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
     setLocalRecordPatches(prev => ({ ...prev, [index]: { ...(prev[index] ?? {}), ...data } }));
   };
 
+  // "生成案例" is only available once the leader has closed at least one record for this history
+  const canGenerateCase = React.useMemo(() => {
+    if (!currentHistoryId) return false;
+    return executionRecords.some(r => r.historyRecordId === currentHistoryId && r.submissionStatus === '已完成');
+  }, [executionRecords, currentHistoryId]);
+
   const handleSubmitRecords = async (status: '草稿' | '待审核' | '已完成' | '待归档') => {
     if (!onSaveRecords || !currentHistoryId) return;
     setSaveStatus('saving');
@@ -104,6 +110,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
         submissionStatus: status,
         date: existing?.date ?? now.slice(0, 10),
         description: patch.description ?? existing?.description ?? '',
+        reflection: patch.reflection ?? existing?.reflection ?? '',
         attachments: patch.attachments ?? existing?.attachments ?? [],
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
@@ -492,14 +499,22 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
               <Send className="w-4 h-4" />
               提交核实
             </button>
-            <button
-              onClick={() => handleSubmitRecords('待归档')}
-              disabled={saveStatus === 'saving' || !onSaveRecords}
-              className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-40 transition-all shadow-lg shadow-emerald-100"
-            >
-              <BookmarkPlus className="w-4 h-4" />
-              生成案例
-            </button>
+            {canGenerateCase ? (
+              <button
+                onClick={() => handleSubmitRecords('待归档')}
+                disabled={saveStatus === 'saving' || !onSaveRecords}
+                className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-40 transition-all shadow-lg shadow-emerald-100"
+              >
+                <BookmarkPlus className="w-4 h-4" />
+                生成案例
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 px-6 py-3 bg-slate-50 border border-slate-200 text-slate-300 rounded-2xl font-bold text-sm cursor-not-allowed select-none" title="需组长审核结案后方可生成案例">
+                <BookmarkPlus className="w-4 h-4" />
+                生成案例
+                <span className="text-[10px] font-normal">(待组长结案)</span>
+              </div>
+            )}
             {saveStatus === 'saved' && (
               <span className="flex items-center gap-1 text-emerald-600 text-sm font-bold">
                 ✓ 已保存

@@ -71,6 +71,7 @@ export default function App() {
   const [cases, setCases] = React.useState<AnalysisCase[]>([]);
   const [executionRecords, setExecutionRecords] = React.useState<ExecutionRecord[]>([]);
   const [activePortal, setActivePortal] = React.useState<'admin' | 'leader' | 'member' | null>(null);
+  const [displayName, setDisplayName] = React.useState<string>('');
 
   const PRESET_GROUPS = ['第一组', '第二组', '第三组', '第四组', '第五组'];
   const [memberGroup, setMemberGroup] = React.useState<string>(
@@ -79,6 +80,11 @@ export default function App() {
   const handleGroupChange = (g: string) => {
     setMemberGroup(g);
     localStorage.setItem('member_group', g);
+  };
+  const handleDisplayNameChange = (name: string) => {
+    if (!user) return;
+    setDisplayName(name);
+    localStorage.setItem(`member_display_name_${user.id}`, name);
   };
 
   React.useEffect(() => {
@@ -91,6 +97,7 @@ export default function App() {
         dataService.setCurrentUser(uid);
         initAnalyticsUser(uid, username);
         setUser({ id: uid, username, email: cbUser.email || undefined });
+        setDisplayName(localStorage.getItem(`member_display_name_${uid}`) || username);
         const saved = localStorage.getItem('portal_preference') as 'admin' | 'leader' | 'member' | null;
         setActivePortal(saved ?? null);
       }
@@ -103,11 +110,13 @@ export default function App() {
         dataService.setCurrentUser(uid);
         initAnalyticsUser(uid, username);
         setUser({ id: uid, username, email: cbUser.email || undefined });
+        setDisplayName(localStorage.getItem(`member_display_name_${uid}`) || username);
         const saved = localStorage.getItem('portal_preference') as 'admin' | 'leader' | 'member' | null;
         setActivePortal(saved ?? null);
       } else {
         dataService.setCurrentUser(null);
         setUser(null);
+        setDisplayName('');
         setActivePortal(null);
       }
     });
@@ -314,10 +323,7 @@ export default function App() {
       id: 'analysis', label: '专家分析', icon: <Sword className="w-5 h-5 transition-all" />,
       children: [{ id: 'current', label: '实时分析' }, { id: 'history', label: '历史存档' }]
     },
-    {
-      id: 'gallery', label: '优秀案例库', icon: <Crown className="w-5 h-5 transition-all" />,
-      children: [{ id: 'online', label: '精英案例' }, { id: 'my', label: '我的案例' }]
-    },
+    { id: 'gallery', label: '优秀案例库', icon: <Crown className="w-5 h-5 transition-all" /> },
     {
       id: 'knowledge', label: '游戏知识库', icon: <Scroll className="w-5 h-5 transition-all" />,
       children: [{ id: 'items', label: '道具数据库' }, { id: 'calendar', label: '维护日历' }]
@@ -327,15 +333,18 @@ export default function App() {
 
   const getSubTab = (parentId: string) => {
     if (parentId === 'analysis') return analysisSubTab;
-    if (parentId === 'gallery') return galleryFilter;
     if (parentId === 'knowledge') return knowledgeTab;
     return null;
   };
 
   const setSubTab = (parentId: string, childId: string) => {
     if (parentId === 'analysis') setAnalysisSubTab(childId as 'current' | 'history');
-    if (parentId === 'gallery') setGalleryFilter(childId as 'online' | 'my');
     if (parentId === 'knowledge') setKnowledgeTab(childId as 'items' | 'calendar');
+  };
+
+  const handleTicketClick = (historyRecordId: string) => {
+    const record = history.flatMap(m => m.records).find(r => r.id === historyRecordId);
+    if (record) handleSelectHistory(record);
   };
 
   const handleSelectPortal = (portal: 'admin' | 'leader' | 'member') => {
@@ -402,16 +411,10 @@ export default function App() {
 
         {/* 组员工作台信息 */}
         {isSidebarOpen && (
-          <div className="px-4 py-3 border-b border-slate-100 bg-amber-50/40 space-y-1.5">
+          <div className="px-4 py-3 border-b border-slate-100 bg-amber-50/40 space-y-0.5">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">组员工作台</p>
-            <p className="text-xs font-bold text-slate-700 truncate">{user.username}</p>
-            <select
-              value={memberGroup}
-              onChange={e => handleGroupChange(e.target.value)}
-              className="w-full text-xs font-semibold text-indigo-600 bg-white border border-amber-200 rounded-lg px-2 py-1 focus:outline-none"
-            >
-              {PRESET_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
+            <p className="text-xs font-bold text-slate-700 truncate">{displayName || user.username}</p>
+            <p className="text-xs text-indigo-600 font-semibold">{memberGroup}</p>
           </div>
         )}
 
@@ -492,16 +495,16 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <p className="text-sm font-bold text-slate-800 leading-none">{user.username}</p>
+              <p className="text-sm font-bold text-slate-800 leading-none">{displayName || user.username}</p>
             </div>
             <div className="w-9 h-9 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-center text-indigo-600 font-black text-sm">
-              {user.username[0].toUpperCase()}
+              {(displayName || user.username)[0].toUpperCase()}
             </div>
           </div>
         </header>
 
         <div className="px-8 pb-12 pt-8 overflow-y-auto flex-1">
-           {activeTab === 'home' && <HomeView serverProfiles={serverProfiles} history={history} cases={cases} executionRecords={executionRecords} />}
+           {activeTab === 'home' && <HomeView serverProfiles={serverProfiles} history={history} cases={cases} executionRecords={executionRecords} onTicketClick={handleTicketClick} />}
            
            {activeTab === 'server' && (
              <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-5 duration-500">
@@ -586,19 +589,25 @@ export default function App() {
               <CaseGallery
                 cases={cases}
                 user={user}
-                filter={galleryFilter}
-                onFilterChange={setGalleryFilter}
                 onVote={handleVote}
                 onView={handleViewCase}
-                onUpdate={handleUpdateCase}
-                onDelete={handleDeleteCase}
                 onRefresh={loadUserData}
               />
            )}
 
            {activeTab === 'knowledge' && <KnowledgeBase activeTab={knowledgeTab} onTabChange={setKnowledgeTab} />}
 
-           {activeTab === 'profile' && <ProfileView user={user} onLogout={handleLogout} />}
+           {activeTab === 'profile' && (
+              <ProfileView
+                user={user}
+                displayName={displayName}
+                onDisplayNameChange={handleDisplayNameChange}
+                memberGroup={memberGroup}
+                groups={PRESET_GROUPS}
+                onGroupChange={handleGroupChange}
+                onLogout={handleLogout}
+              />
+           )}
         </div>
       </main>
     </div>
