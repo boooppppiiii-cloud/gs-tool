@@ -70,6 +70,7 @@ export default function App() {
   const [history, setHistory] = React.useState<MonthHistory[]>([]);
   const [cases, setCases] = React.useState<AnalysisCase[]>([]);
   const [executionRecords, setExecutionRecords] = React.useState<ExecutionRecord[]>([]);
+  const [dismissedOutbursts, setDismissedOutbursts] = React.useState<{ historyRecordId: string; outburstIndex: number }[]>([]);
   const [activePortal, setActivePortal] = React.useState<'admin' | 'leader' | 'member' | null>(null);
   const [displayName, setDisplayName] = React.useState<string>('');
 
@@ -132,16 +133,18 @@ export default function App() {
   const loadUserData = async () => {
     if (!user) return;
     try {
-      const [profiles, historyData, casesData, execData] = await Promise.all([
+      const [profiles, historyData, casesData, execData, dismissed] = await Promise.all([
         dataService.fetchServerProfiles(user.id),
         dataService.fetchHistory(user.id),
         dataService.fetchCases(user.id),
         dataService.fetchExecutionRecords(user.id),
+        dataService.fetchDismissedOutbursts(),
       ]);
       setServerProfiles(profiles);
       setHistory(historyData);
       setCases(casesData);
       setExecutionRecords(execData);
+      setDismissedOutbursts(dismissed);
     } catch (err) {
       console.error('Failed to load user data', err);
     }
@@ -504,7 +507,7 @@ export default function App() {
         </header>
 
         <div className="px-8 pb-12 pt-8 overflow-y-auto flex-1">
-           {activeTab === 'home' && <HomeView serverProfiles={serverProfiles} history={history} cases={cases} executionRecords={executionRecords} onTicketClick={handleTicketClick} />}
+           {activeTab === 'home' && <HomeView serverProfiles={serverProfiles} history={history} cases={cases} executionRecords={executionRecords} dismissedOutbursts={dismissedOutbursts} onTicketClick={handleTicketClick} />}
            
            {activeTab === 'server' && (
              <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-5 duration-500">

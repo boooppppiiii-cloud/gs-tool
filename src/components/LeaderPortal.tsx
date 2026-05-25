@@ -1,8 +1,9 @@
 import React from 'react';
 import {
-  Crown, LogOut, LayoutGrid, Monitor, CheckSquare, Archive, BarChart2,
+  Crown, LogOut, LayoutGrid, Monitor, CheckSquare, Archive, BarChart2, UserCircle,
   ChevronDown, ChevronRight, Sparkles, Loader2, AlertTriangle, FileText,
-  Image as ImageIcon, CheckCircle2, Clock, User, Server, RefreshCw,
+  CheckCircle2, Clock, Server, RefreshCw, MessageSquare, Zap, Activity,
+  Shield, Users, Check, X, ThumbsDown,
 } from 'lucide-react';
 import { User as UserType, ExecutionRecord, LeaderReview, HistoryRecord, ServerProfile, AnalysisCase } from '../types';
 import * as dataService from '../lib/dataService';
@@ -14,14 +15,17 @@ interface Props {
   onLogout: () => void;
 }
 
-type Tab = '大盘监控' | '审批中心' | '案例归档' | '复盘报表';
+type Tab = '大盘监控' | '审批中心' | '案例归档' | '复盘报表' | '个人中心';
 
 const TABS: { id: Tab; icon: React.ReactElement }[] = [
   { id: '大盘监控', icon: <Monitor className="w-5 h-5" /> },
   { id: '审批中心', icon: <CheckSquare className="w-5 h-5" /> },
   { id: '案例归档', icon: <Archive className="w-5 h-5" /> },
   { id: '复盘报表', icon: <BarChart2 className="w-5 h-5" /> },
+  { id: '个人中心', icon: <UserCircle className="w-5 h-5" /> },
 ];
+
+const PRESET_GROUPS = ['第一组', '第二组', '第三组', '第四组', '第五组'];
 
 const STATUS_STYLE: Record<string, string> = {
   '待审核': 'bg-blue-50 text-blue-600 border-blue-200',
@@ -44,24 +48,40 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
   const [allExecRecords, setAllExecRecords] = React.useState<ExecutionRecord[]>([]);
   const [allHistory, setAllHistory] = React.useState<(HistoryRecord & { userId: string })[]>([]);
   const [leaderReviews, setLeaderReviews] = React.useState<LeaderReview[]>([]);
+  const [dismissedOutbursts, setDismissedOutbursts] = React.useState<{ historyRecordId: string; outburstIndex: number }[]>([]);
   const [loading, setLoading] = React.useState(true);
+
+  const [leaderGroup, setLeaderGroup] = React.useState<string>(
+    () => localStorage.getItem(`leader_group_${user.id}`) || PRESET_GROUPS[0]
+  );
+  const handleGroupChange = (g: string) => {
+    setLeaderGroup(g);
+    localStorage.setItem(`leader_group_${user.id}`, g);
+  };
 
   const loadData = React.useCallback(async () => {
     setLoading(true);
-    const [profiles, execs, hist, reviews] = await Promise.all([
+    const [profiles, execs, hist, reviews, dismissed] = await Promise.all([
       dataService.fetchAllServerProfiles(),
       dataService.fetchAllExecutionRecords(),
       dataService.fetchAllHistory(),
       dataService.fetchLeaderReviews(),
+      dataService.fetchDismissedOutbursts(),
     ]);
     setAllProfiles(profiles);
     setAllExecRecords(execs);
     setAllHistory(hist);
     setLeaderReviews(reviews);
+    setDismissedOutbursts(dismissed);
     setLoading(false);
   }, []);
 
   React.useEffect(() => { loadData(); }, [loadData]);
+
+  const handleDismissOutburst = async (historyRecordId: string, outburstIndex: number) => {
+    await dataService.dismissOutburst(historyRecordId, outburstIndex);
+    await loadData();
+  };
 
   const pendingReview = allExecRecords.filter(r => r.submissionStatus === '待审核').length;
   const pendingArchive = allExecRecords.filter(r => r.submissionStatus === '待归档').length;
@@ -70,7 +90,6 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
     <div className="min-h-screen bg-white flex font-sans text-slate-800">
       {/* Sidebar */}
       <aside className="w-56 shrink-0 bg-white border-r border-slate-200 flex flex-col sticky top-0 h-screen">
-        {/* Logo */}
         <div className="px-4 py-5 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-center">
@@ -79,10 +98,10 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">组长工作台</p>
               <p className="text-xs font-bold text-slate-700 truncate">{user.username}</p>
+              <p className="text-[10px] text-indigo-600 font-semibold">{leaderGroup}</p>
             </div>
           </div>
         </div>
-        {/* Pending badges */}
         <div className="px-4 py-3 border-b border-slate-100 grid grid-cols-2 gap-2">
           <div className="text-center p-2 bg-blue-50 rounded-xl border border-blue-100">
             <p className="text-lg font-black text-blue-600">{pendingReview}</p>
@@ -93,24 +112,17 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
             <p className="text-[9px] font-bold text-violet-400 leading-none">待审案例</p>
           </div>
         </div>
-        {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5">
           {TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
+            <button key={t.id} onClick={() => setActiveTab(t.id)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-semibold ${
-                activeTab === t.id
-                  ? 'bg-amber-50 text-indigo-600 border border-amber-200/80'
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
-              }`}
-            >
+                activeTab === t.id ? 'bg-amber-50 text-indigo-600 border border-amber-200/80' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+              }`}>
               <div className={activeTab === t.id ? 'text-indigo-600' : 'text-slate-400'}>{t.icon}</div>
               {t.id}
             </button>
           ))}
         </nav>
-        {/* Footer */}
         <div className="px-3 py-4 border-t border-slate-100 space-y-0.5">
           <button onClick={onSwitchPortal} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-amber-50 hover:text-indigo-600 transition-all text-sm font-semibold">
             <LayoutGrid className="w-4 h-4" /> 切换端口
@@ -138,7 +150,13 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
           ) : (
             <>
               {activeTab === '大盘监控' && (
-                <DashboardTab profiles={allProfiles} history={allHistory} execRecords={allExecRecords} />
+                <DashboardTab
+                  profiles={allProfiles}
+                  history={allHistory}
+                  execRecords={allExecRecords}
+                  dismissedOutbursts={dismissedOutbursts}
+                  onDismiss={handleDismissOutburst}
+                />
               )}
               {activeTab === '审批中心' && (
                 <ApprovalTab
@@ -161,6 +179,9 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
               {activeTab === '复盘报表' && (
                 <ReportTab profiles={allProfiles} history={allHistory} execRecords={allExecRecords} leaderReviews={leaderReviews} />
               )}
+              {activeTab === '个人中心' && (
+                <ProfileTab user={user} leaderGroup={leaderGroup} groups={PRESET_GROUPS} onGroupChange={handleGroupChange} onLogout={onLogout} />
+              )}
             </>
           )}
         </div>
@@ -169,12 +190,89 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
   );
 }
 
+// ─── Shared: Outburst Detail Panel ───────────────────────────────────────────
+
+function OutburstPanel({ ob, playerName }: { ob: any; playerName: string }) {
+  return (
+    <div className="space-y-4 rounded-2xl border border-rose-100 bg-rose-50/30 p-4">
+      {/* Title + tags */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+          <h4 className="text-base font-black text-slate-900 leading-snug">{ob.title ?? ob.trigger}</h4>
+        </div>
+        {ob.tags && ob.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pl-6">
+            {ob.tags.map((tag: string) => (
+              <span key={tag} className="px-2 py-0.5 bg-rose-200 text-rose-700 text-[10px] font-black rounded-full">#{tag}</span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Case background */}
+      {ob.caseBackground && (
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">案例背景</p>
+          <p className="text-xs text-slate-600 bg-white border border-slate-100 rounded-xl p-3 leading-relaxed">{ob.caseBackground}</p>
+        </div>
+      )}
+
+      {/* Trigger point */}
+      <div className="space-y-1">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+          <Activity className="w-3 h-3" /> 负面触发点
+        </p>
+        <p className="text-xs text-orange-900 bg-orange-50 border border-orange-100 rounded-xl p-3 leading-relaxed font-medium">{ob.triggerPoint || ob.trigger}</p>
+      </div>
+
+      {/* Context bubbles */}
+      {ob.context && ob.context.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+            <MessageSquare className="w-3 h-3" /> 溯源上下文
+          </p>
+          <div className="space-y-2 bg-white border border-slate-100 rounded-xl p-3 max-h-48 overflow-y-auto">
+            {ob.context.map((msg: any, i: number) => (
+              <div key={i} className={`flex ${msg.roleName === playerName ? 'justify-start' : 'justify-end'} gap-2`}>
+                <div className="max-w-[80%] space-y-0.5">
+                  <div className="flex items-center gap-1 px-1">
+                    <span className="text-[9px] text-slate-400 font-bold">{msg.roleName}</span>
+                    <span className="text-[9px] text-slate-300">{msg.time}</span>
+                  </div>
+                  <div className={`px-2.5 py-1.5 rounded-xl text-xs leading-relaxed ${
+                    msg.roleName === playerName ? 'bg-slate-100 text-slate-800' : 'bg-indigo-600 text-white'
+                  }`}>
+                    {msg.content}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* GS advice action */}
+      {ob.gsAdvice?.action && (
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest flex items-center gap-1">
+            <Zap className="w-3 h-3" /> AI建议处置动作
+          </p>
+          <p className="text-xs text-slate-800 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed font-medium whitespace-pre-line">{ob.gsAdvice.action}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Tab 1: Dashboard ───────────────────────────────────────────────────────
 
-function DashboardTab({ profiles, history, execRecords }: {
+function DashboardTab({ profiles, history, execRecords, dismissedOutbursts, onDismiss }: {
   profiles: ServerProfile[];
   history: (HistoryRecord & { userId: string })[];
   execRecords: ExecutionRecord[];
+  dismissedOutbursts: { historyRecordId: string; outburstIndex: number }[];
+  onDismiss: (historyRecordId: string, outburstIndex: number) => void;
 }) {
   const gsNames = [...new Set(profiles.map(p => p.gsName).filter(Boolean))] as string[];
   const [selectedGs, setSelectedGs] = React.useState(gsNames[0] ?? '');
@@ -186,35 +284,56 @@ function DashboardTab({ profiles, history, execRecords }: {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <label className="text-xs font-bold text-slate-500">GS 名称：</label>
-        <select
-          value={selectedGs}
-          onChange={e => { setSelectedGs(e.target.value); setExpandedServer(null); }}
-          className="px-3 py-2 text-sm font-semibold border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
-        >
+        <select value={selectedGs} onChange={e => { setSelectedGs(e.target.value); setExpandedServer(null); }}
+          className="px-3 py-2 text-sm font-semibold border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
           {gsNames.length === 0 && <option value="">暂无数据</option>}
           {gsNames.map(g => <option key={g} value={g}>{g}</option>)}
         </select>
       </div>
 
-      {gsProfiles.length === 0 ? (
-        <EmptyState text="该 GS 暂无上传区服" />
-      ) : (
+      {gsProfiles.length === 0 ? <EmptyState text="该 GS 暂无上传区服" /> : (
         <div className="space-y-3">
           {gsProfiles.map(profile => {
-            const profHistory = history.filter(h => (h.serverConfig as any)?.id === profile.id || (h.serverConfig as any)?.name === profile.name);
-            const allOutbursts = profHistory.flatMap(h => h.result?.playerReports?.flatMap(r => r.negativeOutbursts ?? []) ?? []);
+            const profHistory = history.filter(h =>
+              (h.serverConfig as any)?.id === profile.id || (h.serverConfig as any)?.name === profile.name
+            );
             const profExecs = execRecords.filter(r => r.serverProfileName === profile.name);
             const completedExecs = profExecs.filter(r => r.submissionStatus === '已完成').length;
             const portraitCount = Object.keys(profile.persistentPortraits ?? {}).length;
             const keyPlayerCount = profile.keyPlayers?.length ?? 0;
+
+            // Activity metrics based on chat message frequency
+            const totalContextMsgs = profHistory.reduce((sum, h) =>
+              sum + (h.result?.playerReports?.reduce((s2, r) =>
+                s2 + (r.negativeOutbursts?.reduce((s3, ob) => s3 + (ob.context?.length ?? 0), 0) ?? 0), 0) ?? 0), 0);
+            const gsActivityCount = profExecs.length;
+
+            // Build flat outburst list for this server (respecting dismissed)
+            interface DashTicket {
+              historyRecordId: string;
+              outburstIndex: number;
+              ob: any;
+              playerName: string;
+            }
+            const dashTickets: DashTicket[] = [];
+            profHistory.forEach(h => {
+              let perRecordIdx = 0;
+              (h.result?.playerReports ?? []).forEach(report => {
+                (report.negativeOutbursts ?? []).forEach(ob => {
+                  const idx = perRecordIdx++;
+                  if (!dismissedOutbursts.some(d => d.historyRecordId === h.id && d.outburstIndex === idx)) {
+                    dashTickets.push({ historyRecordId: h.id, outburstIndex: idx, ob, playerName: report.roleName });
+                  }
+                });
+              });
+            });
+
             const isExpanded = expandedServer === profile.id;
 
             return (
               <div key={profile.id} className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
-                <button
-                  onClick={() => setExpandedServer(isExpanded ? null : profile.id)}
-                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors text-left"
-                >
+                <button onClick={() => setExpandedServer(isExpanded ? null : profile.id)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors text-left">
                   <div className="flex items-center gap-3">
                     <Server className="w-4 h-4 text-indigo-400" />
                     <span className="font-bold text-slate-800">{profile.name}</span>
@@ -226,11 +345,10 @@ function DashboardTab({ profiles, history, execRecords }: {
                 </button>
                 {isExpanded && (
                   <div className="border-t border-slate-100 p-5 space-y-5 bg-slate-50/30">
-                    {/* Stats row */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {[
-                        { label: '玩家活跃度', value: `${profHistory.reduce((s, h) => s + (h.result?.playerReports?.length ?? 0), 0)} 人次` },
-                        { label: 'GS 活跃度', value: `${profHistory.length} 次分析` },
+                        { label: '玩家活跃度', value: `${totalContextMsgs} 条消息` },
+                        { label: 'GS 活跃度', value: `${gsActivityCount} 次跟进` },
                         { label: '画像完成度', value: keyPlayerCount > 0 ? `${portraitCount}/${keyPlayerCount}` : `${portraitCount} 个` },
                         { label: '工单完成率', value: profExecs.length > 0 ? `${completedExecs}/${profExecs.length}` : '暂无工单' },
                       ].map(s => (
@@ -240,31 +358,32 @@ function DashboardTab({ profiles, history, execRecords }: {
                         </div>
                       ))}
                     </div>
-                    {/* Ecology */}
+
                     {profile.serverEcology && (
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">区服生态总结</p>
                         <p className="text-sm text-slate-600 leading-relaxed bg-white rounded-xl border border-slate-200 p-4">{profile.serverEcology}</p>
                       </div>
                     )}
-                    {/* Tickets */}
-                    {allOutbursts.length > 0 && (
+
+                    {dashTickets.length > 0 && (
                       <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">负面工单 ({allOutbursts.length} 条)</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                          负面工单 ({dashTickets.length} 条)
+                        </p>
                         <div className="space-y-2">
-                          {allOutbursts.slice(0, 10).map((ob, i) => {
-                            const exec = profExecs.find(e => e.outburstTitle === ((ob as any).title ?? ob.trigger));
+                          {dashTickets.map((t, i) => {
+                            const exec = profExecs.find(e => e.historyRecordId === t.historyRecordId && e.outburstIndex === t.outburstIndex);
                             const status = exec?.submissionStatus ?? '待处理';
                             return (
-                              <div key={i} className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-2.5">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLE[status] ?? 'bg-orange-50 text-orange-600 border-orange-200'}`}>
-                                  {status}
-                                </span>
-                                <span className="text-sm text-slate-700 font-medium truncate">{(ob as any).title ?? ob.trigger}</span>
-                              </div>
+                              <DashTicketRow
+                                key={i}
+                                ticket={t}
+                                status={status}
+                                onDismiss={onDismiss}
+                              />
                             );
                           })}
-                          {allOutbursts.length > 10 && <p className="text-xs text-slate-400 pl-2">…共 {allOutbursts.length} 条</p>}
                         </div>
                       </div>
                     )}
@@ -273,6 +392,76 @@ function DashboardTab({ profiles, history, execRecords }: {
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DashTicketRow({ ticket, status, onDismiss }: {
+  ticket: { historyRecordId: string; outburstIndex: number; ob: any; playerName: string };
+  status: string;
+  onDismiss: (historyRecordId: string, outburstIndex: number) => void;
+}) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [pendingDismiss, setPendingDismiss] = React.useState(false);
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors text-left"
+      >
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${STATUS_STYLE[status] ?? 'bg-orange-50 text-orange-600 border-orange-200'}`}>
+          {status}
+        </span>
+        <span className="text-sm text-slate-700 font-medium truncate flex-1">{ticket.ob.title ?? ticket.ob.trigger}</span>
+        <span className="text-xs text-slate-400 shrink-0">{ticket.playerName}</span>
+        {expanded ? <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+      </button>
+
+      {expanded && (
+        <div className="border-t border-slate-100 p-4 space-y-4 bg-slate-50/30">
+          <OutburstPanel ob={ticket.ob} playerName={ticket.playerName} />
+
+          {/* Accuracy marking */}
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">标记识别正确性</p>
+            {!pendingDismiss ? (
+              <div className="flex gap-2">
+                <div className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-sm font-bold text-emerald-600">
+                  <Check className="w-3.5 h-3.5" /> 正确识别
+                </div>
+                <button
+                  onClick={() => setPendingDismiss(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 transition-all"
+                >
+                  <ThumbsDown className="w-3.5 h-3.5" /> 错误识别
+                </button>
+              </div>
+            ) : (
+              <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl space-y-3">
+                <p className="text-sm font-bold text-rose-700">确认将此工单标记为"错误识别"并从组员端同步删除？</p>
+                <p className="text-xs text-rose-500">此操作不可撤销，该负面工单将从大盘和组员首页中移除。</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      onDismiss(ticket.historyRecordId, ticket.outburstIndex);
+                    }}
+                    className="px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition-all"
+                  >
+                    确认删除
+                  </button>
+                  <button
+                    onClick={() => setPendingDismiss(false)}
+                    className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 transition-all"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -288,23 +477,20 @@ function ApprovalTab({ execRecords, history, leaderReviews, userId, onRefresh }:
   userId: string;
   onRefresh: () => void;
 }) {
-  const gsNames = [...new Set(execRecords.map(r => r.serverProfileName).filter(Boolean))];
-  const [selectedGs, setSelectedGs] = React.useState('全部');
+  const serverNames = [...new Set(execRecords.map(r => r.serverProfileName).filter(Boolean))];
+  const [selectedServer, setSelectedServer] = React.useState('全部');
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
 
-  const filtered = selectedGs === '全部' ? execRecords : execRecords.filter(r => r.serverProfileName === selectedGs);
+  const filtered = selectedServer === '全部' ? execRecords : execRecords.filter(r => r.serverProfileName === selectedServer);
 
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <label className="text-xs font-bold text-slate-500">筛选区服：</label>
-        <select
-          value={selectedGs}
-          onChange={e => setSelectedGs(e.target.value)}
-          className="px-3 py-2 text-sm font-semibold border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
-        >
+        <label className="text-xs font-bold text-slate-500">组内下属GS上传的区服：</label>
+        <select value={selectedServer} onChange={e => setSelectedServer(e.target.value)}
+          className="px-3 py-2 text-sm font-semibold border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
           <option value="全部">全部</option>
-          {gsNames.map(g => <option key={g} value={g}>{g}</option>)}
+          {serverNames.map(g => <option key={g} value={g}>{g}</option>)}
         </select>
         <span className="text-xs text-slate-400 font-medium">{filtered.length} 条待审</span>
       </div>
@@ -315,16 +501,9 @@ function ApprovalTab({ execRecords, history, leaderReviews, userId, onRefresh }:
             const review = leaderReviews.find(r => r.executionRecordId === rec.id);
             const isExpanded = expandedId === rec.id;
             return (
-              <TicketCard
-                key={rec.id}
-                record={rec}
-                review={review}
-                history={history}
-                isExpanded={isExpanded}
-                onToggle={() => setExpandedId(isExpanded ? null : rec.id)}
-                userId={userId}
-                onRefresh={onRefresh}
-              />
+              <TicketCard key={rec.id} record={rec} review={review} history={history}
+                isExpanded={isExpanded} onToggle={() => setExpandedId(isExpanded ? null : rec.id)}
+                userId={userId} onRefresh={onRefresh} />
             );
           })}
         </div>
@@ -348,7 +527,6 @@ function TicketCard({ record, review, history, isExpanded, onToggle, userId, onR
   const [comment, setComment] = React.useState(review?.comment ?? '');
   const [saving, setSaving] = React.useState(false);
 
-  // Find original outburst from history
   const histRecord = history.find(h => h.id === record.historyRecordId);
   const outburst = React.useMemo(() => {
     if (!histRecord) return null;
@@ -384,11 +562,7 @@ function TicketCard({ record, review, history, isExpanded, onToggle, userId, onR
         reviewerId: userId,
       });
       onRefresh();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setAiLoading(false);
-    }
+    } catch (e) { console.error(e); } finally { setAiLoading(false); }
   };
 
   const handleDecision = async (decision: '打回' | '继续推进' | '结案') => {
@@ -425,8 +599,16 @@ function TicketCard({ record, review, history, isExpanded, onToggle, userId, onR
 
       {isExpanded && (
         <div className="border-t border-slate-100 p-5 space-y-5 bg-slate-50/30">
-          {/* 1. Execution record content */}
-          <Section title="执行记录内容">
+
+          {/* 0. Full negative case info */}
+          {outburst && (
+            <Section title="负面案例详情">
+              <OutburstPanel ob={outburst.ob} playerName={outburst.playerName} />
+            </Section>
+          )}
+
+          {/* 1. Execution record */}
+          <Section title="GS执行记录">
             <div className="space-y-3">
               <InfoRow label="分类" value={record.category} />
               <InfoRow label="记录日期" value={record.date} />
@@ -436,6 +618,14 @@ function TicketCard({ record, review, history, isExpanded, onToggle, userId, onR
                   {record.description || '（无描述）'}
                 </p>
               </div>
+              {(record as any).reflection && (
+                <div>
+                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">案例结果与反思</p>
+                  <p className="text-sm text-slate-700 bg-emerald-50 border border-emerald-100 rounded-xl p-4 leading-relaxed whitespace-pre-wrap">
+                    {(record as any).reflection}
+                  </p>
+                </div>
+              )}
               {record.attachments.length > 0 && (
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">附件 ({record.attachments.length})</p>
@@ -455,14 +645,11 @@ function TicketCard({ record, review, history, isExpanded, onToggle, userId, onR
             </div>
           </Section>
 
-          {/* 2. AI quality check */}
+          {/* 2. AI quality check — 3 key areas */}
           <Section title="AI 辅助核实">
             {!aiResult ? (
-              <button
-                onClick={handleAiCheck}
-                disabled={aiLoading}
-                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-40 transition-all"
-              >
+              <button onClick={handleAiCheck} disabled={aiLoading}
+                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-40 transition-all">
                 {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                 发起 AI 质检
               </button>
@@ -478,8 +665,7 @@ function TicketCard({ record, review, history, isExpanded, onToggle, userId, onR
                 </div>
                 {[
                   { label: '执行摘要', value: aiResult.summary },
-                  { label: '一致性评估', value: aiResult.consistencyCheck },
-                  { label: '合理性评估', value: aiResult.reasonabilityCheck },
+                  { label: 'GS执行合理性', value: aiResult.reasonabilityCheck },
                   { label: '疑点与风险', value: aiResult.riskPoints },
                 ].map(item => (
                   <div key={item.label}>
@@ -498,13 +684,10 @@ function TicketCard({ record, review, history, isExpanded, onToggle, userId, onR
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">玩家负面是否由 GS 造成</p>
                 <div className="flex gap-2">
                   {([true, false, null] as const).map(v => (
-                    <button
-                      key={String(v)}
-                      onClick={() => setIsGsCaused(v)}
+                    <button key={String(v)} onClick={() => setIsGsCaused(v)}
                       className={`px-4 py-2 rounded-xl text-sm font-bold border transition-colors ${
                         isGsCaused === v ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
-                      }`}
-                    >
+                      }`}>
                       {v === true ? '是' : v === false ? '否' : '不确定'}
                     </button>
                   ))}
@@ -512,18 +695,14 @@ function TicketCard({ record, review, history, isExpanded, onToggle, userId, onR
               </div>
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">批注与建议</p>
-                <textarea
-                  value={comment}
-                  onChange={e => setComment(e.target.value)}
-                  rows={3}
+                <textarea value={comment} onChange={e => setComment(e.target.value)} rows={3}
                   placeholder="输入组长批注、改进建议..."
-                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
-                />
+                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none" />
               </div>
             </div>
           </Section>
 
-          {/* 4. Decision buttons */}
+          {/* 4. Decision */}
           <div className="flex gap-3 pt-1">
             <button onClick={() => handleDecision('打回')} disabled={saving}
               className="px-5 py-2.5 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-sm font-bold hover:bg-rose-100 disabled:opacity-40 transition-all">
@@ -563,16 +742,10 @@ function ArchiveTab({ execRecords, history, profiles, userId, onRefresh }: {
           const histRecord = history.find(h => h.id === rec.historyRecordId);
           const profile = profiles.find(p => p.name === rec.serverProfileName);
           return (
-            <ArchiveCard
-              key={rec.id}
-              record={rec}
-              histRecord={histRecord}
-              profile={profile}
+            <ArchiveCard key={rec.id} record={rec} histRecord={histRecord} profile={profile}
               isExpanded={expandedId === rec.id}
               onToggle={() => setExpandedId(expandedId === rec.id ? null : rec.id)}
-              userId={userId}
-              onRefresh={onRefresh}
-            />
+              userId={userId} onRefresh={onRefresh} />
           );
         })
       )}
@@ -622,6 +795,7 @@ AI建议处置动作：${outburst?.ob.gsAdvice?.action ?? '未知'}
 【GS实际执行记录】
 分类：${record.category}
 描述：${record.description || '无'}
+案例结果与反思：${(record as any).reflection || '无'}
 
 请严格返回JSON对象（不要markdown包裹）：
 {
@@ -635,18 +809,13 @@ AI建议处置动作：${outburst?.ob.gsAdvice?.action ?? '未知'}
 }`;
 
       const res = await fetch('/api/gemini/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: 'gemini-2.5-flash', messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' } }),
       });
       const data = await res.json();
       const raw = JSON.parse(data.choices?.[0]?.message?.content ?? '{}');
       setAiCase(raw);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setAiLoading(false);
-    }
+    } catch (e) { console.error(e); } finally { setAiLoading(false); }
   };
 
   const handleArchive = async () => {
@@ -667,9 +836,7 @@ AI建议处置动作：${outburst?.ob.gsAdvice?.action ?? '未知'}
         disposalPlan: aiCase.disposalPlan ?? '',
         caseResult: aiCase.caseResult ?? '',
         timestamp: new Date().toISOString(),
-        views: 0,
-        likes: 0,
-        votedUserIds: [],
+        views: 0, likes: 0, votedUserIds: [],
         isPublic: rating === '转为优秀案例',
         ownerId: userId,
       };
@@ -698,14 +865,11 @@ AI建议处置动作：${outburst?.ob.gsAdvice?.action ?? '未知'}
 
       {isExpanded && (
         <div className="border-t border-slate-100 p-5 space-y-5 bg-slate-50/30">
-          {/* Execution summary */}
           <Section title="执行记录">
             <p className="text-sm text-slate-700 bg-white border border-slate-200 rounded-xl p-4 leading-relaxed whitespace-pre-wrap">
               {record.description || '（无描述）'}
             </p>
           </Section>
-
-          {/* AI generate */}
           <Section title="AI 生成完整案例">
             {!aiCase ? (
               <button onClick={handleGenerateCase} disabled={aiLoading}
@@ -724,15 +888,10 @@ AI建议处置动作：${outburst?.ob.gsAdvice?.action ?? '未知'}
               </div>
             )}
           </Section>
-
-          {/* Rating + Archive */}
           <Section title="案例定级">
             <div className="space-y-3">
-              <select
-                value={rating}
-                onChange={e => setRating(e.target.value as any)}
-                className="px-3 py-2 text-sm font-semibold border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              >
+              <select value={rating} onChange={e => setRating(e.target.value as any)}
+                className="px-3 py-2 text-sm font-semibold border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
                 <option value="转为优秀案例">转为优秀案例（公开）</option>
                 <option value="差案例复盘">差案例复盘（私有）</option>
                 <option value="不收录">不收录</option>
@@ -763,21 +922,14 @@ function ReportTab({ profiles, history, execRecords, leaderReviews }: {
   const stats = gsNames.map(gs => {
     const gsProfileIds = profiles.filter(p => p.gsName === gs).map(p => p.id);
     const gsProfileNames = profiles.filter(p => p.gsName === gs).map(p => p.name);
-
     const profHistory = history.filter(h =>
-      gsProfileIds.includes((h.serverConfig as any)?.id) ||
-      gsProfileNames.includes((h.serverConfig as any)?.name)
+      gsProfileIds.includes((h.serverConfig as any)?.id) || gsProfileNames.includes((h.serverConfig as any)?.name)
     );
     const found = profHistory.reduce((s, h) => s + (h.result?.playerReports?.reduce((ss, r) => ss + (r.negativeOutbursts?.length ?? 0), 0) ?? 0), 0);
-
     const gsExecs = execRecords.filter(r => gsProfileNames.includes(r.serverProfileName));
     const executed = gsExecs.filter(r => r.category === '已解决').length;
     const closed = gsExecs.filter(r => r.submissionStatus === '已完成').length;
-
-    const relatedReviews = leaderReviews.filter(rv =>
-      gsExecs.some(e => e.id === rv.executionRecordId) && rv.decision !== null
-    );
-
+    const relatedReviews = leaderReviews.filter(rv => gsExecs.some(e => e.id === rv.executionRecordId) && rv.decision !== null);
     return { gs, found, executed, closed, followed: relatedReviews.length };
   });
 
@@ -800,12 +952,8 @@ function ReportTab({ profiles, history, execRecords, leaderReviews }: {
               return (
                 <tr key={s.gs} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-4 font-bold text-slate-800">{s.gs}</td>
-                  <td className="px-4 py-4">
-                    <span className="text-lg font-black text-indigo-600">{s.found}</span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className="text-lg font-black text-emerald-600">{s.executed}</span>
-                  </td>
+                  <td className="px-4 py-4"><span className="text-lg font-black text-indigo-600">{s.found}</span></td>
+                  <td className="px-4 py-4"><span className="text-lg font-black text-emerald-600">{s.executed}</span></td>
                   <td className="px-4 py-4">
                     <div className="space-y-1">
                       <span className="text-lg font-black text-blue-600">{s.closed}</span>
@@ -815,15 +963,64 @@ function ReportTab({ profiles, history, execRecords, leaderReviews }: {
                       <p className="text-[10px] text-slate-400 font-medium">{rate}% 结案率</p>
                     </div>
                   </td>
-                  <td className="px-4 py-4">
-                    <span className="text-lg font-black text-amber-600">{s.followed}</span>
-                  </td>
+                  <td className="px-4 py-4"><span className="text-lg font-black text-amber-600">{s.followed}</span></td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ─── Tab 5: Profile ───────────────────────────────────────────────────────
+
+function ProfileTab({ user, leaderGroup, groups, onGroupChange, onLogout }: {
+  user: UserType;
+  leaderGroup: string;
+  groups: string[];
+  onGroupChange: (g: string) => void;
+  onLogout: () => void;
+}) {
+  return (
+    <div className="max-w-xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-5 duration-500">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl p-8 flex flex-col items-center gap-4 text-center">
+        <div className="w-20 h-20 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20">
+          <Crown className="w-10 h-10 text-amber-300" />
+        </div>
+        <div>
+          <p className="text-xl font-black text-white">{user.username}</p>
+          <p className="text-xs text-slate-400 font-medium mt-1">组长 · {leaderGroup}</p>
+        </div>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Users className="w-4 h-4 text-indigo-600" />
+          <h3 className="text-sm font-black text-slate-800">所属组别</h3>
+        </div>
+        <p className="text-xs text-slate-400 leading-relaxed">
+          选择你所在的运营小组，系统会根据此分组筛选你负责的下属GS数据。
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {groups.map(g => (
+            <button key={g} onClick={() => onGroupChange(g)}
+              className={`px-4 py-2 rounded-2xl text-sm font-bold transition-all border ${
+                leaderGroup === g
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100'
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+              }`}>
+              {g}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <button onClick={onLogout}
+        className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-rose-50 text-rose-600 font-bold text-sm rounded-2xl hover:bg-rose-100 transition-all border border-rose-100">
+        <LogOut className="w-4 h-4" /> 退出登录
+      </button>
     </div>
   );
 }

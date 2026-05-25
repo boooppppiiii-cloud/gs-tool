@@ -7,6 +7,7 @@ interface Props {
   history: MonthHistory[];
   cases: AnalysisCase[];
   executionRecords: ExecutionRecord[];
+  dismissedOutbursts?: { historyRecordId: string; outburstIndex: number }[];
   onTicketClick?: (historyRecordId: string) => void;
 }
 
@@ -33,18 +34,19 @@ const STATUS_STYLES = {
   '已完成': { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200', dot: 'bg-emerald-400' },
 };
 
-export default function HomeView({ serverProfiles, history, cases, executionRecords, onTicketClick }: Props) {
+export default function HomeView({ serverProfiles, history, cases, executionRecords, dismissedOutbursts = [], onTicketClick }: Props) {
   const [expandedEcology, setExpandedEcology] = React.useState<string | null>(null);
 
   const tickets: FlatTicket[] = React.useMemo(() => {
     const flat: FlatTicket[] = [];
-    let globalIndex = 0;
     history.forEach(month => {
       month.records.forEach(record => {
         const serverName = (record.serverConfig as any)?.name ?? '未知区服';
+        let perRecordIdx = 0;
         (record.result?.playerReports ?? []).forEach(report => {
           (report.negativeOutbursts ?? []).forEach(outburst => {
-            const idx = globalIndex++;
+            const idx = perRecordIdx++;
+            if (dismissedOutbursts.some(d => d.historyRecordId === record.id && d.outburstIndex === idx)) return;
             flat.push({
               historyRecordId: record.id,
               outburstIndex: idx,
@@ -61,7 +63,7 @@ export default function HomeView({ serverProfiles, history, cases, executionReco
       });
     });
     return flat.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [history, executionRecords]);
+  }, [history, executionRecords, dismissedOutbursts]);
 
   const pendingCount = tickets.filter(t => getTicketStatus(t) === '待处理').length;
   const reviewCount = tickets.filter(t => getTicketStatus(t) === '待审核').length;

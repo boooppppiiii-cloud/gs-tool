@@ -246,3 +246,18 @@ export async function updateLeaderReview(id: string, updates: Partial<LeaderRevi
   const idx = reviews.findIndex(r => r.id === id);
   if (idx >= 0) { reviews[idx] = { ...reviews[idx], ...updates }; save(REVIEW_KEY, reviews); }
 }
+
+// ---------------- Dismissed Outbursts ----------------
+const DISMISSED_KEY = 'gs_dismissedOutbursts';
+
+export async function fetchDismissedOutbursts(): Promise<{ historyRecordId: string; outburstIndex: number }[]> {
+  return load<{ historyRecordId: string; outburstIndex: number }>(DISMISSED_KEY);
+}
+
+export async function dismissOutburst(historyRecordId: string, outburstIndex: number): Promise<void> {
+  const list = load<{ historyRecordId: string; outburstIndex: number }>(DISMISSED_KEY);
+  if (!list.some(d => d.historyRecordId === historyRecordId && d.outburstIndex === outburstIndex)) {
+    list.push({ historyRecordId, outburstIndex });
+    save(DISMISSED_KEY, list);
+  }
+}
