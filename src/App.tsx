@@ -32,7 +32,7 @@ import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import PortalSelector from './components/PortalSelector';
 import LeaderPortal from './components/LeaderPortal';
-import { ServerProfile, ChatRecord, RechargeRecord, AnalysisResult, MonthHistory, HistoryRecord, AnalysisCase, User, ExecutionRecord } from './types';
+import { ServerProfile, ChatRecord, RechargeRecord, AnalysisResult, MonthHistory, HistoryRecord, AnalysisCase, User, ExecutionRecord, LeaderReview } from './types';
 import { analyzeGameEcology } from './lib/gemini';
 
 import { auth } from './lib/firebase';
@@ -72,6 +72,7 @@ export default function App() {
   const [cases, setCases] = React.useState<AnalysisCase[]>([]);
   const [executionRecords, setExecutionRecords] = React.useState<ExecutionRecord[]>([]);
   const [dismissedOutbursts, setDismissedOutbursts] = React.useState<{ historyRecordId: string; outburstIndex: number }[]>([]);
+  const [leaderReviews, setLeaderReviews] = React.useState<LeaderReview[]>([]);
   const [activePortal, setActivePortal] = React.useState<'admin' | 'leader' | 'member' | null>(null);
   const [displayName, setDisplayName] = React.useState<string>('');
 
@@ -145,18 +146,20 @@ export default function App() {
     if (!user) return;
     try {
       await syncFromCloud(user.id);
-      const [profiles, historyData, casesData, execData, dismissed] = await Promise.all([
+      const [profiles, historyData, casesData, execData, dismissed, reviewsData] = await Promise.all([
         dataService.fetchServerProfiles(user.id),
         dataService.fetchHistory(user.id),
         dataService.fetchCases(user.id),
         dataService.fetchExecutionRecords(user.id),
         dataService.fetchDismissedOutbursts(),
+        dataService.fetchLeaderReviewsForUser(user.id),
       ]);
       setServerProfiles(profiles);
       setHistory(historyData);
       setCases(casesData);
       setExecutionRecords(execData);
       setDismissedOutbursts(dismissed);
+      setLeaderReviews(reviewsData);
     } catch (err) {
       console.error('Failed to load user data', err);
     }
@@ -366,6 +369,19 @@ export default function App() {
     { id: 'profile', label: '个人中心', icon: <Shield className="w-5 h-5 transition-all" /> },
   ];
 
+  const pendingContinueCount = React.useMemo(() => {
+    return leaderReviews.filter(r => {
+      if (r.decision !== '继续推进') return false;
+      const reviewed = executionRecords.find(e => e.id === r.executionRecordId);
+      if (!reviewed) return false;
+      return !executionRecords.some(e =>
+        e.historyRecordId === reviewed.historyRecordId &&
+        e.outburstIndex === reviewed.outburstIndex &&
+        e.createdAt > reviewed.createdAt
+      );
+    }).length;
+  }, [leaderReviews, executionRecords]);
+
   const getSubTab = (parentId: string) => {
     if (parentId === 'analysis') return analysisSubTab;
     if (parentId === 'knowledge') return knowledgeTab;
@@ -468,7 +484,16 @@ export default function App() {
                 <div className={`shrink-0 transition-colors ${activeTab === item.id ? 'text-indigo-600' : 'text-slate-400 group-hover:text-indigo-600'}`}>
                   {item.icon}
                 </div>
-                {isSidebarOpen && <span className="text-sm font-semibold">{item.label}</span>}
+                {isSidebarOpen && (
+                  <span className="text-sm font-semibold flex items-center gap-1.5">
+                    {item.label}
+                    {item.id === 'analysis' && pendingContinueCount > 0 && (
+                      <span className="px-1.5 py-0.5 bg-amber-500 text-white text-[9px] font-black rounded-full leading-none">
+                        {pendingContinueCount}
+                      </span>
+                    )}
+                  </span>
+                )}
                 {!isSidebarOpen && (
                   <div className="absolute left-full ml-2 bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap shadow-lg z-50">
                     {item.label}
@@ -606,6 +631,7 @@ export default function App() {
                                    result={analysisResult}
                                    executionRecords={executionRecords}
                                    currentHistoryId={currentHistoryId}
+                                   leaderReviews={leaderReviews}
                                    serverName={serverProfiles.find(p => p.id === activeProfileId)?.name}
                                    gsName={serverProfiles.find(p => p.id === activeProfileId)?.gsName}
                                    onSaveRecords={async (records) => {

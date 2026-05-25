@@ -36,8 +36,9 @@ import {
   Coffee,
   AlertCircle,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
-import { AnalysisResult, PlayerBehaviorReport, ExecutionRecord, GsCommunicationReport, AnalysisCase, PortraitTable } from '../types';
+import { AnalysisResult, PlayerBehaviorReport, ExecutionRecord, GsCommunicationReport, AnalysisCase, PortraitTable, LeaderReview } from '../types';
 import ExecutionRecordUpload from './ExecutionRecordUpload';
 import CaseGenerationModal from './CaseGenerationModal';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
@@ -52,13 +53,14 @@ interface Props {
   onSaveRecords?: (records: ExecutionRecord[]) => Promise<void>;
   onSaveCase?: (draft: Partial<AnalysisCase>) => Promise<void>;
   onUpdatePortrait?: (roleName: string, updates: Record<string, string>) => void;
+  leaderReviews?: LeaderReview[];
   serverName?: string;
   gsName?: string;
 }
 
 const COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 
-export default function AnalysisReport({ result: rawResult, executionRecords = [], currentHistoryId, onSaveRecords, onSaveCase, onUpdatePortrait, serverName, gsName }: Props) {
+export default function AnalysisReport({ result: rawResult, executionRecords = [], currentHistoryId, onSaveRecords, onSaveCase, onUpdatePortrait, leaderReviews = [], serverName, gsName }: Props) {
   const result: AnalysisResult = {
     ...rawResult,
     identifiedKeyPlayers: rawResult.identifiedKeyPlayers ?? [],
@@ -81,6 +83,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
 
   const [adviceRatings, setAdviceRatings] = useState<Record<string, 'up' | 'down'>>({});
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [successToast, setSuccessToast] = useState(false);
 
   // Flatten all outbursts across player reports for execution record tracking
   const allOutbursts = React.useMemo(() => {
@@ -94,6 +97,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
   }, [result]);
 
   const [localRecordPatches, setLocalRecordPatches] = useState<Record<number, Partial<ExecutionRecord>>>({});
+  const [newRecordDrafts, setNewRecordDrafts] = useState<Record<number, Partial<ExecutionRecord>>>({});
   const [caseGenModal, setCaseGenModal] = useState<{
     outburst: any;
     execRecord: Partial<ExecutionRecord>;
@@ -104,37 +108,78 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
     setLocalRecordPatches(prev => ({ ...prev, [index]: { ...(prev[index] ?? {}), ...data } }));
   };
 
-  // "生成案例" is only available once the leader has closed at least one record for this history
+  const handleNewRecordChange = (index: number, data: Partial<ExecutionRecord>) => {
+    setNewRecordDrafts(prev => ({ ...prev, [index]: { ...(prev[index] ?? {}), ...data } }));
+  };
+
+  // "上传案例" is only available once the leader has closed at least one record for this history
   const canGenerateCase = React.useMemo(() => {
     if (!currentHistoryId) return false;
     return executionRecords.some(r => r.historyRecordId === currentHistoryId && r.submissionStatus === '已完成');
+  }, [executionRecords, currentHistoryId]);
+
+  // All records archived = final state, no further editing
+  const hasUploaded = React.useMemo(() => {
+    if (!currentHistoryId) return false;
+    return executionRecords.some(r => r.historyRecordId === currentHistoryId && r.submissionStatus === '待归档');
   }, [executionRecords, currentHistoryId]);
 
   const handleSubmitRecords = async (status: '草稿' | '待审核' | '已完成' | '待归档') => {
     if (!onSaveRecords || !currentHistoryId) return;
     setSaveStatus('saving');
     const now = new Date().toISOString();
-    const records: ExecutionRecord[] = allOutbursts.map((ob, i) => {
-      const patch = localRecordPatches[i] ?? {};
-      const existing = executionRecords.find(r => r.historyRecordId === currentHistoryId && r.outburstIndex === i);
-      return {
-        id: existing?.id ?? `exec_${Date.now()}_${i}`,
-        historyRecordId: currentHistoryId,
-        playerName: ob.playerName,
-        outburstIndex: i,
-        outburstTitle: ob.title,
-        serverProfileName: '',
-        category: patch.category ?? existing?.category ?? '待推进',
-        submissionStatus: status,
-        date: existing?.date ?? now.slice(0, 10),
-        description: patch.description ?? existing?.description ?? '',
-        reflection: patch.reflection ?? existing?.reflection ?? '',
-        attachments: patch.attachments ?? existing?.attachments ?? [],
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-        ownerId: '',
-      };
+    const records: ExecutionRecord[] = [];
+
+    allOutbursts.forEach((ob, i) => {
+      const outburstRecs = executionRecords
+        .filter(r => r.historyRecordId === currentHistoryId && r.outburstIndex === i)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      const latestRec = outburstRecs[outburstRecs.length - 1];
+      const latestReview = latestRec ? leaderReviews.find(r => r.executionRecordId === latestRec.id) : undefined;
+      const isNewRound = !!latestRec && latestReview?.decision === '继续推进';
+
+      if (isNewRound) {
+        const draft = newRecordDrafts[i] ?? {};
+        if (!draft.description && !draft.category) return;
+        records.push({
+          id: `exec_${Date.now()}_${i}_r${outburstRecs.length + 1}`,
+          historyRecordId: currentHistoryId,
+          playerName: ob.playerName,
+          outburstIndex: i,
+          outburstTitle: ob.title,
+          serverProfileName: '',
+          category: draft.category ?? '待推进',
+          submissionStatus: status,
+          date: now.slice(0, 10),
+          description: draft.description ?? '',
+          reflection: draft.reflection ?? '',
+          attachments: draft.attachments ?? [],
+          createdAt: now,
+          updatedAt: now,
+          ownerId: '',
+        });
+      } else {
+        const patch = localRecordPatches[i] ?? {};
+        records.push({
+          id: latestRec?.id ?? `exec_${Date.now()}_${i}`,
+          historyRecordId: currentHistoryId,
+          playerName: ob.playerName,
+          outburstIndex: i,
+          outburstTitle: ob.title,
+          serverProfileName: '',
+          category: patch.category ?? latestRec?.category ?? '待推进',
+          submissionStatus: status,
+          date: latestRec?.date ?? now.slice(0, 10),
+          description: patch.description ?? latestRec?.description ?? '',
+          reflection: patch.reflection ?? latestRec?.reflection ?? '',
+          attachments: patch.attachments ?? latestRec?.attachments ?? [],
+          createdAt: latestRec?.createdAt ?? now,
+          updatedAt: now,
+          ownerId: '',
+        });
+      }
     });
+
     await onSaveRecords(records);
     setSaveStatus('saved');
     setTimeout(() => setSaveStatus('idle'), 2000);
@@ -464,43 +509,105 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
             <ClipboardList className="w-6 h-6 text-indigo-600" />
             执行记录上传
           </h3>
-          <div className="space-y-3">
-            {allOutbursts.map((ob, i) => (
-              <div key={i} className="space-y-1">
-                <ExecutionRecordUpload
-                  outburstIndex={i}
-                  playerName={ob.playerName}
-                  outburstTitle={ob.title}
-                  existing={executionRecords.find(r => r.historyRecordId === currentHistoryId && r.outburstIndex === i)}
-                  onChange={handleRecordChange}
-                />
-                {onSaveCase && (
-                  <div className="flex justify-end pr-1">
-                    <button
-                      onClick={() => {
-                        const patch = localRecordPatches[i] ?? {};
-                        const existing = executionRecords.find(r => r.historyRecordId === currentHistoryId && r.outburstIndex === i);
-                        setCaseGenModal({
-                          outburst: ob.outburst,
-                          execRecord: { ...existing, ...patch },
-                          playerName: ob.playerName,
-                        });
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      AI 辅助整合案例
-                    </button>
-                  </div>
-                )}
+
+          {/* 继续推进 banner */}
+          {(() => {
+            const pending = allOutbursts.filter((_, i) => {
+              const recs = executionRecords
+                .filter(r => r.historyRecordId === currentHistoryId && r.outburstIndex === i)
+                .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+              const latest = recs[recs.length - 1];
+              return latest ? leaderReviews.find(r => r.executionRecordId === latest.id)?.decision === '继续推进' : false;
+            });
+            return pending.length > 0 ? (
+              <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl text-sm text-amber-700 font-bold">
+                <RefreshCw className="w-4 h-4 shrink-0" />
+                有 {pending.length} 个工单被组长要求继续推进，请填写新一轮执行记录
               </div>
-            ))}
+            ) : null;
+          })()}
+
+          <div className="space-y-4">
+            {allOutbursts.map((ob, i) => {
+              const outburstRecs = executionRecords
+                .filter(r => r.historyRecordId === currentHistoryId && r.outburstIndex === i)
+                .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+              const latestRec = outburstRecs[outburstRecs.length - 1];
+              const latestReview = latestRec ? leaderReviews.find(r => r.executionRecordId === latestRec.id) : undefined;
+              const isNewRound = !!latestRec && latestReview?.decision === '继续推进';
+              const isFinalState = latestRec?.submissionStatus === '待归档';
+              const isLeaderClosed = latestRec?.submissionStatus === '已完成';
+              const needsInput = !latestRec || isNewRound;
+              const showNewInput = needsInput && !isFinalState && !isLeaderClosed;
+              const showAiButton = !!onSaveCase && !isFinalState;
+
+              return (
+                <div key={i} className="space-y-2">
+                  {/* Past records (read-only) */}
+                  {outburstRecs.map((rec, round) => (
+                    <PastExecutionRecordCard
+                      key={rec.id}
+                      record={rec}
+                      roundIndex={round + 1}
+                      review={leaderReviews.find(r => r.executionRecordId === rec.id)}
+                    />
+                  ))}
+
+                  {/* New round input */}
+                  {showNewInput && (
+                    <div className="space-y-1.5">
+                      {isNewRound && (
+                        <div className="flex items-start gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 font-bold">
+                          <RefreshCw className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          <span>
+                            组长要求继续推进 — 请填写第 {outburstRecs.length + 1} 轮执行记录
+                            {latestReview?.comment && (
+                              <span className="font-normal ml-1 text-amber-600">"{latestReview.comment}"</span>
+                            )}
+                          </span>
+                        </div>
+                      )}
+                      <ExecutionRecordUpload
+                        key={`${i}-${isNewRound ? 'new' : 'first'}-${outburstRecs.length}`}
+                        outburstIndex={i}
+                        playerName={ob.playerName}
+                        outburstTitle={ob.title}
+                        existing={undefined}
+                        onChange={isNewRound ? handleNewRecordChange : handleRecordChange}
+                      />
+                    </div>
+                  )}
+
+                  {/* AI case generation */}
+                  {showAiButton && (
+                    <div className="flex justify-end pr-1">
+                      <button
+                        onClick={() => {
+                          const draft = isNewRound ? (newRecordDrafts[i] ?? {}) : (localRecordPatches[i] ?? {});
+                          const base = latestRec;
+                          setCaseGenModal({
+                            outburst: ob.outburst,
+                            execRecord: { ...base, ...draft },
+                            playerName: ob.playerName,
+                          });
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        AI 辅助整合案例
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
+
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-3 pt-2">
             <button
               onClick={() => handleSubmitRecords('草稿')}
-              disabled={saveStatus === 'saving' || !onSaveRecords}
+              disabled={saveStatus === 'saving' || !onSaveRecords || canGenerateCase || hasUploaded}
               className="flex items-center gap-2 px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 disabled:opacity-40 transition-all"
             >
               <Save className="w-4 h-4" />
@@ -508,25 +615,33 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
             </button>
             <button
               onClick={() => handleSubmitRecords('待审核')}
-              disabled={saveStatus === 'saving' || !onSaveRecords}
+              disabled={saveStatus === 'saving' || !onSaveRecords || canGenerateCase || hasUploaded}
               className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-40 transition-all shadow-lg shadow-indigo-100"
             >
               <Send className="w-4 h-4" />
               提交核实
             </button>
-            {canGenerateCase ? (
+            {hasUploaded ? (
+              <div className="flex items-center gap-2 px-6 py-3 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-2xl font-bold text-sm">
+                <CheckCircle2 className="w-4 h-4" />
+                案例已完成
+              </div>
+            ) : canGenerateCase ? (
               <button
-                onClick={() => handleSubmitRecords('待归档')}
+                onClick={async () => {
+                  await handleSubmitRecords('待归档');
+                  setSuccessToast(true);
+                }}
                 disabled={saveStatus === 'saving' || !onSaveRecords}
                 className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-40 transition-all shadow-lg shadow-emerald-100"
               >
                 <BookmarkPlus className="w-4 h-4" />
-                生成案例
+                上传案例
               </button>
             ) : (
-              <div className="flex items-center gap-2 px-6 py-3 bg-slate-50 border border-slate-200 text-slate-300 rounded-2xl font-bold text-sm cursor-not-allowed select-none" title="需组长审核结案后方可生成案例">
+              <div className="flex items-center gap-2 px-6 py-3 bg-slate-50 border border-slate-200 text-slate-300 rounded-2xl font-bold text-sm cursor-not-allowed select-none" title="需组长审核结案后方可上传案例">
                 <BookmarkPlus className="w-4 h-4" />
-                生成案例
+                上传案例
                 <span className="text-[10px] font-normal">(待组长结案)</span>
               </div>
             )}
@@ -631,6 +746,26 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
 
       <FeedbackPanel />
 
+      {successToast && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-[32px] shadow-2xl px-10 py-8 flex flex-col items-center gap-4 max-w-xs w-full mx-4">
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
+              <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-lg font-black text-slate-900">操作成功</p>
+              <p className="text-sm text-slate-500">案例已上传，工单已完成归档</p>
+            </div>
+            <button
+              onClick={() => setSuccessToast(false)}
+              className="px-8 py-2.5 bg-emerald-600 text-white rounded-2xl font-bold text-sm hover:bg-emerald-700 transition-colors"
+            >
+              确认
+            </button>
+          </div>
+        </div>
+      )}
+
       {caseGenModal && onSaveCase && (
         <CaseGenerationModal
           playerName={caseGenModal.playerName}
@@ -644,6 +779,78 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
             setCaseGenModal(null);
           }}
         />
+      )}
+    </div>
+  );
+}
+
+function PastExecutionRecordCard({
+  record, roundIndex, review,
+}: {
+  record: ExecutionRecord;
+  roundIndex: number;
+  review?: LeaderReview;
+}) {
+  const [open, setOpen] = useState(false);
+  const decisionStyle: Record<string, string> = {
+    '继续推进': 'bg-amber-50 border-amber-200 text-amber-700',
+    '打回': 'bg-rose-50 border-rose-200 text-rose-700',
+    '结案': 'bg-emerald-50 border-emerald-200 text-emerald-700',
+  };
+  const dc = review?.decision ? (decisionStyle[review.decision] ?? 'bg-slate-50 border-slate-200 text-slate-500') : '';
+
+  return (
+    <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-50 text-left transition-colors"
+      >
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs font-black text-slate-500">第 {roundIndex} 次执行</span>
+          <span className="text-xs text-slate-400">{record.date}</span>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+            record.submissionStatus === '待归档' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+            record.submissionStatus === '已完成' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+            record.submissionStatus === '待审核' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' :
+            'bg-slate-100 text-slate-500 border-slate-200'
+          }`}>
+            {record.submissionStatus === '待归档' ? '已完成' :
+             record.submissionStatus === '已完成' ? '已结案，待总结' :
+             record.submissionStatus}
+          </span>
+          {review?.decision && (
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${dc}`}>
+              组长：{review.decision}
+            </span>
+          )}
+        </div>
+        <span className="text-xs text-slate-400 shrink-0">{open ? '收起' : '查看'}</span>
+      </button>
+      {open && (
+        <div className="border-t border-slate-100 px-5 py-4 space-y-3 bg-slate-50/30">
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">执行描述</p>
+            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{record.description || '（无）'}</p>
+          </div>
+          {record.reflection && (
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">反思</p>
+              <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{record.reflection}</p>
+            </div>
+          )}
+          {review && (
+            <div className={`p-3 rounded-xl border ${dc} space-y-1.5`}>
+              <p className="text-[10px] font-black uppercase tracking-widest">组长审批意见</p>
+              {review.isGsCaused !== null && (
+                <p className="text-xs">GS 责任：{review.isGsCaused ? '是' : '否'}</p>
+              )}
+              {review.comment && (
+                <p className="text-xs leading-relaxed">{review.comment}</p>
+              )}
+              <p className="text-xs font-bold">决定：{review.decision}</p>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

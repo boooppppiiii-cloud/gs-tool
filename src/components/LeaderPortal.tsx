@@ -367,6 +367,80 @@ function DashboardTab({ profiles, history, execRecords, dismissedOutbursts, onDi
                       </div>
                     )}
 
+                    {(() => {
+                      const latestHistory = profHistory
+                        .slice()
+                        .sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0];
+                      const keyPlayerPortraits = (latestHistory?.result?.playerReports ?? [])
+                        .filter(p => p.portraitTable?.isKeyPlayer || (profile.keyPlayers ?? []).includes(p.roleName));
+                      if (keyPlayerPortraits.length === 0) return null;
+                      return (
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                            重点玩家画像 ({keyPlayerPortraits.length} 人)
+                          </p>
+                          <div className="grid grid-cols-1 gap-2">
+                            {keyPlayerPortraits.map(p => {
+                              const pt = p.portraitTable;
+                              return (
+                                <div key={p.roleName} className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-black text-slate-800 text-sm">{p.roleName}</span>
+                                      {pt?.isKeyPlayer && (
+                                        <span className="text-[9px] font-black px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full border border-amber-200">
+                                          重点玩家
+                                        </span>
+                                      )}
+                                    </div>
+                                    {pt && (
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-[10px] text-slate-400">画像完成度</span>
+                                        <span className="text-xs font-black text-indigo-600">{Math.round(pt.overallCompletion * 100)}%</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-slate-600 leading-relaxed line-clamp-2 italic">
+                                    {p.portrait.summary || '暂无画像总结'}
+                                  </p>
+                                  {pt && (
+                                    <div className="flex items-center gap-4 text-xs">
+                                      <span className="text-slate-500">
+                                        累计充值：<span className="font-bold text-indigo-600">¥{pt.basicData.totalRecharge.toLocaleString()}</span>
+                                      </span>
+                                      {pt.basicData.anomalySignals && pt.basicData.anomalySignals !== '无' && (
+                                        <span className="text-rose-500 font-medium">⚠ {pt.basicData.anomalySignals}</span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {pt && pt.dimensions.length > 0 && (
+                                    <div className="flex gap-2 flex-wrap">
+                                      {pt.dimensions.map(dim => (
+                                        <div key={dim.name} className="flex items-center gap-1">
+                                          <span className="text-[9px] text-slate-400">
+                                            {dim.name.replace(/^维度[一二三四五六七八九十]：/, '')}
+                                          </span>
+                                          <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                            <div
+                                              className="h-full bg-indigo-400 rounded-full"
+                                              style={{ width: `${Math.round(dim.completionRate * 100)}%` }}
+                                            />
+                                          </div>
+                                          <span className="text-[9px] text-indigo-500 font-bold">
+                                            {Math.round(dim.completionRate * 100)}%
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {dashTickets.length > 0 && (
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
@@ -561,6 +635,7 @@ function TicketCard({ record, review, history, isExpanded, onToggle, userId, onR
         aiCheckResult: JSON.stringify(result),
         reviewedAt: new Date().toISOString(),
         reviewerId: userId,
+        memberUserId: record.ownerId,
       });
       onRefresh();
     } catch (e) { console.error(e); } finally { setAiLoading(false); }
@@ -578,6 +653,7 @@ function TicketCard({ record, review, history, isExpanded, onToggle, userId, onR
       aiCheckResult: aiResult ? JSON.stringify(aiResult) : review?.aiCheckResult,
       reviewedAt: new Date().toISOString(),
       reviewerId: userId,
+      memberUserId: record.ownerId,
     });
     await dataService.updateExecutionRecord(record.id, { submissionStatus: newStatus });
     setSaving(false);

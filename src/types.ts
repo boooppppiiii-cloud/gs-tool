@@ -203,6 +203,7 @@ export interface LeaderReview {
   aiCheckResult?: string;
   reviewedAt: string;
   reviewerId: string;
+  memberUserId?: string;
 }
 
 export interface HistoryRecord {

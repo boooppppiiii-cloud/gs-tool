@@ -310,6 +310,13 @@ export async function fetchLeaderReviews(): Promise<LeaderReview[]> {
   return load<LeaderReview>(REVIEW_KEY);
 }
 
+export async function fetchLeaderReviewsForUser(userId: string): Promise<LeaderReview[]> {
+  const userRecordIds = new Set(
+    load<ExecutionRecord>(EXEC_KEY).filter(r => r.ownerId === userId).map(r => r.id)
+  );
+  return load<LeaderReview>(REVIEW_KEY).filter(r => userRecordIds.has(r.executionRecordId));
+}
+
 export async function saveLeaderReview(review: LeaderReview): Promise<void> {
   const reviews = load<LeaderReview>(REVIEW_KEY);
   const idx = reviews.findIndex(r => r.id === review.id);
