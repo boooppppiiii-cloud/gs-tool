@@ -25,7 +25,7 @@ const TABS: { id: Tab; icon: React.ReactElement }[] = [
   { id: '个人中心', icon: <UserCircle className="w-5 h-5" /> },
 ];
 
-const PRESET_GROUPS = ['第一组', '第二组', '第三组', '第四组', '第五组'];
+const PRESET_GROUPS = ['杭州三组', '杭州五组', '杭州对抗组', '山东一组', '山东对抗组', '山东对抗二组', '山东二组', '山东九组', '山东三组'];
 
 const STATUS_STYLE: Record<string, string> = {
   '待审核': 'bg-blue-50 text-blue-600 border-blue-200',
@@ -51,9 +51,10 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
   const [dismissedOutbursts, setDismissedOutbursts] = React.useState<{ historyRecordId: string; outburstIndex: number }[]>([]);
   const [loading, setLoading] = React.useState(true);
 
-  const [leaderGroup, setLeaderGroup] = React.useState<string>(
-    () => localStorage.getItem(`leader_group_${user.id}`) || PRESET_GROUPS[0]
-  );
+  const [leaderGroup, setLeaderGroup] = React.useState<string>(() => {
+    const saved = localStorage.getItem(`leader_group_${user.id}`);
+    return saved && PRESET_GROUPS.includes(saved) ? saved : PRESET_GROUPS[0];
+  });
   const handleGroupChange = (g: string) => {
     setLeaderGroup(g);
     localStorage.setItem(`leader_group_${user.id}`, g);
@@ -62,9 +63,9 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
   const loadData = React.useCallback(async () => {
     setLoading(true);
     const [profiles, execs, hist, reviews, dismissed] = await Promise.all([
-      dataService.fetchAllServerProfiles(),
-      dataService.fetchAllExecutionRecords(),
-      dataService.fetchAllHistory(),
+      dataService.fetchAllServerProfiles(leaderGroup),
+      dataService.fetchAllExecutionRecords(leaderGroup),
+      dataService.fetchAllHistory(leaderGroup),
       dataService.fetchLeaderReviews(),
       dataService.fetchDismissedOutbursts(),
     ]);
@@ -74,7 +75,7 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
     setLeaderReviews(reviews);
     setDismissedOutbursts(dismissed);
     setLoading(false);
-  }, []);
+  }, [leaderGroup]);
 
   React.useEffect(() => { loadData(); }, [loadData]);
 

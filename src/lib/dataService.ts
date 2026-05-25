@@ -13,6 +13,10 @@ function currentUid(): string {
   return _currentUserId;
 }
 
+function getStoredGroup(): string {
+  return _currentUserId ? (localStorage.getItem(`member_group_${_currentUserId}`) || '') : '';
+}
+
 // localStorage helpers
 function load<T>(key: string): T[] {
   try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
@@ -26,7 +30,7 @@ export async function saveServerProfile(profile: ServerProfile) {
   const uid = currentUid();
   const profiles = load<ServerProfile>('gs_serverProfiles');
   const idx = profiles.findIndex(p => p.id === profile.id);
-  const record = { ...profile, ownerId: uid };
+  const record = { ...profile, ownerId: uid, group: profile.group || getStoredGroup() };
   if (idx >= 0) profiles[idx] = record; else profiles.push(record);
   save('gs_serverProfiles', profiles);
   cloudSet('serverProfiles', record.id, record);
@@ -51,7 +55,7 @@ export async function updateServerProfile(id: string, updates: Partial<ServerPro
 export async function saveAnalysisRecord(serverConfig: ServerProfile, result: AnalysisResult): Promise<string> {
   const uid = currentUid();
   const id = `hist_${Date.now()}`;
-  const record = { id, timestamp: new Date().toISOString(), serverConfig, result, userId: uid };
+  const record = { id, timestamp: new Date().toISOString(), serverConfig, result, userId: uid, group: getStoredGroup() };
   const history = load<typeof record>('gs_analysisHistory');
   history.unshift(record);
   save('gs_analysisHistory', history);
@@ -204,7 +208,7 @@ export async function saveExecutionRecord(record: ExecutionRecord): Promise<void
   const uid = currentUid();
   const records = load<ExecutionRecord>(EXEC_KEY);
   const idx = records.findIndex(r => r.id === record.id);
-  const entry = { ...record, ownerId: uid, updatedAt: new Date().toISOString() };
+  const entry = { ...record, ownerId: uid, group: record.group || getStoredGroup(), updatedAt: new Date().toISOString() };
   if (idx >= 0) records[idx] = entry; else records.push(entry);
   save(EXEC_KEY, records);
   cloudSet('execRecords', entry.id, entry);
@@ -226,16 +230,19 @@ export async function deleteExecutionRecord(id: string): Promise<void> {
 }
 
 // ---------------- All-user reads (for leader portal) ----------------
-export async function fetchAllServerProfiles(): Promise<ServerProfile[]> {
-  return load<ServerProfile>('gs_serverProfiles');
+export async function fetchAllServerProfiles(group?: string): Promise<ServerProfile[]> {
+  const all = load<ServerProfile>('gs_serverProfiles');
+  return group ? all.filter(p => p.group === group) : all;
 }
 
-export async function fetchAllExecutionRecords(): Promise<ExecutionRecord[]> {
-  return load<ExecutionRecord>(EXEC_KEY);
+export async function fetchAllExecutionRecords(group?: string): Promise<ExecutionRecord[]> {
+  const all = load<ExecutionRecord>(EXEC_KEY);
+  return group ? all.filter(r => r.group === group) : all;
 }
 
-export async function fetchAllHistory(): Promise<(HistoryRecord & { userId: string })[]> {
-  return load<HistoryRecord & { userId: string }>('gs_analysisHistory');
+export async function fetchAllHistory(group?: string): Promise<(HistoryRecord & { userId: string })[]> {
+  const all = load<HistoryRecord & { userId: string }>('gs_analysisHistory');
+  return group ? all.filter(r => r.group === group) : all;
 }
 
 // ---------------- Leader Reviews ----------------

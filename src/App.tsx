@@ -76,12 +76,17 @@ export default function App() {
   const [displayName, setDisplayName] = React.useState<string>('');
 
   const PRESET_GROUPS = ['杭州三组', '杭州五组', '杭州对抗组', '山东一组', '山东对抗组', '山东对抗二组', '山东二组', '山东九组', '山东三组'];
-  const [memberGroup, setMemberGroup] = React.useState<string>(
-    localStorage.getItem('member_group') || '第一组'
-  );
+  const [memberGroup, setMemberGroup] = React.useState<string>(PRESET_GROUPS[0]);
+  React.useEffect(() => {
+    if (user) {
+      const saved = localStorage.getItem(`member_group_${user.id}`);
+      setMemberGroup(saved && PRESET_GROUPS.includes(saved) ? saved : PRESET_GROUPS[0]);
+    }
+  }, [user?.id]);
   const handleGroupChange = (g: string) => {
+    if (!user) return;
     setMemberGroup(g);
-    localStorage.setItem('member_group', g);
+    localStorage.setItem(`member_group_${user.id}`, g);
   };
   const handleDisplayNameChange = (name: string) => {
     if (!user) return;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getAnalyticsLogs, fetchAllAnalyticsLogs } from '../services/analyticsService';
-import { cloudFetchAll } from '../lib/cloudSync';
+import { cloudFetchAll, testCloudWrite } from '../lib/cloudSync';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
   LineChart, Line,
@@ -157,6 +157,8 @@ export default function AdminDashboard() {
         </h2>
         <p className="text-slate-500 font-medium mt-1 uppercase tracking-widest text-[10px]">Real-time Analytics & Business Dashboard</p>
       </div>
+
+      <CloudSyncTestButton />
 
       {/* Tab switcher */}
       <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl w-fit">
@@ -844,6 +846,33 @@ function KbSearchStats({ logs }: { logs: UsageLog[] }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function CloudSyncTestButton() {
+  const [status, setStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle');
+  const [msg, setMsg] = useState('');
+
+  const run = async () => {
+    setStatus('testing');
+    const { ok, message } = await testCloudWrite();
+    setStatus(ok ? 'ok' : 'fail');
+    setMsg(message);
+  };
+
+  return (
+    <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+      <button
+        onClick={run}
+        disabled={status === 'testing'}
+        className="px-4 py-2 bg-indigo-600 text-white text-xs font-black rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+      >
+        {status === 'testing' ? '测试中…' : '测试云端同步'}
+      </button>
+      {status === 'ok' && <span className="text-xs font-bold text-emerald-600">{msg}</span>}
+      {status === 'fail' && <span className="text-xs font-bold text-rose-600">{msg}</span>}
+      {status === 'idle' && <span className="text-xs text-slate-400">点击验证 CloudBase 写入权限是否正常</span>}
     </div>
   );
 }

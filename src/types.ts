@@ -25,6 +25,7 @@ export interface ServerProfile {
   openingDate: string;
   mergeStage?: string;
   gsName?: string;
+  group?: string;
   gsPersona?: {
     age?: string;
     hometown?: string;
@@ -63,6 +64,7 @@ export interface ExecutionRecord {
   createdAt: string;
   updatedAt: string;
   ownerId: string;
+  group?: string;
 }
 
 export interface ServerContext extends ServerProfile {}
@@ -181,6 +183,7 @@ export interface HistoryRecord {
   timestamp: string;
   serverConfig: ServerContext;
   result: AnalysisResult;
+  group?: string;
 }
 
 export interface MonthHistory {
