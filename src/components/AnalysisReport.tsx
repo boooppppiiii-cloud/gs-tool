@@ -61,7 +61,7 @@ interface Props {
 const COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 
 export default function AnalysisReport({ result: rawResult, executionRecords = [], currentHistoryId, onSaveRecords, onSaveCase, onUpdatePortrait, leaderReviews = [], serverName, gsName }: Props) {
-  const result: AnalysisResult = {
+  const result: AnalysisResult = React.useMemo(() => ({
     ...rawResult,
     identifiedKeyPlayers: rawResult.identifiedKeyPlayers ?? [],
     playerReports: (rawResult.playerReports ?? []).map((p: any) => ({
@@ -79,7 +79,8 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
       rechargeData: rawResult.rechargeReport?.rechargeData ?? [],
     },
     serverEcology: rawResult.serverEcology ?? '',
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [rawResult]);
 
   const [adviceRatings, setAdviceRatings] = useState<Record<string, 'up' | 'down'>>({});
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -104,13 +105,13 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
     playerName: string;
   } | null>(null);
 
-  const handleRecordChange = (index: number, data: Partial<ExecutionRecord>) => {
+  const handleRecordChange = React.useCallback((index: number, data: Partial<ExecutionRecord>) => {
     setLocalRecordPatches(prev => ({ ...prev, [index]: { ...(prev[index] ?? {}), ...data } }));
-  };
+  }, []);
 
-  const handleNewRecordChange = (index: number, data: Partial<ExecutionRecord>) => {
+  const handleNewRecordChange = React.useCallback((index: number, data: Partial<ExecutionRecord>) => {
     setNewRecordDrafts(prev => ({ ...prev, [index]: { ...(prev[index] ?? {}), ...data } }));
-  };
+  }, []);
 
   // "上传案例" is only available once the leader has closed at least one record for this history
   const canGenerateCase = React.useMemo(() => {
@@ -185,11 +186,11 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
     setTimeout(() => setSaveStatus('idle'), 2000);
   };
 
-  const rateAdvice = (key: string, rating: 'up' | 'down', playerName: string, trigger: string) => {
+  const rateAdvice = React.useCallback((key: string, rating: 'up' | 'down', playerName: string, trigger: string) => {
     if (adviceRatings[key]) return;
     setAdviceRatings(prev => ({ ...prev, [key]: rating }));
     logUsage('advice_rating', JSON.stringify({ playerName, trigger, rating }));
-  };
+  }, [adviceRatings]);
 
   const exportToWord = async () => {
     const doc = new Document({
@@ -309,7 +310,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
       <div className="flex justify-end">
         <button 
           onClick={exportToWord}
-          className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition-all active:scale-95"
+          className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition-colors active:scale-95"
         >
           <FileDown className="w-5 h-5" /> 导出 Word 总结报告
         </button>
@@ -351,7 +352,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
               const ratingKey = `${player.roleName}-${idx}`;
               const rated = adviceRatings[ratingKey];
               return (
-                <div key={`${player.roleName}-${idx}`} className="bg-white border border-slate-200 rounded-[40px] overflow-hidden shadow-sm hover:shadow-md transition-all">
+                <div key={`${player.roleName}-${idx}`} className="bg-white border border-slate-200 rounded-[40px] overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                   {/* ── 标题 + 标签 ── */}
                   <div className="px-8 py-6 bg-rose-50 border-b border-rose-100">
                     <div className="flex items-start justify-between gap-4">
@@ -608,7 +609,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
             <button
               onClick={() => handleSubmitRecords('草稿')}
               disabled={saveStatus === 'saving' || !onSaveRecords || canGenerateCase || hasUploaded}
-              className="flex items-center gap-2 px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 disabled:opacity-40 transition-all"
+              className="flex items-center gap-2 px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 disabled:opacity-40 transition-colors"
             >
               <Save className="w-4 h-4" />
               暂存草稿
@@ -616,7 +617,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
             <button
               onClick={() => handleSubmitRecords('待审核')}
               disabled={saveStatus === 'saving' || !onSaveRecords || canGenerateCase || hasUploaded}
-              className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-40 transition-all shadow-lg shadow-indigo-100"
+              className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-40 transition-colors shadow-lg shadow-indigo-100"
             >
               <Send className="w-4 h-4" />
               提交核实
@@ -633,7 +634,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
                   setSuccessToast(true);
                 }}
                 disabled={saveStatus === 'saving' || !onSaveRecords}
-                className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-40 transition-all shadow-lg shadow-emerald-100"
+                className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-40 transition-colors shadow-lg shadow-emerald-100"
               >
                 <BookmarkPlus className="w-4 h-4" />
                 上传案例
@@ -784,7 +785,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
   );
 }
 
-function PastExecutionRecordCard({
+const PastExecutionRecordCard = React.memo(function PastExecutionRecordCard({
   record, roundIndex, review,
 }: {
   record: ExecutionRecord;
@@ -854,9 +855,9 @@ function PastExecutionRecordCard({
       )}
     </div>
   );
-}
+});
 
-function PortraitTableCard({
+const PortraitTableCard = React.memo(function PortraitTableCard({
   player,
   onUpdatePortrait,
 }: {
@@ -1051,7 +1052,7 @@ function PortraitTableCard({
       )}
     </div>
   );
-}
+});
 
 function PortraitDetail({ title, content, color }: { title: string; content: string; color: string }) {
   return (

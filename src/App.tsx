@@ -42,6 +42,24 @@ import { logUsage, initAnalyticsUser } from './services/analyticsService';
 
 const ADMIN_EMAIL = '1463432441@qq.com';
 
+type TabId = 'home' | 'server' | 'analysis' | 'gallery' | 'knowledge' | 'profile';
+type NavItem = { id: TabId; label: string; icon: React.ReactElement; children?: { id: string; label: string }[] };
+
+const NAV_ITEMS: NavItem[] = [
+  { id: 'home', label: '首页', icon: <Zap className="w-5 h-5" /> },
+  { id: 'server', label: '区服配置', icon: <Hammer className="w-5 h-5" /> },
+  {
+    id: 'analysis', label: '专家分析', icon: <Sword className="w-5 h-5" />,
+    children: [{ id: 'current', label: '实时分析' }, { id: 'history', label: '历史存档' }]
+  },
+  { id: 'gallery', label: '优秀案例库', icon: <Crown className="w-5 h-5" /> },
+  {
+    id: 'knowledge', label: '游戏知识库', icon: <Scroll className="w-5 h-5" />,
+    children: [{ id: 'items', label: '道具数据库' }, { id: 'calendar', label: '维护日历' }]
+  },
+  { id: 'profile', label: '个人中心', icon: <Shield className="w-5 h-5" /> },
+];
+
 export default function App() {
   const [user, setUser] = React.useState<User | null>(null);
   const [activeTab, setActiveTab] = React.useState<'home' | 'server' | 'analysis' | 'gallery' | 'knowledge' | 'profile'>('home');
@@ -351,23 +369,6 @@ export default function App() {
     }
   };
 
-  type TabId = 'home' | 'server' | 'analysis' | 'gallery' | 'knowledge' | 'profile';
-  type NavItem = { id: TabId; label: string; icon: React.ReactElement; children?: { id: string; label: string }[] };
-
-  const navItems: NavItem[] = [
-    { id: 'home', label: '首页', icon: <Zap className="w-5 h-5 transition-all" /> },
-    { id: 'server', label: '区服配置', icon: <Hammer className="w-5 h-5 transition-all" /> },
-    {
-      id: 'analysis', label: '专家分析', icon: <Sword className="w-5 h-5 transition-all" />,
-      children: [{ id: 'current', label: '实时分析' }, { id: 'history', label: '历史存档' }]
-    },
-    { id: 'gallery', label: '优秀案例库', icon: <Crown className="w-5 h-5 transition-all" /> },
-    {
-      id: 'knowledge', label: '游戏知识库', icon: <Scroll className="w-5 h-5 transition-all" />,
-      children: [{ id: 'items', label: '道具数据库' }, { id: 'calendar', label: '维护日历' }]
-    },
-    { id: 'profile', label: '个人中心', icon: <Shield className="w-5 h-5 transition-all" /> },
-  ];
 
   const pendingContinueCount = React.useMemo(() => {
     return leaderReviews.filter(r => {
@@ -436,7 +437,7 @@ export default function App() {
     <div className="min-h-screen bg-white flex font-sans text-slate-800">
       {/* Sidebar Navigation */}
       <aside
-        className={`bg-white flex flex-col transition-all duration-300 z-50 sticky top-0 h-screen border-r border-slate-200 ${
+        className={`bg-white flex flex-col transition-[width] duration-200 z-50 sticky top-0 h-screen border-r border-slate-200 ${
           isSidebarOpen ? 'w-60' : 'w-[72px]'
         }`}
       >
@@ -471,11 +472,11 @@ export default function App() {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {navItems.map((item) => (
+          {NAV_ITEMS.map((item) => (
             <React.Fragment key={item.id}>
               <button
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all relative group ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors relative group ${
                   activeTab === item.id
                     ? 'bg-amber-50 text-indigo-600 border border-amber-200/80'
                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
@@ -511,7 +512,7 @@ export default function App() {
                       <button
                         key={child.id}
                         onClick={() => setSubTab(item.id, child.id)}
-                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
                           isChildActive
                             ? 'bg-amber-50 text-indigo-600'
                             : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'
@@ -532,14 +533,14 @@ export default function App() {
         <div className="px-3 py-4 border-t border-slate-100 space-y-0.5">
           <button
             onClick={handleSwitchPortal}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-amber-50 hover:text-indigo-600 transition-all ${!isSidebarOpen && 'justify-center'}`}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-amber-50 hover:text-indigo-600 transition-colors ${!isSidebarOpen && 'justify-center'}`}
           >
             <LayoutGrid className="w-4 h-4 shrink-0" />
             {isSidebarOpen && <span className="text-sm font-semibold">切换端口</span>}
           </button>
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all ${!isSidebarOpen && 'justify-center'}`}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-colors ${!isSidebarOpen && 'justify-center'}`}
           >
             <LogOut className="w-4 h-4 shrink-0" />
             {isSidebarOpen && <span className="text-sm font-semibold">退出登录</span>}
@@ -551,7 +552,7 @@ export default function App() {
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
         <header className="px-8 py-4 sticky top-0 bg-white/95 backdrop-blur-sm z-40 flex items-center justify-between border-b border-slate-100">
           <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
-            <span>{navItems.find(i => i.id === activeTab)?.label}</span>
+            <span>{NAV_ITEMS.find(i => i.id === activeTab)?.label}</span>
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right">
@@ -601,7 +602,7 @@ export default function App() {
                               <button
                                 onClick={startAnalysis}
                                 disabled={!activeProfileId || chatData.length === 0 || isAnalyzing}
-                                className="w-full py-4 mt-4 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-30 disabled:hover:translate-y-0 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 group"
+                                className="w-full py-4 mt-4 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-30 disabled:hover:translate-y-0 hover:-translate-y-0.5 transition-[background-color,transform] flex items-center justify-center gap-3 group"
                               >
                                 {isAnalyzing ? (
                                   <span>大数据模型正在深度演算...</span>
@@ -625,7 +626,7 @@ export default function App() {
                      <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
                         <div className="flex items-center justify-between">
                            <h2 className="text-3xl font-black text-slate-900 tracking-tight">分析报告已生成</h2>
-                           <button onClick={() => setAnalysisResult(null)} className="px-6 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-xs hover:bg-indigo-100 transition-all">重新分析</button>
+                           <button onClick={() => setAnalysisResult(null)} className="px-6 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-xs hover:bg-indigo-100 transition-colors">重新分析</button>
                         </div>
                                                  <AnalysisReport
                                    result={analysisResult}
@@ -743,14 +744,14 @@ function PlaceholderPortal({
       <div className="flex gap-3">
         <button
           onClick={onSwitchPortal}
-          className="px-6 py-3 bg-amber-50 border border-amber-200 text-indigo-600 rounded-xl font-bold text-sm hover:bg-amber-100 transition-all flex items-center gap-2"
+          className="px-6 py-3 bg-amber-50 border border-amber-200 text-indigo-600 rounded-xl font-bold text-sm hover:bg-amber-100 transition-colors flex items-center gap-2"
         >
           <LayoutGrid className="w-4 h-4" />
           切换端口
         </button>
         <button
           onClick={onLogout}
-          className="px-6 py-3 bg-rose-50 text-rose-500 rounded-xl font-bold text-sm hover:bg-rose-100 transition-all flex items-center gap-2"
+          className="px-6 py-3 bg-rose-50 text-rose-500 rounded-xl font-bold text-sm hover:bg-rose-100 transition-colors flex items-center gap-2"
         >
           <LogOut className="w-4 h-4" />
           退出登录

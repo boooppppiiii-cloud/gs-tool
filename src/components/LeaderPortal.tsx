@@ -116,7 +116,7 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
         <nav className="flex-1 px-3 py-4 space-y-0.5">
           {TABS.map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-semibold ${
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-sm font-semibold ${
                 activeTab === t.id ? 'bg-amber-50 text-indigo-600 border border-amber-200/80' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
               }`}>
               <div className={activeTab === t.id ? 'text-indigo-600' : 'text-slate-400'}>{t.icon}</div>
@@ -125,10 +125,10 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
           ))}
         </nav>
         <div className="px-3 py-4 border-t border-slate-100 space-y-0.5">
-          <button onClick={onSwitchPortal} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-amber-50 hover:text-indigo-600 transition-all text-sm font-semibold">
+          <button onClick={onSwitchPortal} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-amber-50 hover:text-indigo-600 transition-colors text-sm font-semibold">
             <LayoutGrid className="w-4 h-4" /> 切换端口
           </button>
-          <button onClick={onLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all text-sm font-semibold">
+          <button onClick={onLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-colors text-sm font-semibold">
             <LogOut className="w-4 h-4" /> 退出登录
           </button>
         </div>
@@ -136,7 +136,7 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
 
       {/* Main */}
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
-        <header className="px-8 py-4 sticky top-0 bg-white/95 backdrop-blur-sm z-40 border-b border-slate-100 flex items-center justify-between">
+        <header className="px-8 py-4 sticky top-0 bg-white z-40 border-b border-slate-100 flex items-center justify-between">
           <p className="text-sm font-bold text-slate-400">{activeTab}</p>
           <button onClick={loadData} className="p-2 hover:bg-slate-100 rounded-xl transition-colors" title="刷新数据">
             <RefreshCw className={`w-4 h-4 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
@@ -473,7 +473,7 @@ function DashboardTab({ profiles, history, execRecords, dismissedOutbursts, onDi
   );
 }
 
-function DashTicketRow({ ticket, status, onDismiss }: {
+const DashTicketRow = React.memo(function DashTicketRow({ ticket, status, onDismiss }: {
   ticket: { historyRecordId: string; outburstIndex: number; ob: any; playerName: string };
   status: string;
   onDismiss: (historyRecordId: string, outburstIndex: number) => void;
@@ -509,7 +509,7 @@ function DashTicketRow({ ticket, status, onDismiss }: {
                 </div>
                 <button
                   onClick={() => setPendingDismiss(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 transition-all"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 transition-colors"
                 >
                   <ThumbsDown className="w-3.5 h-3.5" /> 错误识别
                 </button>
@@ -523,13 +523,13 @@ function DashTicketRow({ ticket, status, onDismiss }: {
                     onClick={async () => {
                       onDismiss(ticket.historyRecordId, ticket.outburstIndex);
                     }}
-                    className="px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition-all"
+                    className="px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition-colors"
                   >
                     确认删除
                   </button>
                   <button
                     onClick={() => setPendingDismiss(false)}
-                    className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 transition-all"
+                    className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors"
                   >
                     取消
                   </button>
@@ -541,7 +541,7 @@ function DashTicketRow({ ticket, status, onDismiss }: {
       )}
     </div>
   );
-}
+});
 
 // ─── Tab 2: Approval ──────────────────────────────────────────────────────
 
@@ -587,7 +587,7 @@ function ApprovalTab({ execRecords, history, leaderReviews, userId, onRefresh }:
   );
 }
 
-function TicketCard({ record, review, history, isExpanded, onToggle, userId, onRefresh }: {
+const TicketCard = React.memo(function TicketCard({ record, review, history, isExpanded, onToggle, userId, onRefresh }: {
   record: ExecutionRecord;
   review?: LeaderReview;
   history: (HistoryRecord & { userId: string })[];
@@ -726,7 +726,7 @@ function TicketCard({ record, review, history, isExpanded, onToggle, userId, onR
           <Section title="AI 辅助核实">
             {!aiResult ? (
               <button onClick={handleAiCheck} disabled={aiLoading}
-                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-40 transition-all">
+                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-40 transition-colors">
                 {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                 发起 AI 质检
               </button>
@@ -782,15 +782,15 @@ function TicketCard({ record, review, history, isExpanded, onToggle, userId, onR
           {/* 4. Decision */}
           <div className="flex gap-3 pt-1">
             <button onClick={() => handleDecision('打回')} disabled={saving}
-              className="px-5 py-2.5 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-sm font-bold hover:bg-rose-100 disabled:opacity-40 transition-all">
+              className="px-5 py-2.5 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-sm font-bold hover:bg-rose-100 disabled:opacity-40 transition-colors">
               打回
             </button>
             <button onClick={() => handleDecision('继续推进')} disabled={saving}
-              className="px-5 py-2.5 bg-amber-50 text-amber-600 border border-amber-200 rounded-xl text-sm font-bold hover:bg-amber-100 disabled:opacity-40 transition-all">
+              className="px-5 py-2.5 bg-amber-50 text-amber-600 border border-amber-200 rounded-xl text-sm font-bold hover:bg-amber-100 disabled:opacity-40 transition-colors">
               继续推进
             </button>
             <button onClick={() => handleDecision('结案')} disabled={saving}
-              className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-40 transition-all shadow-lg shadow-emerald-100">
+              className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-40 transition-colors shadow-lg shadow-emerald-100">
               结案
             </button>
             {saving && <Loader2 className="w-5 h-5 animate-spin text-slate-400 self-center" />}
@@ -799,7 +799,7 @@ function TicketCard({ record, review, history, isExpanded, onToggle, userId, onR
       )}
     </div>
   );
-}
+});
 
 // ─── Tab 3: Archive ───────────────────────────────────────────────────────
 
@@ -830,7 +830,7 @@ function ArchiveTab({ execRecords, history, profiles, userId, onRefresh }: {
   );
 }
 
-function ArchiveCard({ record, histRecord, profile, isExpanded, onToggle, userId, onRefresh }: {
+const ArchiveCard = React.memo(function ArchiveCard({ record, histRecord, profile, isExpanded, onToggle, userId, onRefresh }: {
   record: ExecutionRecord;
   histRecord?: HistoryRecord & { userId: string };
   profile?: ServerProfile;
@@ -950,7 +950,7 @@ AI建议处置动作：${outburst?.ob.gsAdvice?.action ?? '未知'}
           <Section title="AI 生成完整案例">
             {!aiCase ? (
               <button onClick={handleGenerateCase} disabled={aiLoading}
-                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-40 transition-all">
+                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-40 transition-colors">
                 {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                 AI 生成案例摘要
               </button>
@@ -974,7 +974,7 @@ AI建议处置动作：${outburst?.ob.gsAdvice?.action ?? '未知'}
                 <option value="不收录">不收录</option>
               </select>
               <button onClick={handleArchive} disabled={archiving || (!aiCase && rating !== '不收录')}
-                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-40 transition-all shadow-lg shadow-emerald-100">
+                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-40 transition-colors shadow-lg shadow-emerald-100">
                 {archiving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                 确认归档
               </button>
@@ -984,7 +984,7 @@ AI建议处置动作：${outburst?.ob.gsAdvice?.action ?? '未知'}
       )}
     </div>
   );
-}
+});
 
 // ─── Tab 4: Report ────────────────────────────────────────────────────────
 
@@ -1083,7 +1083,7 @@ function ProfileTab({ user, leaderGroup, groups, onGroupChange, onLogout }: {
         <div className="flex flex-wrap gap-2">
           {groups.map(g => (
             <button key={g} onClick={() => onGroupChange(g)}
-              className={`px-4 py-2 rounded-2xl text-sm font-bold transition-all border ${
+              className={`px-4 py-2 rounded-2xl text-sm font-bold transition-colors border ${
                 leaderGroup === g
                   ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100'
                   : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
@@ -1095,7 +1095,7 @@ function ProfileTab({ user, leaderGroup, groups, onGroupChange, onLogout }: {
       </div>
 
       <button onClick={onLogout}
-        className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-rose-50 text-rose-600 font-bold text-sm rounded-2xl hover:bg-rose-100 transition-all border border-rose-100">
+        className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-rose-50 text-rose-600 font-bold text-sm rounded-2xl hover:bg-rose-100 transition-colors border border-rose-100">
         <LogOut className="w-4 h-4" /> 退出登录
       </button>
     </div>
