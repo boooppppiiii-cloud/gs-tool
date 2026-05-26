@@ -1,15 +1,14 @@
 /**
- * parser.ts — Convert raw GM data into the exact same format that ExcelUpload.tsx produces.
+ * parser.ts — Convert raw GM data into the same format ExcelUpload.tsx produces.
  *
- * Chat Excel column mapping (same as ExcelUpload.tsx):
- *   C = time, D = roleName, E = type, F = content, H = target
+ * Chat CSV column mapping (same as ExcelUpload.tsx CSV branch):
+ *   col[2]=time, col[3]=roleName, col[4]=type, col[5]=content, col[7]=target
  *
  * Recharge table column mapping (same as ExcelUpload.tsx Sheet2):
- *   col[1] = amount, col[2] = roleName, col[6] = status, col[7] = method
- *   (0-indexed; adjust RECHARGE_COL_MAP below if your GM table differs)
+ *   Adjust RECHARGE_COL_MAP below to match the actual GM recharge table column order.
  */
 
-import * as XLSX from 'xlsx';
+import * as fs from 'fs';
 
 export interface ChatRecord {
   time: string;
@@ -26,42 +25,45 @@ export interface RechargeRecord {
   method: string;
 }
 
-// ── RECHARGE TABLE COLUMN INDICES (0-based) ───────────────────────────────
-// Update these to match the actual column order in the GM backend's recharge table.
-// Open the page in browser, count the <th> columns from left (starting at 0).
+// ── Adjust these 0-based column indices to match the recharge table ───────
+// Open the recharge search page, count <th> columns left-to-right from 0.
 const RECHARGE_COL_MAP = {
-  amount:   1,   // 充值金额
-  roleName: 2,   // 角色名
-  status:   6,   // 状态
-  method:   7,   // 方式
+  amount:   1,
+  roleName: 2,
+  status:   6,
+  method:   7,
 };
 // ──────────────────────────────────────────────────────────────────────────
 
 /**
- * Parse a downloaded Excel/XLSX file into ChatRecord[].
- * Uses the same column mapping as ExcelUpload.tsx Sheet1.
+ * Parse a chat CSV file downloaded from the GM backend.
+ * The CSV must have a header row; data starts from row 2.
  */
-export function parseChatExcel(filePath: string): ChatRecord[] {
-  const workbook = XLSX.readFile(filePath);
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const json = XLSX.utils.sheet_to_json<any>(sheet, { header: 'A' });
+export function parseChatCsv(filePath: string): ChatRecord[] {
+  const text = fs.readFileSync(filePath, 'utf-8');
+  // Delete temp file after reading
+  try { fs.unlinkSync(filePath); } catch {}
 
-  const records: ChatRecord[] = json.slice(1).map((row: any) => ({
-    time:     String(row.C || ''),
-    roleName: String(row.D || ''),
-    type:     String(row.E || ''),
-    content:  String(row.F || ''),
-    target:   String(row.H || ''),
-  })).filter((r: ChatRecord) => r.roleName && r.content);
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  const records: ChatRecord[] = lines.slice(1).map(line => {
+    const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+    return {
+      time:     cols[2] ?? '',
+      roleName: cols[3] ?? '',
+      type:     cols[4] ?? '',
+      content:  cols[5] ?? '',
+      target:   cols[7] ?? '',
+    };
+  }).filter(r => r.roleName && r.content);
 
   records.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
-  console.log(`[Parser] Parsed ${records.length} chat records from Excel`);
+  console.log(`[Parser] ${records.length} chat records parsed from CSV`);
   return records;
 }
 
 /**
  * Convert scraped HTML table rows into RechargeRecord[].
- * Rows come from GmClient.scrapeRechargeRecords() as string[][].
+ * Rows come from GmClient.scrapeRechargeById() as string[][].
  */
 export function parseRechargeRows(rows: string[][]): RechargeRecord[] {
   const { amount, roleName, status, method } = RECHARGE_COL_MAP;
@@ -74,6 +76,6 @@ export function parseRechargeRows(rows: string[][]): RechargeRecord[] {
     }))
     .filter(r => r.roleName);
 
-  console.log(`[Parser] Parsed ${records.length} recharge records from HTML`);
+  console.log(`[Parser] ${records.length} recharge records parsed from HTML`);
   return records;
 }

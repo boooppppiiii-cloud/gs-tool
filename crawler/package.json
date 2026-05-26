@@ -1,7 +1,7 @@
 {
   "name": "gs-crawler",
-  "version": "1.0.0",
-  "description": "Automated GM data collector → AI analysis → daily report",
+  "version": "2.0.0",
+  "description": "Multi-user GM data collector → AI analysis → daily report",
   "type": "commonjs",
   "main": "dist/index.js",
   "scripts": {
@@ -9,14 +9,14 @@
     "start": "node dist/index.js",
     "dev": "ts-node index.ts",
     "now": "ts-node index.ts --now",
+    "auth:chat": "ts-node auth.ts --backend chat",
+    "auth:recharge": "ts-node auth.ts --backend recharge",
     "install-browsers": "npx playwright install chromium"
   },
   "dependencies": {
-    "@playwright/test": "^1.44.0",
     "dotenv": "^16.4.5",
     "node-cron": "^3.0.3",
-    "playwright": "^1.44.0",
-    "xlsx": "^0.18.5"
+    "playwright": "^1.44.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
