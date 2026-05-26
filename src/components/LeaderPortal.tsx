@@ -93,13 +93,16 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
   const pendingArchive = allExecRecords.filter(r => r.submissionStatus === '待归档').length;
 
   const enrichedMembers = React.useMemo(() => {
-    if (allMembers.length === 0) return [];
-    return allMembers.map(m => ({
-      userId: m.userId,
-      username: m.username ||
-        allProfiles.find(p => p.ownerId === m.userId)?.gsName ||
-        m.userId,
-    }));
+    const map = new Map<string, string>();
+    // Prefer cloud-fetched username
+    allMembers.forEach(m => { if (m.username) map.set(m.userId, m.username); });
+    // Supplement / fallback from profiles (works even when cloud query returns nothing)
+    allProfiles.forEach(p => {
+      if (p.ownerId && !map.has(p.ownerId)) {
+        map.set(p.ownerId, p.gsName || p.ownerId);
+      }
+    });
+    return Array.from(map.entries()).map(([userId, username]) => ({ userId, username }));
   }, [allMembers, allProfiles]);
 
   return (

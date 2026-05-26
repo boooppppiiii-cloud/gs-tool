@@ -120,6 +120,13 @@ export default function App() {
     localStorage.setItem(`member_display_name_${user.id}`, name);
   };
 
+  // Re-publish user profile when display name is confirmed or portal switches to member
+  React.useEffect(() => {
+    if (user && displayName && activePortal === 'member') {
+      dataService.setMemberGroupAndTagRecords(user.id, memberGroup, displayName);
+    }
+  }, [displayName, user?.id, activePortal]);
+
   React.useEffect(() => {
     dataService.testConnection();
     auth.getLoginState().then(state => {

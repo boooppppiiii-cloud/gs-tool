@@ -199,6 +199,7 @@ export async function testConnection() {
 
 // ---------------- Execution Records ----------------
 const EXEC_KEY = 'gs_execRecords';
+const USER_PROFILES_KEY = 'gs_userProfiles';
 
 export async function fetchExecutionRecords(userId: string): Promise<ExecutionRecord[]> {
   return load<ExecutionRecord>(EXEC_KEY).filter(r => r.ownerId === userId);
@@ -266,15 +267,33 @@ export async function setMemberGroupAndTagRecords(userId: string, group: string,
   });
   save('gs_analysisHistory', history);
 
+  // Update local userProfiles cache
+  const cachedProfiles = load<{ userId: string; username: string; group: string; updatedAt: string }>(USER_PROFILES_KEY);
+  const ci = cachedProfiles.findIndex(m => m.userId === userId);
+  const entry = { userId, group, username: username ?? '', updatedAt: new Date().toISOString() };
+  if (ci >= 0) cachedProfiles[ci] = entry; else cachedProfiles.push(entry);
+  save(USER_PROFILES_KEY, cachedProfiles);
+
   // Publish user's group membership and account name to cloud so leader can discover it
   cloudSet('userProfiles', userId, { userId, group, username: username ?? '', updatedAt: new Date().toISOString() });
 }
 
 export async function fetchGroupMembers(group: string): Promise<{ userId: string; username: string }[]> {
-  const members = await cloudFetchWhere<{ userId: string; username: string; group: string }>(
+  const cloud = await cloudFetchWhere<{ userId: string; username: string; group: string; updatedAt?: string }>(
     'userProfiles', 'group', group
   );
-  return members.map(m => ({ userId: m.userId, username: m.username || m.userId }));
+  if (cloud.length > 0) {
+    // Merge into local cache so future offline lookups work
+    const cached = load<{ userId: string; username: string; group: string; updatedAt: string }>(USER_PROFILES_KEY);
+    const cmap = new Map(cached.map(m => [m.userId, m]));
+    cloud.forEach(m => cmap.set(m.userId, { userId: m.userId, group: m.group, username: m.username ?? '', updatedAt: m.updatedAt ?? '' }));
+    save(USER_PROFILES_KEY, Array.from(cmap.values()));
+    return cloud.map(m => ({ userId: m.userId, username: m.username || m.userId }));
+  }
+  // Cloud empty or failed — fall back to local cache for this group
+  const local = load<{ userId: string; username: string; group: string }>(USER_PROFILES_KEY)
+    .filter(m => m.group === group);
+  return local.map(m => ({ userId: m.userId, username: m.username || m.userId }));
 }
 
 // Leader portal fetches: pull from CloudBase by group field, merge with any
