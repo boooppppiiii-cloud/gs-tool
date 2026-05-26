@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Scroll, FileText, Search, Sparkles, ChevronRight, AlertTriangle, Package, Zap, Edit2, Check, X, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react';
-import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
+import { auth } from '../lib/firebase';
+import { cloudFetchAll, cloudSet, cloudUpdate } from '../lib/cloudSync';
 import { logUsage } from '../services/analyticsService';
 import { searchKnowledgeBase, isNotFound } from '../lib/coze';
 
@@ -93,16 +94,11 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
   }, []);
 
   const loadCalendar = async () => {
-    try {
-      const res = await db.collection('maintenance_calendar').orderBy('dayNumber', 'asc').get();
-      const events = (res.data || []) as CalendarEvent[];
-      if (events.length === 0 && isAdmin) {
-        await seedCalendar();
-      } else {
-        setCalendar(events);
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, 'maintenance_calendar');
+    const events = await cloudFetchAll<CalendarEvent>('maintenance_calendar', 'dayNumber');
+    if (events.length === 0 && isAdmin) {
+      await seedCalendar();
+    } else {
+      setCalendar(events);
     }
   };
 
@@ -111,33 +107,25 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
   }, [isAdmin]);
 
   const seedCalendar = async () => {
-    try {
-      await Promise.all(GAME_CALENDAR.map((event, idx) => {
-        const eventId = `day-${idx + 1}`;
-        return db.collection('maintenance_calendar').doc(eventId).set({ ...event, id: eventId, dayNumber: idx + 1 });
-      }));
-      logUsage('calendar_seed', 'Seeded initial calendar data');
-      await loadCalendar();
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'maintenance_calendar');
-    }
+    await Promise.all(GAME_CALENDAR.map((event, idx) => {
+      const eventId = `day-${idx + 1}`;
+      return cloudSet('maintenance_calendar', eventId, { ...event, id: eventId, dayNumber: idx + 1 });
+    }));
+    logUsage('calendar_seed', 'Seeded initial calendar data');
+    await loadCalendar();
   };
 
   const handleUpdateEvent = async (id: string) => {
     if (!editValues) return;
-    try {
-      await db.collection('maintenance_calendar').doc(id).update({
-        activity: editValues.activity,
-        item: editValues.item,
-        maintenance: editValues.maintenance
-      });
-      setEditingEventId(null);
-      setEditValues(null);
-      logUsage('calendar_edit', `Updated calendar day ${id}`);
-      await loadCalendar();
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `maintenance_calendar/${id}`);
-    }
+    await cloudUpdate('maintenance_calendar', id, {
+      activity: editValues.activity,
+      item: editValues.item,
+      maintenance: editValues.maintenance,
+    });
+    setEditingEventId(null);
+    setEditValues(null);
+    logUsage('calendar_edit', `Updated calendar day ${id}`);
+    await loadCalendar();
   };
 
   const doSearch = async (query: string) => {

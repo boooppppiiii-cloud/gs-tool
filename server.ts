@@ -192,6 +192,95 @@ async function startServer() {
     }
   });
 
+  // 埋点日志写入端点（服务端 admin SDK 写入，绕过客户端 CORS）
+  app.post('/api/analytics/log', async (req: any, res: any) => {
+    try {
+      const db = getAdminDb();
+      if (!db) return res.status(503).json({ error: 'Admin SDK 未配置' });
+      const log = req.body;
+      await db.collection('usage_logs').add(log);
+      res.json({ ok: true });
+    } catch (e: any) {
+      console.error('[Analytics Write] 写入失败:', e);
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
+  // 通用 CloudBase DB 代理（admin SDK，无 CORS，无安全规则限制）
+  app.post('/api/db/upsert', async (req: any, res: any) => {
+    try {
+      const db = getAdminDb();
+      if (!db) return res.status(503).json({ error: 'Admin SDK 未配置' });
+      const { collection, id, data } = req.body;
+      try {
+        await db.collection(collection).add({ _id: id, ...data });
+      } catch (e: any) {
+        const code = String(e?.code || e?.message || '');
+        if (code.includes('-502008') || code.toLowerCase().includes('duplicate') || code.toLowerCase().includes('exist')) {
+          await db.collection(collection).doc(id).update(data);
+        } else throw e;
+      }
+      res.json({ ok: true });
+    } catch (e: any) {
+      console.error('[DB upsert] 失败:', e);
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
+  app.post('/api/db/update', async (req: any, res: any) => {
+    try {
+      const db = getAdminDb();
+      if (!db) return res.status(503).json({ error: 'Admin SDK 未配置' });
+      const { collection, id, data } = req.body;
+      await db.collection(collection).doc(id).update(data);
+      res.json({ ok: true });
+    } catch (e: any) {
+      console.error('[DB update] 失败:', e);
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
+  app.post('/api/db/delete', async (req: any, res: any) => {
+    try {
+      const db = getAdminDb();
+      if (!db) return res.status(503).json({ error: 'Admin SDK 未配置' });
+      const { collection, id } = req.body;
+      await (db.collection(collection).doc(id) as any).remove();
+      res.json({ ok: true });
+    } catch (e: any) {
+      console.error('[DB delete] 失败:', e);
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
+  app.post('/api/db/getAll', async (req: any, res: any) => {
+    try {
+      const db = getAdminDb();
+      if (!db) return res.status(503).json({ error: 'Admin SDK 未配置' });
+      const { collection, orderBy, limit: lim = 1000 } = req.body;
+      let query: any = db.collection(collection);
+      if (orderBy) query = query.orderBy(orderBy, 'asc');
+      const result = await query.limit(lim).get();
+      res.json({ data: result.data || [] });
+    } catch (e: any) {
+      console.error('[DB getAll] 失败:', e);
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
+  app.post('/api/db/where', async (req: any, res: any) => {
+    try {
+      const db = getAdminDb();
+      if (!db) return res.status(503).json({ error: 'Admin SDK 未配置' });
+      const { collection, field, value } = req.body;
+      const result = await db.collection(collection).where({ [field]: value }).limit(500).get();
+      res.json({ data: result.data || [] });
+    } catch (e: any) {
+      console.error('[DB where] 失败:', e);
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

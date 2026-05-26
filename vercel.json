@@ -5,6 +5,8 @@
   "rewrites": [
     { "source": "/api/gemini/(.*)", "destination": "/api/gemini" },
     { "source": "/api/coze/(.*)",   "destination": "/api/coze" },
-    { "source": "/api/admin/(.*)",  "destination": "/api/admin" }
+    { "source": "/api/admin/(.*)",     "destination": "/api/admin" },
+    { "source": "/api/analytics/(.*)", "destination": "/api/analytics" },
+    { "source": "/api/db/(.*)",        "destination": "/api/db" }
   ]
 }

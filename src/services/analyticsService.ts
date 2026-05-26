@@ -1,4 +1,3 @@
-import { db } from '../lib/firebase';
 
 export interface UsageLog {
   id: string;
@@ -70,8 +69,12 @@ export function logUsage(
       ...(extra?.uploadedRechargeRows !== undefined && { uploadedRechargeRows: extra.uploadedRechargeRows }),
     };
 
-    (db.collection('usage_logs') as any).add({ _id: id, ...log }).catch((e: unknown) => {
-      console.error('[Analytics] 云端写入失败', e);
+    fetch('/api/analytics/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ _id: id, ...log }),
+    }).catch((e: unknown) => {
+      console.error('[Analytics] 服务端写入失败', e);
     });
   } catch (e) {
     console.error('[Analytics] 记录失败', e);
