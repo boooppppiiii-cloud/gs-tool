@@ -79,9 +79,8 @@ export function logUsage(
 }
 
 export async function fetchAllAnalyticsLogs(): Promise<UsageLog[]> {
-  const res = await db.collection('usage_logs')
-    .orderBy('timestamp', 'desc')
-    .limit(1000)
-    .get();
-  return (res.data || []) as UsageLog[];
+  const res = await fetch('/api/admin/logs');
+  if (!res.ok) throw new Error(`Admin logs fetch failed: ${res.status}`);
+  const json = await res.json();
+  return (json.data || []) as UsageLog[];
 }

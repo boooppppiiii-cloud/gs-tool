@@ -3,8 +3,27 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
+import { createRequire } from "module";
 
 dotenv.config();
+
+const require = createRequire(import.meta.url);
+
+// 懒初始化 CloudBase 服务端 SDK（仅在配置了凭证时可用）
+function getAdminDb() {
+  const secretId = process.env.CLOUDBASE_SECRET_ID;
+  const secretKey = process.env.CLOUDBASE_SECRET_KEY;
+  const envId = process.env.CLOUDBASE_ENV_ID;
+  if (!secretId || !secretKey || !envId) return null;
+  try {
+    const tcb = require('@cloudbase/node-sdk');
+    const app = tcb.init({ secretId, secretKey, env: envId });
+    return app.database();
+  } catch (e) {
+    console.warn('[AdminDB] CloudBase 服务端 SDK 初始化失败:', e);
+    return null;
+  }
+}
 
 process.on('unhandledRejection', (reason) => {
   console.error('[Server] 未处理的异步异常（已拦截，进程继续运行）:', reason);
@@ -151,6 +170,25 @@ async function startServer() {
     } catch (err) {
       console.error('[Gemini] 网络错误:', err);
       if (!res.headersSent) res.status(502).json({ error: 'Gemini 代理请求失败', detail: String(err) });
+    }
+  });
+
+  // 管理员日志查询端点（服务端权限，全量不过滤）
+  app.get('/api/admin/logs', async (req: any, res: any) => {
+    try {
+      const db = getAdminDb();
+      if (!db) {
+        return res.status(503).json({ error: 'Admin SDK 未配置，请在 .env 中设置 CLOUDBASE_SECRET_ID 和 CLOUDBASE_SECRET_KEY' });
+      }
+      const result = await db
+        .collection('usage_logs')
+        .orderBy('timestamp', 'desc')
+        .limit(1000)
+        .get();
+      res.json({ data: result.data });
+    } catch (e: any) {
+      console.error('[Admin Logs] 查询失败:', e);
+      res.status(500).json({ error: String(e?.message || e) });
     }
   });
 

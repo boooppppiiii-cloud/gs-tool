@@ -103,7 +103,7 @@ export default function App() {
       setMemberGroup(group);
       setAnalyticsGroup(group);
       // Ensure all existing records are tagged and synced to cloud on login
-      dataService.setMemberGroupAndTagRecords(user.id, group);
+      dataService.setMemberGroupAndTagRecords(user.id, group, displayName || user.username);
     }
   }, [user?.id]);
   const handleGroupChange = (g: string) => {
@@ -112,7 +112,7 @@ export default function App() {
     setAnalyticsGroup(g);
     localStorage.setItem(`member_group_${user.id}`, g);
     // Retag all records with new group and push to cloud
-    dataService.setMemberGroupAndTagRecords(user.id, g);
+    dataService.setMemberGroupAndTagRecords(user.id, g, displayName || user.username);
   };
   const handleDisplayNameChange = (name: string) => {
     if (!user) return;

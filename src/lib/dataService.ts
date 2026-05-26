@@ -247,7 +247,7 @@ export async function fetchAllHistory(group?: string): Promise<(HistoryRecord & 
 
 // Tag all existing records for a user with their new group, then push to cloud.
 // Call this whenever a member sets or confirms their group.
-export async function setMemberGroupAndTagRecords(userId: string, group: string): Promise<void> {
+export async function setMemberGroupAndTagRecords(userId: string, group: string, username?: string): Promise<void> {
   const profiles = load<ServerProfile>('gs_serverProfiles');
   profiles.forEach(p => {
     if (p.ownerId === userId) { p.group = group; cloudSet('serverProfiles', p.id, p); }
@@ -266,8 +266,15 @@ export async function setMemberGroupAndTagRecords(userId: string, group: string)
   });
   save('gs_analysisHistory', history);
 
-  // Publish user's group membership to cloud so leader can discover it
-  cloudSet('userProfiles', userId, { userId, group, updatedAt: new Date().toISOString() });
+  // Publish user's group membership and account name to cloud so leader can discover it
+  cloudSet('userProfiles', userId, { userId, group, username: username ?? '', updatedAt: new Date().toISOString() });
+}
+
+export async function fetchGroupMembers(group: string): Promise<{ userId: string; username: string }[]> {
+  const members = await cloudFetchWhere<{ userId: string; username: string; group: string }>(
+    'userProfiles', 'group', group
+  );
+  return members.map(m => ({ userId: m.userId, username: m.username || m.userId }));
 }
 
 // Leader portal fetches: pull from CloudBase by group field, merge with any

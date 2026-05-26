@@ -51,6 +51,7 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
   const [allHistory, setAllHistory] = React.useState<(HistoryRecord & { userId: string })[]>([]);
   const [leaderReviews, setLeaderReviews] = React.useState<LeaderReview[]>([]);
   const [dismissedOutbursts, setDismissedOutbursts] = React.useState<{ historyRecordId: string; outburstIndex: number }[]>([]);
+  const [allMembers, setAllMembers] = React.useState<{ userId: string; username: string }[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   const [leaderGroup, setLeaderGroup] = React.useState<string>(() => {
@@ -64,18 +65,20 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
 
   const loadData = React.useCallback(async () => {
     setLoading(true);
-    const [profiles, execs, hist, reviews, dismissed] = await Promise.all([
+    const [profiles, execs, hist, reviews, dismissed, members] = await Promise.all([
       dataService.fetchAllServerProfilesForLeader(leaderGroup),
       dataService.fetchAllExecutionRecordsForLeader(leaderGroup),
       dataService.fetchAllHistoryForLeader(leaderGroup),
       dataService.fetchLeaderReviews(),
       dataService.fetchDismissedOutbursts(),
+      dataService.fetchGroupMembers(leaderGroup),
     ]);
     setAllProfiles(profiles);
     setAllExecRecords(execs);
     setAllHistory(hist);
     setLeaderReviews(reviews);
     setDismissedOutbursts(dismissed);
+    setAllMembers(members);
     setLoading(false);
   }, [leaderGroup]);
 
@@ -88,6 +91,16 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
 
   const pendingReview = allExecRecords.filter(r => r.submissionStatus === '待审核').length;
   const pendingArchive = allExecRecords.filter(r => r.submissionStatus === '待归档').length;
+
+  const enrichedMembers = React.useMemo(() => {
+    if (allMembers.length === 0) return [];
+    return allMembers.map(m => ({
+      userId: m.userId,
+      username: m.username ||
+        allProfiles.find(p => p.ownerId === m.userId)?.gsName ||
+        m.userId,
+    }));
+  }, [allMembers, allProfiles]);
 
   return (
     <div className="min-h-screen bg-white flex font-sans text-slate-800">
@@ -159,6 +172,7 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
                   execRecords={allExecRecords}
                   dismissedOutbursts={dismissedOutbursts}
                   onDismiss={handleDismissOutburst}
+                  members={enrichedMembers}
                 />
               )}
               {activeTab === '审批中心' && (
@@ -168,6 +182,7 @@ export default function LeaderPortal({ user, onSwitchPortal, onLogout }: Props) 
                   leaderReviews={leaderReviews}
                   userId={user.id}
                   onRefresh={loadData}
+                  members={enrichedMembers}
                 />
               )}
               {activeTab === '案例归档' && (
@@ -270,28 +285,31 @@ function OutburstPanel({ ob, playerName }: { ob: any; playerName: string }) {
 
 // ─── Tab 1: Dashboard ───────────────────────────────────────────────────────
 
-function DashboardTab({ profiles, history, execRecords, dismissedOutbursts, onDismiss }: {
+function DashboardTab({ profiles, history, execRecords, dismissedOutbursts, onDismiss, members }: {
   profiles: ServerProfile[];
   history: (HistoryRecord & { userId: string })[];
   execRecords: ExecutionRecord[];
   dismissedOutbursts: { historyRecordId: string; outburstIndex: number }[];
   onDismiss: (historyRecordId: string, outburstIndex: number) => void;
+  members: { userId: string; username: string }[];
 }) {
-  const gsNames = [...new Set(profiles.map(p => p.gsName).filter(Boolean))] as string[];
-  const [selectedGs, setSelectedGs] = React.useState(gsNames[0] ?? '');
+  const [selectedMemberId, setSelectedMemberId] = React.useState('全部');
   const [expandedServer, setExpandedServer] = React.useState<string | null>(null);
   const [expandedPortrait, setExpandedPortrait] = React.useState<PlayerBehaviorReport | null>(null);
 
-  const gsProfiles = profiles.filter(p => p.gsName === selectedGs);
+  const gsProfiles = selectedMemberId === '全部'
+    ? profiles
+    : profiles.filter(p => p.ownerId === selectedMemberId);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <label className="text-xs font-bold text-slate-500">GS 名称：</label>
-        <select value={selectedGs} onChange={e => { setSelectedGs(e.target.value); setExpandedServer(null); }}
+        <label className="text-xs font-bold text-slate-500">组员账号：</label>
+        <select value={selectedMemberId} onChange={e => { setSelectedMemberId(e.target.value); setExpandedServer(null); }}
           className="px-3 py-2 text-sm font-semibold border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
-          {gsNames.length === 0 && <option value="">暂无数据</option>}
-          {gsNames.map(g => <option key={g} value={g}>{g}</option>)}
+          <option value="全部">全部</option>
+          {members.length === 0 && <option disabled value="">（暂无已注册组员）</option>}
+          {members.map(m => <option key={m.userId} value={m.userId}>{m.username}</option>)}
         </select>
       </div>
 
@@ -531,27 +549,28 @@ const DashTicketRow = React.memo(function DashTicketRow({ ticket, status, onDism
 
 // ─── Tab 2: Approval ──────────────────────────────────────────────────────
 
-function ApprovalTab({ execRecords, history, leaderReviews, userId, onRefresh }: {
+function ApprovalTab({ execRecords, history, leaderReviews, userId, onRefresh, members }: {
   execRecords: ExecutionRecord[];
   history: (HistoryRecord & { userId: string })[];
   leaderReviews: LeaderReview[];
   userId: string;
   onRefresh: () => void;
+  members: { userId: string; username: string }[];
 }) {
-  const serverNames = [...new Set(execRecords.map(r => r.serverProfileName).filter(Boolean))];
-  const [selectedServer, setSelectedServer] = React.useState('全部');
+  const [selectedMemberId, setSelectedMemberId] = React.useState('全部');
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
 
-  const filtered = selectedServer === '全部' ? execRecords : execRecords.filter(r => r.serverProfileName === selectedServer);
+  const filtered = selectedMemberId === '全部' ? execRecords : execRecords.filter(r => r.ownerId === selectedMemberId);
 
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <label className="text-xs font-bold text-slate-500">组内下属GS上传的区服：</label>
-        <select value={selectedServer} onChange={e => setSelectedServer(e.target.value)}
+        <label className="text-xs font-bold text-slate-500">组员账号：</label>
+        <select value={selectedMemberId} onChange={e => setSelectedMemberId(e.target.value)}
           className="px-3 py-2 text-sm font-semibold border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
           <option value="全部">全部</option>
-          {serverNames.map(g => <option key={g} value={g}>{g}</option>)}
+          {members.length === 0 && <option disabled value="">（暂无已注册组员）</option>}
+          {members.map(m => <option key={m.userId} value={m.userId}>{m.username}</option>)}
         </select>
         <span className="text-xs text-slate-400 font-medium">{filtered.length} 条待审</span>
       </div>
