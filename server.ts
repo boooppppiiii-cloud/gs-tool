@@ -9,21 +9,35 @@ dotenv.config();
 
 const require = createRequire(import.meta.url);
 
-// 懒初始化 CloudBase 服务端 SDK（仅在配置了凭证时可用）
-function getAdminDb() {
+// CloudBase 服务端 SDK — 单次初始化，启动时调用 initAdminDb()
+let _adminDb: any = null;
+let _adminDbError: string = '未初始化';
+
+function initAdminDb() {
   const secretId = process.env.CLOUDBASE_SECRET_ID;
   const secretKey = process.env.CLOUDBASE_SECRET_KEY;
   const envId = process.env.CLOUDBASE_ENV_ID;
-  if (!secretId || !secretKey || !envId) return null;
+  if (!secretId || !secretKey || !envId) {
+    _adminDbError = '缺少环境变量：CLOUDBASE_SECRET_ID / CLOUDBASE_SECRET_KEY / CLOUDBASE_ENV_ID';
+    console.warn('[AdminDB]', _adminDbError);
+    return;
+  }
   try {
-    const tcb = require('@cloudbase/node-sdk');
+    const mod = require('@cloudbase/node-sdk');
+    // 兼容 CJS/ESM 互操作：模块导出可能挂在 .default 上
+    const tcb = (mod?.default ?? mod) as any;
     const app = tcb.init({ secretId, secretKey, env: envId });
-    return app.database();
-  } catch (e) {
-    console.warn('[AdminDB] CloudBase 服务端 SDK 初始化失败:', e);
-    return null;
+    _adminDb = app.database();
+    _adminDbError = '';
+    console.log('[AdminDB] CloudBase 服务端 SDK 初始化成功');
+  } catch (e: any) {
+    _adminDbError = String(e?.message || e);
+    console.error('[AdminDB] CloudBase 服务端 SDK 初始化失败:', e);
   }
 }
+
+function getAdminDb() { return _adminDb; }
+function getAdminDbError() { return _adminDbError || 'Admin SDK 未就绪'; }
 
 process.on('unhandledRejection', (reason) => {
   console.error('[Server] 未处理的异步异常（已拦截，进程继续运行）:', reason);
@@ -48,6 +62,7 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3): P
 }
 
 async function startServer() {
+  initAdminDb();
   const app = express();
   const PORT = parseInt(process.env.PORT || '3000', 10);
 
@@ -178,7 +193,7 @@ async function startServer() {
     try {
       const db = getAdminDb();
       if (!db) {
-        return res.status(503).json({ error: 'Admin SDK 未配置，请在 .env 中设置 CLOUDBASE_SECRET_ID 和 CLOUDBASE_SECRET_KEY' });
+        return res.status(503).json({ error: `Admin SDK 未就绪: ${getAdminDbError()}` });
       }
       const result = await db
         .collection('usage_logs')
@@ -196,7 +211,7 @@ async function startServer() {
   app.post('/api/analytics/log', async (req: any, res: any) => {
     try {
       const db = getAdminDb();
-      if (!db) return res.status(503).json({ error: 'Admin SDK 未配置' });
+      if (!db) return res.status(503).json({ error: `Admin SDK 未就绪: ${getAdminDbError()}` });
       const log = req.body;
       await db.collection('usage_logs').add(log);
       res.json({ ok: true });
@@ -210,7 +225,7 @@ async function startServer() {
   app.post('/api/db/upsert', async (req: any, res: any) => {
     try {
       const db = getAdminDb();
-      if (!db) return res.status(503).json({ error: 'Admin SDK 未配置' });
+      if (!db) return res.status(503).json({ error: `Admin SDK 未就绪: ${getAdminDbError()}` });
       const { collection, id, data } = req.body;
       try {
         await db.collection(collection).add({ _id: id, ...data });
@@ -230,7 +245,7 @@ async function startServer() {
   app.post('/api/db/update', async (req: any, res: any) => {
     try {
       const db = getAdminDb();
-      if (!db) return res.status(503).json({ error: 'Admin SDK 未配置' });
+      if (!db) return res.status(503).json({ error: `Admin SDK 未就绪: ${getAdminDbError()}` });
       const { collection, id, data } = req.body;
       await db.collection(collection).doc(id).update(data);
       res.json({ ok: true });
@@ -243,7 +258,7 @@ async function startServer() {
   app.post('/api/db/delete', async (req: any, res: any) => {
     try {
       const db = getAdminDb();
-      if (!db) return res.status(503).json({ error: 'Admin SDK 未配置' });
+      if (!db) return res.status(503).json({ error: `Admin SDK 未就绪: ${getAdminDbError()}` });
       const { collection, id } = req.body;
       await (db.collection(collection).doc(id) as any).remove();
       res.json({ ok: true });
@@ -256,7 +271,7 @@ async function startServer() {
   app.post('/api/db/getAll', async (req: any, res: any) => {
     try {
       const db = getAdminDb();
-      if (!db) return res.status(503).json({ error: 'Admin SDK 未配置' });
+      if (!db) return res.status(503).json({ error: `Admin SDK 未就绪: ${getAdminDbError()}` });
       const { collection, orderBy, limit: lim = 1000 } = req.body;
       let query: any = db.collection(collection);
       if (orderBy) query = query.orderBy(orderBy, 'asc');
@@ -271,7 +286,7 @@ async function startServer() {
   app.post('/api/db/where', async (req: any, res: any) => {
     try {
       const db = getAdminDb();
-      if (!db) return res.status(503).json({ error: 'Admin SDK 未配置' });
+      if (!db) return res.status(503).json({ error: `Admin SDK 未就绪: ${getAdminDbError()}` });
       const { collection, field, value } = req.body;
       const result = await db.collection(collection).where({ [field]: value }).limit(500).get();
       res.json({ data: result.data || [] });
