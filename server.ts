@@ -4,6 +4,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { createRequire } from "module";
+import { spawn } from "child_process";
+import fs from "fs";
 
 dotenv.config();
 
@@ -294,6 +296,32 @@ async function startServer() {
       console.error('[DB where] 失败:', e);
       res.status(500).json({ error: String(e?.message || e) });
     }
+  });
+
+  // Crawler session status + re-auth triggers
+  const STATUS_FILE = path.join(__dirname, 'crawler', 'sessions', 'status.json');
+
+  app.get('/api/crawler/session-status', (_req: any, res: any) => {
+    try {
+      res.json(JSON.parse(fs.readFileSync(STATUS_FILE, 'utf-8')));
+    } catch {
+      res.json({ chat: 'ok', recharge: 'ok' });
+    }
+  });
+
+  app.post('/api/crawler/auth/:backend', (req: any, res: any) => {
+    const { backend } = req.params as { backend: string };
+    if (backend !== 'chat' && backend !== 'recharge') {
+      return res.status(400).json({ error: 'invalid backend' });
+    }
+    const child = spawn('npm', ['run', `auth:${backend}`], {
+      cwd: __dirname,
+      shell: true,
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.unref();
+    res.json({ ok: true });
   });
 
   // Vite middleware for development

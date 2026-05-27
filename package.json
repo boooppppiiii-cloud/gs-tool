@@ -4,13 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev": "npx kill-port 3000 3001 24678",
+    "predev": "node scripts/kill-dev-ports.js",
     "dev": "tsx server.ts",
     "build": "vite build",
     "start": "NODE_ENV=production tsx server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "auth:chat": "npm --prefix crawler run auth:chat",
+    "auth:recharge": "npm --prefix crawler run auth:recharge",
+    "crawler:now": "npm --prefix crawler run now",
+    "crawler:start": "npm --prefix crawler run start"
   },
   "dependencies": {
     "@cloudbase/js-sdk": "^2.28.5",

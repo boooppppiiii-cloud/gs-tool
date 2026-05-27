@@ -94,6 +94,23 @@ export default function App() {
   const [activePortal, setActivePortal] = React.useState<'admin' | 'leader' | 'member' | null>(null);
   const [displayName, setDisplayName] = React.useState<string>('');
 
+  const [crawlerStatus, setCrawlerStatus] = React.useState<{ chat: string; recharge: string }>({ chat: 'ok', recharge: 'ok' });
+  const [authingBackend, setAuthingBackend] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (activeTab !== 'analysis') return;
+    const check = () => fetch('/api/crawler/session-status').then(r => r.json()).then(setCrawlerStatus).catch(() => {});
+    check();
+    const id = setInterval(check, 60_000);
+    return () => clearInterval(id);
+  }, [activeTab]);
+
+  const triggerAuth = async (b: 'chat' | 'recharge') => {
+    setAuthingBackend(b);
+    await fetch(`/api/crawler/auth/${b}`, { method: 'POST' });
+    setTimeout(() => setAuthingBackend(null), 3000);
+  };
+
   const PRESET_GROUPS = ['杭州三组', '杭州五组', '杭州对抗组', '山东一组', '山东对抗组', '山东对抗二组', '山东二组', '山东九组', '山东三组'];
   const [memberGroup, setMemberGroup] = React.useState<string>(PRESET_GROUPS[0]);
   React.useEffect(() => {
@@ -614,7 +631,33 @@ export default function App() {
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                         <ExcelUpload onDataLoaded={handleDataLoaded} isAnalyzing={isAnalyzing} />
                         <div className="space-y-6">
-                           <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-4">
+                           {(crawlerStatus.chat === 'expired' || crawlerStatus.recharge === 'expired') && (
+                              <div className="space-y-2">
+                                {crawlerStatus.chat === 'expired' && (
+                                  <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-2xl">
+                                    <span className="text-sm font-bold text-amber-700 flex items-center gap-2">
+                                      <AlertTriangleIcon className="w-4 h-4" /> 聊天后台登录已过期
+                                    </span>
+                                    <button onClick={() => triggerAuth('chat')} disabled={authingBackend === 'chat'}
+                                      className="px-3 py-1 text-xs font-bold bg-amber-500 text-white rounded-xl hover:bg-amber-600 disabled:opacity-50 transition-colors">
+                                      {authingBackend === 'chat' ? '启动中...' : '重新认证'}
+                                    </button>
+                                  </div>
+                                )}
+                                {crawlerStatus.recharge === 'expired' && (
+                                  <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-2xl">
+                                    <span className="text-sm font-bold text-amber-700 flex items-center gap-2">
+                                      <AlertTriangleIcon className="w-4 h-4" /> 充值后台扫码已过期
+                                    </span>
+                                    <button onClick={() => triggerAuth('recharge')} disabled={authingBackend === 'recharge'}
+                                      className="px-3 py-1 text-xs font-bold bg-amber-500 text-white rounded-xl hover:bg-amber-600 disabled:opacity-50 transition-colors">
+                                      {authingBackend === 'recharge' ? '启动中...' : '重新认证'}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                   <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-4">
                               <h4 className="text-xl font-black text-slate-800">就绪检查</h4>
                               <p className="text-sm text-slate-500 font-medium">在开始深度神经网络分析前，请确保数据源完整。</p>
                               <div className="space-y-3">

@@ -8,11 +8,11 @@
 
 ### 第一步：安装运行环境
 
-打开命令行，进入 `crawler` 文件夹，依次执行：
+在**项目根目录**（`26.05.07` 文件夹）打开命令行，依次执行：
 
 ```
-npm install
-npx playwright install chromium
+npm install --prefix crawler
+npx --prefix crawler playwright install chromium
 ```
 
 **成功标志**：看到 "Chromium 下载完成" 字样，没有红色报错。
@@ -65,7 +65,7 @@ npx playwright install chromium
 
 ### 第四步：登录聊天后台（只需做一次，过期了再重做）
 
-在命令行执行：
+在**项目根目录**命令行执行：
 
 ```
 npm run auth:chat
@@ -82,16 +82,17 @@ npm run auth:chat
 
 ### 第五步：登录充值后台（只需做一次，过期了再重做）
 
-在命令行执行：
+在**项目根目录**命令行执行：
 
 ```
 npm run auth:recharge
 ```
 
-→ 程序会**自动弹出一个浏览器窗口**，显示二维码  
-→ **用手机扫码**完成登录  
-→ 登录成功后浏览器自动关闭  
-→ 命令行显示 `✓ 充值后台 session 已保存` 即代表成功
+→ 程序会**自动弹出一个浏览器窗口**  
+→ 页面若显示"登录过期"，点击页面上的**"重新登录"按钮**  
+→ 弹出的二维码窗口中，**用手机扫码**完成登录  
+→ 扫码后弹窗自动关闭，程序自动保存登录状态  
+→ 命令行显示 `✓ 充值后台 session 已保存` 即代表成功，浏览器自动关闭
 
 ---
 
@@ -130,10 +131,10 @@ npm run auth:recharge
 
 ### 完成！测试运行
 
-确保 App 的后端服务已经在运行（先执行根目录的 `npm run dev`），然后在命令行执行：
+确保 App 的后端服务已经在运行（先执行根目录的 `npm run dev`），然后在**项目根目录**命令行执行：
 
 ```
-npm run now
+npm run crawler:now
 ```
 
 如果每个区服都打印出 `✓ Daily report generated`，说明一切正常。
@@ -142,11 +143,11 @@ npm run now
 
 ```bash
 # 简单方式：直接运行，关掉命令行就停
-npm start
+npm run crawler:start
 
 # 推荐方式：用 pm2 在后台守护运行
 npm install -g pm2
-pm2 start dist/index.js --name gs-crawler
+pm2 start "npm run crawler:start" --name gs-crawler
 pm2 save        # 保存配置
 pm2 startup     # 设置开机自启
 ```
@@ -155,7 +156,7 @@ pm2 startup     # 设置开机自启
 
 ## 登录过期怎么办？
 
-当命令行出现 `⚠ Session expired for chat/recharge backend` 时，说明某个后台的登录状态过期了，重新执行对应的认证命令即可：
+当命令行出现 `⚠ Session expired for chat/recharge backend` 时，说明某个后台的登录状态过期了，在**项目根目录**重新执行对应的认证命令即可：
 
 ```
 npm run auth:chat      # 聊天后台过期

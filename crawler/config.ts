@@ -2,7 +2,7 @@ import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as fs from 'fs';
 
-dotenv.config({ path: path.resolve(__dirname, '..', '.env.crawler') });
+dotenv.config({ path: path.resolve(__dirname, '.env.crawler') });
 
 function require_env(key: string): string {
   const val = process.env[key];

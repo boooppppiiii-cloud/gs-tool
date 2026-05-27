@@ -14,10 +14,21 @@
  */
 
 import * as cron from 'node-cron';
+import * as fs from 'fs';
+import * as path from 'path';
 import { config, loadUsers, GsUser } from './config';
 import { GmClient, SessionExpiredError } from './gmClient';
 import { parseChatCsv, parseRechargeRows } from './parser';
 import { runAnalysis } from './autoAnalysis';
+
+function setSessionStatus(backend: 'chat' | 'recharge', status: 'ok' | 'expired'): void {
+  const file = path.join(config.SESSIONS_DIR, 'status.json');
+  try {
+    const s = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf-8')) : { chat: 'ok', recharge: 'ok' };
+    s[backend] = status;
+    fs.writeFileSync(file, JSON.stringify(s), 'utf-8');
+  } catch {}
+}
 
 function getTimeRange(): { start: Date; end: Date } {
   const now = new Date();
@@ -91,7 +102,7 @@ async function collectAll(): Promise<void> {
       if (err instanceof SessionExpiredError) {
         console.error(`\n  ⚠ Session expired for ${err.backend} backend.`);
         console.error(`  → Run: npm run auth:${err.backend}  then restart the crawler.\n`);
-        // Notify via system bell
+        setSessionStatus(err.backend, 'expired');
         process.stdout.write('\x07');
       } else {
         console.error(`  ✗ [${user.serverName}] Collection failed:`, err);
