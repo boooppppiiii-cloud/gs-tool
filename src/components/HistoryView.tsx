@@ -17,6 +17,7 @@ import {
   Download,
   Database,
   Loader2,
+  Sword,
 } from 'lucide-react';
 import { MonthHistory, HistoryRecord, CrawlerChatRecord } from '../types';
 
@@ -25,9 +26,10 @@ interface Props {
   crawlerChatLogs?: CrawlerChatRecord[];
   onSelect: (record: HistoryRecord) => void;
   onDelete: (month: string, id: string) => void;
+  onAnalyze?: (log: CrawlerChatRecord) => void;
 }
 
-export default function HistoryView({ history, crawlerChatLogs = [], onSelect, onDelete }: Props) {
+export default function HistoryView({ history, crawlerChatLogs = [], onSelect, onDelete, onAnalyze }: Props) {
   const [expandedMonths, setExpandedMonths] = React.useState<string[]>([]);
   const [expandedCrawlMonths, setExpandedCrawlMonths] = React.useState<string[]>([]);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -216,14 +218,25 @@ export default function HistoryView({ history, crawlerChatLogs = [], onSelect, o
                             </p>
                           </div>
                         </div>
-                        <button
-                          onClick={() => downloadCsv(log.csvFileId, `crawl_${log.serverName}_${log.crawlStart.slice(0, 10)}.csv`)}
-                          disabled={downloading === log.csvFileId}
-                          className="p-2 rounded-lg hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 transition-colors disabled:opacity-50 shrink-0"
-                          title="下载 CSV"
-                        >
-                          {downloading === log.csvFileId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                        </button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {onAnalyze && (
+                            <button
+                              onClick={() => onAnalyze(log)}
+                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors"
+                              title="一键专家分析"
+                            >
+                              <Sword className="w-3 h-3" /> 一键分析
+                            </button>
+                          )}
+                          <button
+                            onClick={() => downloadCsv(log.csvFileId, `crawl_${log.serverName}_${log.crawlStart.slice(0, 10)}.csv`)}
+                            disabled={downloading === log.csvFileId}
+                            className="p-2 rounded-lg hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 transition-colors disabled:opacity-50"
+                            title="下载 CSV"
+                          >
+                            {downloading === log.csvFileId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

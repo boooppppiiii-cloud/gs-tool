@@ -4,10 +4,21 @@
  */
 
 import React from 'react';
-import { FileSpreadsheet, Upload, CheckCircle2, AlertTriangle as AlertTriangleIcon, Loader2, Database, ChevronDown } from 'lucide-react';
+import {
+  Upload, CheckCircle2, AlertTriangle as AlertTriangleIcon, Loader2,
+  Database, ChevronDown, ImageIcon, X, Scan,
+} from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { ChatRecord, RechargeRecord, CrawlerChatRecord } from '../types';
 import { logUsage } from '../services/analyticsService';
+
+// ── Internal types for image extraction ──────────────────────────────────────
+interface GameMessage { roleName: string; content: string; chatType?: string }
+interface WechatMessage { senderName: string; content: string }
+type ExtractResult =
+  | { type: 'game'; messages: GameMessage[] }
+  | { type: 'wechat'; messages: WechatMessage[]; uniqueSenders: string[] }
+  | { error: string }
 
 interface Props {
   onDataLoaded: (chat: ChatRecord[], recharge: RechargeRecord[], fileName: string) => void;
@@ -15,7 +26,7 @@ interface Props {
   crawlerLogs?: CrawlerChatRecord[];
 }
 
-type Mode = 'upload' | 'crawler';
+type Mode = 'upload' | 'crawler' | 'image';
 
 function parseCsvContent(text: string): ChatRecord[] {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -28,17 +39,35 @@ function parseCsvContent(text: string): ChatRecord[] {
 }
 
 export default function ExcelUpload({ onDataLoaded, isAnalyzing, crawlerLogs = [] }: Props) {
+  // ── Upload mode ────────────────────────────────────────────────────────────
   const [fileName, setFileName] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const [mode, setMode] = React.useState<Mode>('upload');
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
+
+  // ── Crawler mode ───────────────────────────────────────────────────────────
   const [loadingCrawlId, setLoadingCrawlId] = React.useState<string | null>(null);
   const [selectedCrawlId, setSelectedCrawlId] = React.useState<string | null>(null);
+  const [crawlerError, setCrawlerError] = React.useState<string | null>(null);
 
+  // ── Image mode ─────────────────────────────────────────────────────────────
+  const [imgItems, setImgItems] = React.useState<{ file: File; dataUrl: string }[]>([]);
+  const [isExtracting, setIsExtracting] = React.useState(false);
+  const [imgError, setImgError] = React.useState<string | null>(null);
+  // After extraction:
+  const [gameMessages, setGameMessages] = React.useState<GameMessage[]>([]);
+  const [wechatMessages, setWechatMessages] = React.useState<WechatMessage[]>([]);
+  const [uniqueSenders, setUniqueSenders] = React.useState<string[]>([]);
+  const [roleMapping, setRoleMapping] = React.useState<Record<string, string>>({});
+  const [imgReady, setImgReady] = React.useState(false);
+
+  // ── Mode ───────────────────────────────────────────────────────────────────
+  const [mode, setMode] = React.useState<Mode>('upload');
+
+  // ── Upload handler ─────────────────────────────────────────────────────────
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
-    setError(null);
+    setUploadError(null);
     const isCSV = file.name.toLowerCase().endsWith('.csv');
     try {
       logUsage('excel_upload', `Started processing ${file.name}`);
@@ -65,13 +94,14 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing, crawlerLogs = [
       }
     } catch (err) {
       console.error(err);
-      setError('文件解析失败，请确认格式正确（Excel: Sheet1聊天/Sheet2充值；CSV: 逗号分隔聊天记录）');
+      setUploadError('文件解析失败，请确认格式正确（Excel: Sheet1聊天/Sheet2充值；CSV: 逗号分隔聊天记录）');
     }
   };
 
+  // ── Crawler handler ────────────────────────────────────────────────────────
   const handleSelectCrawlerLog = async (log: CrawlerChatRecord) => {
     setLoadingCrawlId(log.id);
-    setError(null);
+    setCrawlerError(null);
     try {
       const res = await fetch('/api/db/getDoc', {
         method: 'POST',
@@ -87,13 +117,114 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing, crawlerLogs = [
       logUsage('crawler_log_selected', `server=${log.serverName} rows=${log.rowCount}`);
     } catch (err) {
       console.error(err);
-      setError('爬虫记录加载失败，请重试');
+      setCrawlerError('爬虫记录加载失败，请重试');
     } finally {
       setLoadingCrawlId(null);
     }
   };
 
-  // Group logs by month for display
+  // ── Image handlers ─────────────────────────────────────────────────────────
+  const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        setImgItems(prev => [...prev, { file, dataUrl: ev.target?.result as string }]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const removeImage = (idx: number) => {
+    setImgItems(prev => prev.filter((_, i) => i !== idx));
+    // Reset extraction results when images change
+    setGameMessages([]);
+    setWechatMessages([]);
+    setUniqueSenders([]);
+    setRoleMapping({});
+    setImgReady(false);
+    setImgError(null);
+  };
+
+  const handleExtract = async () => {
+    if (imgItems.length === 0) return;
+    setIsExtracting(true);
+    setImgError(null);
+    setGameMessages([]);
+    setWechatMessages([]);
+    setUniqueSenders([]);
+    setImgReady(false);
+
+    const allGame: GameMessage[] = [];
+    const allWechat: WechatMessage[] = [];
+    const senderSet = new Set<string>();
+    const errors: string[] = [];
+
+    for (const { file, dataUrl } of imgItems) {
+      try {
+        const base64 = dataUrl.split(',')[1];
+        const mimeType = file.type || 'image/jpeg';
+        const res = await fetch('/api/image/extract-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: base64, mimeType }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const result: ExtractResult = await res.json();
+        if ('error' in result) throw new Error(result.error);
+        if (result.type === 'game') {
+          allGame.push(...result.messages);
+        } else {
+          allWechat.push(...result.messages);
+          result.uniqueSenders.forEach(s => senderSet.add(s));
+        }
+      } catch (err: any) {
+        errors.push(`「${file.name}」: ${err.message}`);
+      }
+    }
+
+    setGameMessages(allGame);
+    setWechatMessages(allWechat);
+    const senders = Array.from(senderSet);
+    setUniqueSenders(senders);
+    setRoleMapping(Object.fromEntries(senders.map(s => [s, ''])));
+
+    if (errors.length > 0) setImgError(errors.join('；'));
+
+    // If only game messages (no wechat), load immediately
+    if (allWechat.length === 0 && allGame.length > 0) {
+      const records = allGame.map(m => ({
+        time: '', roleName: m.roleName, type: m.chatType || '世界', content: m.content, target: '',
+      } as ChatRecord));
+      onDataLoaded(records, [], '图片识别');
+      setImgReady(true);
+      logUsage('image_extract', `game mode, ${records.length} records`);
+    }
+
+    setIsExtracting(false);
+  };
+
+  const handleConfirmMapping = () => {
+    const records: ChatRecord[] = [
+      ...gameMessages.map(m => ({
+        time: '', roleName: m.roleName, type: m.chatType || '世界', content: m.content, target: '',
+      } as ChatRecord)),
+      ...wechatMessages.map(m => ({
+        time: '', roleName: roleMapping[m.senderName]?.trim() || m.senderName,
+        type: '微信', content: m.content, target: '',
+      } as ChatRecord)).filter(r => r.roleName),
+    ];
+    onDataLoaded(records, [], '图片识别');
+    setImgReady(true);
+    logUsage('image_extract', `wechat mode, ${records.length} records`);
+  };
+
+  const needsMapping = wechatMessages.length > 0 && !imgReady;
+  const totalExtracted = gameMessages.length + wechatMessages.length;
+
+  // ── Crawler logs grouped by month ─────────────────────────────────────────
   const logsByMonth = React.useMemo(() => {
     const groups: { month: string; logs: CrawlerChatRecord[] }[] = [];
     const seen = new Map<string, CrawlerChatRecord[]>();
@@ -120,6 +251,14 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing, crawlerLogs = [
           <Upload className="w-3.5 h-3.5" /> 上传文件
         </button>
         <button
+          onClick={() => setMode('image')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold transition-colors ${
+            mode === 'image' ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600' : 'text-slate-500 hover:bg-slate-50'
+          }`}
+        >
+          <ImageIcon className="w-3.5 h-3.5" /> 图片识别
+        </button>
+        <button
           onClick={() => setMode('crawler')}
           className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold transition-colors ${
             mode === 'crawler' ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600' : 'text-slate-500 hover:bg-slate-50'
@@ -132,6 +271,7 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing, crawlerLogs = [
         </button>
       </div>
 
+      {/* ── Upload mode ──────────────────────────────────────────────────────── */}
       {mode === 'upload' && (
         <div className="p-8">
           <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl p-10 transition-colors hover:border-indigo-300 group relative">
@@ -162,7 +302,7 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing, crawlerLogs = [
                     </p>
                     <p className="text-sm text-slate-500 mt-1">支持 .xlsx / .xls / .csv 格式 | CSV 文件名即为区服名称</p>
                   </div>
-                  {fileName && !error && (
+                  {fileName && !uploadError && (
                     <div className="mt-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-1.5 rounded-full text-sm font-medium">
                       <CheckCircle2 className="w-4 h-4" />
                       <span>数据已就绪，点击下方按钮开始分析</span>
@@ -172,9 +312,9 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing, crawlerLogs = [
               )}
             </div>
           </div>
-          {error && (
+          {uploadError && (
             <div className="mt-4 flex items-center gap-2 text-rose-600 bg-rose-50 p-3 rounded-lg text-sm">
-              <AlertTriangleIcon className="w-4 h-4" /> {error}
+              <AlertTriangleIcon className="w-4 h-4" /> {uploadError}
             </div>
           )}
           <div className="mt-6 grid grid-cols-3 gap-4 text-xs text-slate-400">
@@ -185,6 +325,124 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing, crawlerLogs = [
         </div>
       )}
 
+      {/* ── Image mode ───────────────────────────────────────────────────────── */}
+      {mode === 'image' && (
+        <div className="p-5 space-y-4">
+          {/* Drop zone */}
+          {!isExtracting && !needsMapping && (
+            <div className="relative border-2 border-dashed border-slate-200 rounded-xl p-6 hover:border-indigo-300 transition-colors group">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImagePick}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                disabled={isAnalyzing}
+              />
+              <div className="flex flex-col items-center gap-2 pointer-events-none">
+                <div className="w-12 h-12 bg-indigo-50 border border-indigo-100 rounded-full flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
+                  <ImageIcon className="w-6 h-6 text-indigo-500" />
+                </div>
+                <p className="text-sm font-semibold text-slate-700">点击或拖拽上传聊天截图</p>
+                <p className="text-xs text-slate-400">支持游戏内截图 / 微信截图 / 文字截图，可多选</p>
+              </div>
+            </div>
+          )}
+
+          {/* Thumbnails */}
+          {imgItems.length > 0 && !isExtracting && !needsMapping && !imgReady && (
+            <div className="grid grid-cols-3 gap-2">
+              {imgItems.map(({ file, dataUrl }, idx) => (
+                <div key={idx} className="relative group rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-50">
+                  <img src={dataUrl} alt={file.name} className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => removeImage(idx)}
+                    className="absolute top-1 right-1 w-5 h-5 bg-slate-800/70 hover:bg-rose-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <X className="w-3 h-3 text-white" />
+                  </button>
+                  <p className="absolute bottom-0 left-0 right-0 bg-black/40 text-white text-[9px] px-1 py-0.5 truncate">{file.name}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Extracting */}
+          {isExtracting && (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
+              <p className="text-sm font-bold text-slate-600">AI 正在识别聊天内容...</p>
+              <p className="text-xs text-slate-400">共 {imgItems.length} 张图片</p>
+            </div>
+          )}
+
+          {/* WeChat mapping UI */}
+          {needsMapping && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 font-bold">
+                <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0" />
+                检测到微信/通讯软件聊天记录，请填写每位发言者对应的游戏角色名
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {uniqueSenders.map(sender => (
+                  <div key={sender} className="flex items-center gap-3 px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
+                    <span className="text-sm font-bold text-slate-700 min-w-0 flex-1 truncate" title={sender}>{sender}</span>
+                    <span className="text-slate-300 text-sm shrink-0">→</span>
+                    <input
+                      type="text"
+                      placeholder="游戏角色名"
+                      value={roleMapping[sender] ?? ''}
+                      onChange={e => setRoleMapping(prev => ({ ...prev, [sender]: e.target.value }))}
+                      className="w-32 px-2 py-1 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white shrink-0"
+                    />
+                  </div>
+                ))}
+              </div>
+              {gameMessages.length > 0 && (
+                <p className="text-[10px] text-slate-400 px-1">同时识别到 {gameMessages.length} 条游戏截图聊天，将自动合并</p>
+              )}
+              <button
+                onClick={handleConfirmMapping}
+                className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors"
+              >
+                确认并加载（{totalExtracted} 条聊天）
+              </button>
+            </div>
+          )}
+
+          {/* Ready state */}
+          {imgReady && (
+            <div className="flex items-center gap-2 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 font-bold">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              已加载 {gameMessages.length + wechatMessages.length} 条聊天记录 — 点击下方按钮开始分析
+            </div>
+          )}
+
+          {/* Error */}
+          {imgError && (
+            <div className="flex items-start gap-2 px-4 py-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-bold">
+              <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {imgError}
+            </div>
+          )}
+
+          {/* Extract button */}
+          {!isExtracting && !needsMapping && !imgReady && imgItems.length > 0 && (
+            <button
+              onClick={handleExtract}
+              disabled={isAnalyzing}
+              className="w-full py-2.5 flex items-center justify-center gap-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            >
+              <Scan className="w-4 h-4" />
+              开始识别（{imgItems.length} 张图片）
+            </button>
+          )}
+          {!isExtracting && !needsMapping && !imgReady && imgItems.length === 0 && (
+            <p className="text-center text-xs text-slate-400 py-2">上传截图后点击识别，AI 将自动提取聊天记录</p>
+          )}
+        </div>
+      )}
+
+      {/* ── Crawler mode ─────────────────────────────────────────────────────── */}
       {mode === 'crawler' && (
         <div className="p-4 space-y-3 max-h-96 overflow-y-auto">
           {crawlerLogs.length === 0 ? (
@@ -201,9 +459,9 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing, crawlerLogs = [
                   已加载：{fileName} — 点击下方按钮开始分析
                 </div>
               )}
-              {error && (
+              {crawlerError && (
                 <div className="flex items-center gap-2 px-4 py-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-bold">
-                  <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0" /> {error}
+                  <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0" /> {crawlerError}
                 </div>
               )}
               {logsByMonth.map(({ month, logs }) => (

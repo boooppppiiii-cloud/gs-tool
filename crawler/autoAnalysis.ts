@@ -134,7 +134,7 @@ export async function runAnalysis(
   rechargeData: RechargeRecord[],
   userId: string,
   group: string,
-  csvFilePath?: string,
+  csvContent?: string,
   serverName?: string,
   crawlPeriod?: { start: Date; end: Date },
 ): Promise<void> {
@@ -196,21 +196,17 @@ export async function runAnalysis(
   await dbPost('upsert', {
     collection: 'analysisHistory',
     id: histId,
-    data: { id: histId, timestamp: new Date().toISOString(), serverConfig: profile, result, userId, group, hasCsv: !!csvFilePath },
+    data: { id: histId, timestamp: new Date().toISOString(), serverConfig: profile, result, userId, group, hasCsv: !!csvContent },
   });
 
-  if (csvFilePath) {
+  if (csvContent) {
     try {
-      const fs = await import('fs');
-      if (fs.existsSync(csvFilePath)) {
-        const csvContent = fs.readFileSync(csvFilePath, 'utf-8');
-        await dbPost('upsert', {
-          collection: 'chat_csv_files',
-          id: histId,
-          data: { recordId: histId, userId, content: csvContent },
-        });
-        console.log(`[AutoAnalysis] CSV uploaded to chat_csv_files (${csvContent.length} chars)`);
-      }
+      await dbPost('upsert', {
+        collection: 'chat_csv_files',
+        id: histId,
+        data: { recordId: histId, userId, content: csvContent },
+      });
+      console.log(`[AutoAnalysis] CSV uploaded (${csvContent.length} chars)`);
     } catch (e) {
       console.warn('[AutoAnalysis] CSV 上传失败（不影响分析结果）:', e);
     }

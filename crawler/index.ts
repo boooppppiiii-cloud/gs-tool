@@ -49,8 +49,11 @@ async function collectForUser(user: GsUser, start: Date, end: Date): Promise<voi
   await chatClient.launch();
   let chatData;
   let csvPath: string | undefined;
+  let csvContent: string | undefined;
   try {
     csvPath = await chatClient.exportChatCsv(user.serverName, start, end);
+    // Read content before parseChatCsv deletes the temp file
+    try { csvContent = fs.readFileSync(csvPath, 'utf-8'); } catch {}
     chatData = parseChatCsv(csvPath);
   } finally {
     await chatClient.close();
@@ -74,7 +77,7 @@ async function collectForUser(user: GsUser, start: Date, end: Date): Promise<voi
   }
   const rechargeData = parseRechargeRows(allRechargeRows);
 
-  await runAnalysis(chatData, rechargeData, user.gsUserId, user.gsGroup, csvPath, user.serverName, { start, end });
+  await runAnalysis(chatData, rechargeData, user.gsUserId, user.gsGroup, csvContent, user.serverName, { start, end });
   console.log(`  [${user.serverName}] ✓ Daily report generated`);
 }
 

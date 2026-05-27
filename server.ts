@@ -311,6 +311,58 @@ async function startServer() {
     }
   });
 
+  // Image → chat extraction (Gemini Vision)
+  app.post('/api/image/extract-chat', async (req: any, res: any) => {
+    try {
+      const { imageBase64, mimeType = 'image/jpeg' } = req.body ?? {};
+      if (!imageBase64) return res.status(400).json({ error: '缺少图片数据' });
+
+      const prompt = `你是专业的游戏聊天记录识别助手。分析这张截图，判断属于哪种类型并提取信息。
+
+类型A：游戏内聊天截图（传奇/傲世传奇等游戏界面，可见角色名和游戏聊天框）
+类型B：微信/QQ等通讯软件聊天截图，或纯文字聊天记录截图
+
+如果是类型A，输出：
+{"type":"game","messages":[{"roleName":"角色名","content":"消息内容","chatType":"世界或区域或私聊或帮派"}]}
+
+如果是类型B，输出：
+{"type":"wechat","messages":[{"senderName":"发言者昵称","content":"消息内容"}],"uniqueSenders":["昵称1","昵称2"]}
+
+只输出JSON，不要markdown代码块或任何说明文字。`;
+
+      const geminiBody = {
+        contents: [{ parts: [
+          { inlineData: { mimeType, data: imageBase64 } },
+          { text: prompt },
+        ]}],
+        generationConfig: { responseMimeType: 'application/json' },
+      };
+
+      const model = 'gemini-2.5-flash';
+      const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+      const response = await fetchWithRetry(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(geminiBody),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        const safeStatus = response.status >= 100 && response.status <= 599 ? response.status : 502;
+        return res.status(safeStatus).json({ error: errText });
+      }
+
+      const data = await response.json() as any;
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+      let result: unknown;
+      try { result = JSON.parse(text); } catch { result = { error: '解析失败', raw: text.slice(0, 200) }; }
+      res.json(result);
+    } catch (e: any) {
+      console.error('[Image Extract] 失败:', e);
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
   // Crawler session status + re-auth triggers
   const STATUS_FILE = path.join(__dirname, 'crawler', 'sessions', 'status.json');
 
@@ -324,11 +376,14 @@ async function startServer() {
 
   app.post('/api/crawler/collect-now', (req: any, res: any) => {
     const { serverName, ownerId } = req.body ?? {};
+    const logPath = path.join(__dirname, 'crawler', 'sessions', 'crawl_last.log');
+    fs.writeFileSync(logPath, `[${new Date().toISOString()}] Crawl started\n`, 'utf-8');
+    const logStream = fs.createWriteStream(logPath, { flags: 'a' });
     const child = spawn('npm', ['run', 'crawler:now'], {
       cwd: __dirname,
       shell: true,
       detached: true,
-      stdio: 'ignore',
+      stdio: ['ignore', logStream, logStream],
       env: {
         ...process.env,
         CRAWL_HOURS: '10',
@@ -338,6 +393,15 @@ async function startServer() {
     });
     child.unref();
     res.json({ ok: true });
+  });
+
+  app.get('/api/crawler/last-log', (_req: any, res: any) => {
+    const logPath = path.join(__dirname, 'crawler', 'sessions', 'crawl_last.log');
+    try {
+      res.json({ log: fs.readFileSync(logPath, 'utf-8') });
+    } catch {
+      res.json({ log: '(暂无运行日志)' });
+    }
   });
 
   app.post('/api/crawler/auth/:backend', (req: any, res: any) => {

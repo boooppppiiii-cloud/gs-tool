@@ -100,6 +100,8 @@ export default function App() {
   const [isCollecting, setIsCollecting] = React.useState(false);
   const [collectMsg, setCollectMsg] = React.useState<string | null>(null);
   const [crawlServerName, setCrawlServerName] = React.useState<string>('');
+  const [crawlLog, setCrawlLog] = React.useState<string | null>(null);
+  const [showCrawlLog, setShowCrawlLog] = React.useState(false);
 
   React.useEffect(() => {
     if (activeTab !== 'analysis') return;
@@ -130,6 +132,34 @@ export default function App() {
       setCollectMsg('启动失败，请检查服务器');
     }
     setTimeout(() => { setIsCollecting(false); setCollectMsg(null); }, 8000);
+  };
+
+  const handleAnalyzeFromCrawl = async (log: import('./types').CrawlerChatRecord) => {
+    try {
+      const res = await fetch('/api/db/getDoc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collection: 'chat_csv_files', id: log.csvFileId }),
+      });
+      const { data } = await res.json();
+      if (!data?.content) {
+        setCollectMsg('未找到 CSV 数据，请重新爬取');
+        setTimeout(() => setCollectMsg(null), 4000);
+        return;
+      }
+      const lines = (data.content as string).split(/\r?\n/).filter((l: string) => l.trim());
+      const chatRecords: ChatRecord[] = lines.slice(1).map((line: string) => {
+        const cols = line.split(',').map((c: string) => c.trim().replace(/^"|"$/g, ''));
+        return { time: cols[2] ?? '', roleName: cols[3] ?? '', type: cols[4] ?? '', content: cols[5] ?? '', target: cols[7] ?? '' };
+      }).filter((r: ChatRecord) => r.roleName && r.content);
+      setChatData(chatRecords);
+      setRechargeData([]);
+      setAnalysisResult(null);
+      setAnalysisSubTab('current');
+    } catch {
+      setCollectMsg('加载数据失败，请重试');
+      setTimeout(() => setCollectMsg(null), 4000);
+    }
   };
 
   const PRESET_GROUPS = ['杭州三组', '杭州五组', '杭州对抗组', '山东一组', '山东对抗组', '山东对抗二组', '山东二组', '山东九组', '山东三组'];
@@ -653,7 +683,7 @@ export default function App() {
            {activeTab === 'analysis' && (
              <div className="space-y-8 animate-in fade-in duration-500">
                {analysisSubTab === 'history' ? (
-                 <HistoryView history={history} crawlerChatLogs={crawlerChatLogs} onSelect={handleSelectHistory} onDelete={handleDeleteHistory} />
+                 <HistoryView history={history} crawlerChatLogs={crawlerChatLogs} onSelect={handleSelectHistory} onDelete={handleDeleteHistory} onAnalyze={handleAnalyzeFromCrawl} />
                ) : (
                  <div className="space-y-8">
                    {!analysisResult ? (
@@ -709,6 +739,21 @@ export default function App() {
                                         className="w-full py-2 text-sm font-bold bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-100 disabled:opacity-50 transition-colors">
                                         {isCollecting ? '爬取进行中...' : '立即爬取（过去10小时）'}
                                       </button>
+                                      <button
+                                        onClick={async () => {
+                                          const r = await fetch('/api/crawler/last-log');
+                                          const { log } = await r.json();
+                                          setCrawlLog(log);
+                                          setShowCrawlLog(v => !v);
+                                        }}
+                                        className="w-full py-1.5 text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors">
+                                        {showCrawlLog ? '收起运行日志' : '查看上次运行日志'}
+                                      </button>
+                                      {showCrawlLog && crawlLog && (
+                                        <pre className="text-[10px] text-slate-500 bg-slate-50 rounded-xl p-3 max-h-48 overflow-auto whitespace-pre-wrap break-all">
+                                          {crawlLog}
+                                        </pre>
+                                      )}
                                     </>
                                   );
                                 })()}

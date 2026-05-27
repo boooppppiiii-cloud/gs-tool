@@ -213,17 +213,23 @@ ${rechargeData}
 ②大致职业（同上）
 ③核心在线时段（从聊天时间规律分析，无则obtained=false）
 ④生活状态/情绪锚点（近期现实压力，从聊天中明确提及的内容提取，无则obtained=false）
+⑤性别（从聊天称谓/自述中判断，无则obtained=false）
+⑥居住地（从聊天中明确提及的地名/方言/时区线索提取，无则obtained=false）
+⑦兴趣爱好（从聊天中提及的游戏外爱好/话题提取，无则obtained=false）
 
-维度二：江湖地位（只能来自Sheet1聊天数据）
+维度二：游戏行为（只能来自Sheet1聊天数据）
 ①同盟与从属（帮会地位与跟随者，从聊天行为提取，无则obtained=false）
 ②宿敌与仇恨（敌对玩家或帮会，从聊天内容提取，无则obtained=false）
+③用户关系（统计该玩家与其他玩家的直接交互条数，按以下四个等级判定：边缘接触<5条、普通互动5-10条、活跃互动10-20条、核心关系>20条；列出主要互动对象及等级，无则obtained=false）
+④对抗风格（从PK/战场/仇恨言论中提取，如主动挑衅/被动应战/战略型等，无则obtained=false）
+⑤主要聊天话题（统计该玩家发言中最常涉及的3个话题类别，无则obtained=false）
 
 维度三：消费心理（来自Sheet2充值数据+Sheet1聊天数据，来源混用须注明）
 ①核心驱动（战力追求/面子/复仇等，无法判断则obtained=false）
 ②消费偏好（买断式/概率抽取，从充值数据提取，无则obtained=false）
 ③敏感点/雷区（从聊天中明确表达的反感/投诉提取，无则obtained=false）
 
-铁律：每个词条 value 只填数据中有据可查的内容；无数据支撑则 obtained=false，value="数据中无记录"，evidence=""。completionRate = 该维度中 obtained=true 的词条数 ÷ 总词条数（保留两位小数）。
+铁律：每个词条 value 只填数据中有据可查的内容；无数据支撑则 obtained=false，value="数据中无记录"，evidence=""。completionRate = 该维度中 obtained=true 的词条数 ÷ 总词条数（保留两位小数）。维度一共7条，维度二共5条，维度三共3条。
 
 ## 任务三：负面爆发核查（仅基于 Sheet1 聊天数据）
 - 识别明确出现在聊天记录中的负面情绪/投诉/发泄行为。
@@ -290,20 +296,26 @@ GS角色名已在背景信息中标注（"角色名:xxx"），以此识别GS在�
         "dimensions": [
           {
             "name": "维度一：现实属性",
-            "completionRate": 0.75,
+            "completionRate": 0.57,
             "items": [
               { "label": "年龄段", "value": "提取内容或'数据中无记录'", "evidence": "依据原文或''", "obtained": true或false },
               { "label": "大致职业", "value": "...", "evidence": "...", "obtained": true或false },
               { "label": "核心在线时段", "value": "...", "evidence": "...", "obtained": true或false },
-              { "label": "生活状态/情绪锚点", "value": "...", "evidence": "...", "obtained": true或false }
+              { "label": "生活状态/情绪锚点", "value": "...", "evidence": "...", "obtained": true或false },
+              { "label": "性别", "value": "...", "evidence": "...", "obtained": true或false },
+              { "label": "居住地", "value": "...", "evidence": "...", "obtained": true或false },
+              { "label": "兴趣爱好", "value": "...", "evidence": "...", "obtained": true或false }
             ]
           },
           {
-            "name": "维度二：江湖地位",
-            "completionRate": 0.5,
+            "name": "维度二：游戏行为",
+            "completionRate": 0.4,
             "items": [
               { "label": "同盟与从属", "value": "...", "evidence": "...", "obtained": true或false },
-              { "label": "宿敌与仇恨", "value": "...", "evidence": "...", "obtained": true或false }
+              { "label": "宿敌与仇恨", "value": "...", "evidence": "...", "obtained": true或false },
+              { "label": "用户关系", "value": "核心关系：玩家A(25条)、活跃互动：玩家B(15条)...", "evidence": "...", "obtained": true或false },
+              { "label": "对抗风格", "value": "...", "evidence": "...", "obtained": true或false },
+              { "label": "主要聊天话题", "value": "...", "evidence": "...", "obtained": true或false }
             ]
           },
           {
