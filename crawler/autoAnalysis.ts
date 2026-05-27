@@ -204,36 +204,38 @@ export async function runAnalysis(
       const fs = await import('fs');
       if (fs.existsSync(csvFilePath)) {
         const csvContent = fs.readFileSync(csvFilePath, 'utf-8');
-        // Save CSV linked to the analysis record
         await dbPost('upsert', {
           collection: 'chat_csv_files',
           id: histId,
           data: { recordId: histId, userId, content: csvContent },
         });
         console.log(`[AutoAnalysis] CSV uploaded to chat_csv_files (${csvContent.length} chars)`);
-
-        // Save standalone crawler chat log metadata
-        if (crawlPeriod) {
-          const crawlId = `crawl_${Date.now()}`;
-          await dbPost('upsert', {
-            collection: 'crawler_chat_logs',
-            id: crawlId,
-            data: {
-              id: crawlId,
-              userId,
-              serverName: profile.name,
-              timestamp: new Date().toISOString(),
-              crawlStart: crawlPeriod.start.toISOString(),
-              crawlEnd: crawlPeriod.end.toISOString(),
-              rowCount: chatData.length,
-              csvFileId: histId,
-            },
-          });
-          console.log(`[AutoAnalysis] Crawler chat log saved: ${crawlId}`);
-        }
       }
     } catch (e) {
       console.warn('[AutoAnalysis] CSV 上传失败（不影响分析结果）:', e);
+    }
+  }
+
+  if (crawlPeriod) {
+    try {
+      const crawlId = `crawl_${Date.now()}`;
+      await dbPost('upsert', {
+        collection: 'crawler_chat_logs',
+        id: crawlId,
+        data: {
+          id: crawlId,
+          userId,
+          serverName: profile.name,
+          timestamp: new Date().toISOString(),
+          crawlStart: crawlPeriod.start.toISOString(),
+          crawlEnd: crawlPeriod.end.toISOString(),
+          rowCount: chatData.length,
+          csvFileId: histId,
+        },
+      });
+      console.log(`[AutoAnalysis] Crawler chat log saved: ${crawlId}`);
+    } catch (e) {
+      console.warn('[AutoAnalysis] Crawler log 保存失败:', e);
     }
   }
 

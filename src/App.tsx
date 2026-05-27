@@ -207,6 +207,12 @@ export default function App() {
     }
   }, [user]);
 
+  React.useEffect(() => {
+    if (analysisSubTab === 'history' && user) {
+      dataService.fetchCrawlerChatLogs(user.id).then(logs => setCrawlerChatLogs(logs));
+    }
+  }, [analysisSubTab, user?.id]);
+
   const loadUserData = async () => {
     if (!user) return;
     try {
