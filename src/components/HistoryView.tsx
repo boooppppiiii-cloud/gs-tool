@@ -3,17 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { 
-  Scroll as Calendar, 
-  ChevronRight, 
-  Trash2, 
-  FileText, 
-  Hammer as Server, 
+import React, { useState } from 'react';
+import {
+  Scroll as Calendar,
+  ChevronRight,
+  Trash2,
+  FileText,
+  Hammer as Server,
   Shield as Users,
   Clock,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Download,
 } from 'lucide-react';
 import { MonthHistory, HistoryRecord } from '../types';
 
@@ -25,6 +26,29 @@ interface Props {
 
 export default function HistoryView({ history, onSelect, onDelete }: Props) {
   const [expandedMonths, setExpandedMonths] = React.useState<string[]>([]);
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  const downloadCsv = async (record: HistoryRecord) => {
+    setDownloading(record.id);
+    try {
+      const res = await fetch('/api/db/getDoc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collection: 'chat_csv_files', id: record.id }),
+      });
+      const { data } = await res.json();
+      if (!data?.content) return;
+      const blob = new Blob([data.content], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `chat_${record.serverConfig?.name ?? record.id}_${record.timestamp.slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   const toggleMonth = (month: string) => {
     setExpandedMonths(prev => 
@@ -89,14 +113,24 @@ export default function HistoryView({ history, onSelect, onDelete }: Props) {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <button 
+                    {record.hasCsv && (
+                      <button
+                        onClick={() => downloadCsv(record)}
+                        disabled={downloading === record.id}
+                        className="p-2 rounded-lg hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 transition-colors disabled:opacity-50"
+                        title="下载原始 CSV"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button
                       onClick={() => onSelect(record)}
                       className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors"
                       title="查看报告"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
-                    <button 
+                    <button
                       onClick={() => { onDelete(monthGroup.month, record.id); }}
                       className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                       title="删除记录"

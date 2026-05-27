@@ -285,6 +285,19 @@ async function startServer() {
     }
   });
 
+  app.post('/api/db/getDoc', async (req: any, res: any) => {
+    try {
+      const db = getAdminDb();
+      if (!db) return res.status(503).json({ error: `Admin SDK 未就绪: ${getAdminDbError()}` });
+      const { collection, id } = req.body;
+      const result = await db.collection(collection).doc(id).get();
+      res.json({ data: result.data ?? null });
+    } catch (e: any) {
+      console.error('[DB getDoc] 失败:', e);
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
   app.post('/api/db/where', async (req: any, res: any) => {
     try {
       const db = getAdminDb();
@@ -307,6 +320,18 @@ async function startServer() {
     } catch {
       res.json({ chat: 'ok', recharge: 'ok' });
     }
+  });
+
+  app.post('/api/crawler/collect-now', (_req: any, res: any) => {
+    const child = spawn('npm', ['run', 'crawler:now'], {
+      cwd: __dirname,
+      shell: true,
+      detached: true,
+      stdio: 'ignore',
+      env: { ...process.env, CRAWL_HOURS: '10' },
+    });
+    child.unref();
+    res.json({ ok: true });
   });
 
   app.post('/api/crawler/auth/:backend', (req: any, res: any) => {

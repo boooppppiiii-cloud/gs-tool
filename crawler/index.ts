@@ -53,8 +53,9 @@ async function collectForUser(user: GsUser, start: Date, end: Date): Promise<voi
   const chatClient = new GmClient('chat');
   await chatClient.launch();
   let chatData;
+  let csvPath: string | undefined;
   try {
-    const csvPath = await chatClient.exportChatCsv(user.serverName, start, end);
+    csvPath = await chatClient.exportChatCsv(user.serverName, start, end);
     chatData = parseChatCsv(csvPath);
   } finally {
     await chatClient.close();
@@ -80,12 +81,15 @@ async function collectForUser(user: GsUser, start: Date, end: Date): Promise<voi
   const rechargeData = parseRechargeRows(allRechargeRows);
 
   // ── AI analysis + CloudBase write ─────────────────────────────────────
-  await runAnalysis(chatData, rechargeData, user.gsUserId, user.gsGroup);
+  await runAnalysis(chatData, rechargeData, user.gsUserId, user.gsGroup, csvPath);
   console.log(`  [${user.serverName}] ✓ Daily report generated`);
 }
 
 async function collectAll(): Promise<void> {
-  const { start, end } = getTimeRange();
+  const hoursOverride = process.env.CRAWL_HOURS ? parseInt(process.env.CRAWL_HOURS, 10) : null;
+  const { start, end } = hoursOverride
+    ? { start: new Date(Date.now() - hoursOverride * 3_600_000), end: new Date() }
+    : getTimeRange();
   const users = loadUsers();
 
   console.log(`\n${'='.repeat(60)}`);

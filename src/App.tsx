@@ -96,6 +96,8 @@ export default function App() {
 
   const [crawlerStatus, setCrawlerStatus] = React.useState<{ chat: string; recharge: string }>({ chat: 'ok', recharge: 'ok' });
   const [authingBackend, setAuthingBackend] = React.useState<string | null>(null);
+  const [isCollecting, setIsCollecting] = React.useState(false);
+  const [collectMsg, setCollectMsg] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (activeTab !== 'analysis') return;
@@ -109,6 +111,18 @@ export default function App() {
     setAuthingBackend(b);
     await fetch(`/api/crawler/auth/${b}`, { method: 'POST' });
     setTimeout(() => setAuthingBackend(null), 3000);
+  };
+
+  const triggerCollect = async () => {
+    setIsCollecting(true);
+    setCollectMsg(null);
+    try {
+      await fetch('/api/crawler/collect-now', { method: 'POST' });
+      setCollectMsg('爬取已启动，结果将在几分钟后写入云端');
+    } catch {
+      setCollectMsg('启动失败，请检查服务器');
+    }
+    setTimeout(() => { setIsCollecting(false); setCollectMsg(null); }, 8000);
   };
 
   const PRESET_GROUPS = ['杭州三组', '杭州五组', '杭州对抗组', '山东一组', '山东对抗组', '山东对抗二组', '山东二组', '山东九组', '山东三组'];
@@ -631,32 +645,43 @@ export default function App() {
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                         <ExcelUpload onDataLoaded={handleDataLoaded} isAnalyzing={isAnalyzing} />
                         <div className="space-y-6">
-                           {(crawlerStatus.chat === 'expired' || crawlerStatus.recharge === 'expired') && (
+                           <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm space-y-3">
+                              <h4 className="text-base font-black text-slate-800">GM 后台认证</h4>
                               <div className="space-y-2">
-                                {crawlerStatus.chat === 'expired' && (
-                                  <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-2xl">
-                                    <span className="text-sm font-bold text-amber-700 flex items-center gap-2">
-                                      <AlertTriangleIcon className="w-4 h-4" /> 聊天后台登录已过期
-                                    </span>
-                                    <button onClick={() => triggerAuth('chat')} disabled={authingBackend === 'chat'}
-                                      className="px-3 py-1 text-xs font-bold bg-amber-500 text-white rounded-xl hover:bg-amber-600 disabled:opacity-50 transition-colors">
-                                      {authingBackend === 'chat' ? '启动中...' : '重新认证'}
-                                    </button>
-                                  </div>
-                                )}
-                                {crawlerStatus.recharge === 'expired' && (
-                                  <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-2xl">
-                                    <span className="text-sm font-bold text-amber-700 flex items-center gap-2">
-                                      <AlertTriangleIcon className="w-4 h-4" /> 充值后台扫码已过期
-                                    </span>
-                                    <button onClick={() => triggerAuth('recharge')} disabled={authingBackend === 'recharge'}
-                                      className="px-3 py-1 text-xs font-bold bg-amber-500 text-white rounded-xl hover:bg-amber-600 disabled:opacity-50 transition-colors">
-                                      {authingBackend === 'recharge' ? '启动中...' : '重新认证'}
-                                    </button>
-                                  </div>
+                                {(['chat', 'recharge'] as const).map(b => {
+                                  const expired = crawlerStatus[b] === 'expired';
+                                  const label = b === 'chat' ? '聊天后台' : '充值后台';
+                                  return (
+                                    <div key={b} className={`flex items-center justify-between p-3 rounded-2xl border ${expired ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
+                                      <span className={`text-sm font-bold flex items-center gap-2 ${expired ? 'text-amber-700' : 'text-slate-600'}`}>
+                                        {expired
+                                          ? <AlertTriangleIcon className="w-4 h-4" />
+                                          : <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />}
+                                        {label}
+                                        {expired && <span className="text-xs font-bold text-amber-600">已过期</span>}
+                                      </span>
+                                      <button
+                                        onClick={() => triggerAuth(b)}
+                                        disabled={authingBackend === b}
+                                        className={`px-3 py-1 text-xs font-bold rounded-xl transition-colors disabled:opacity-50 ${expired ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600'}`}>
+                                        {authingBackend === b ? '启动中...' : '重新认证'}
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              <div className="border-t border-slate-100 pt-3 space-y-2">
+                                <button
+                                  onClick={triggerCollect}
+                                  disabled={isCollecting}
+                                  className="w-full py-2 text-sm font-bold bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-100 disabled:opacity-50 transition-colors">
+                                  {isCollecting ? '爬取进行中...' : '立即爬取（过去10小时）'}
+                                </button>
+                                {collectMsg && (
+                                  <p className="text-xs text-slate-500 text-center">{collectMsg}</p>
                                 )}
                               </div>
-                            )}
+                            </div>
                    <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-4">
                               <h4 className="text-xl font-black text-slate-800">就绪检查</h4>
                               <p className="text-sm text-slate-500 font-medium">在开始深度神经网络分析前，请确保数据源完整。</p>

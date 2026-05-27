@@ -120,6 +120,7 @@ export async function runAnalysis(
   rechargeData: RechargeRecord[],
   userId: string,
   group: string,
+  csvFilePath?: string,
 ): Promise<void> {
   console.log(`[AutoAnalysis] userId=${userId}, chat=${chatData.length}, recharge=${rechargeData.length}`);
 
@@ -179,8 +180,25 @@ export async function runAnalysis(
   await dbPost('upsert', {
     collection: 'analysisHistory',
     id: histId,
-    data: { id: histId, timestamp: new Date().toISOString(), serverConfig: profile, result, userId, group },
+    data: { id: histId, timestamp: new Date().toISOString(), serverConfig: profile, result, userId, group, hasCsv: !!csvFilePath },
   });
+
+  if (csvFilePath) {
+    try {
+      const fs = await import('fs');
+      if (fs.existsSync(csvFilePath)) {
+        const csvContent = fs.readFileSync(csvFilePath, 'utf-8');
+        await dbPost('upsert', {
+          collection: 'chat_csv_files',
+          id: histId,
+          data: { recordId: histId, userId, content: csvContent },
+        });
+        console.log(`[AutoAnalysis] CSV uploaded to chat_csv_files (${csvContent.length} chars)`);
+      }
+    } catch (e) {
+      console.warn('[AutoAnalysis] CSV 上传失败（不影响分析结果）:', e);
+    }
+  }
 
   // Update ServerProfile portraits + ecology
   const newPortraits = { ...(profile.persistentPortraits ?? {}) };

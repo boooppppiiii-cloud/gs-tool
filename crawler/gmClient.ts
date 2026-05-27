@@ -73,9 +73,14 @@ export class GmClient {
     await this.page.waitForTimeout(1500);
     this.checkLoggedOut('');
 
-    // TODO: select server/region — selector not yet provided
-    // await this.page.selectOption('/* server select */', { label: serverName });
-    console.warn(`[GmClient] Server filter not configured — exporting all servers (serverName=${serverName})`);
+    // Select2 region filter: click trigger → type to search → click matching result
+    await this.page.click('#s2id_serverSelect_notify > a > span');
+    await this.page.waitForTimeout(500);
+    await this.page.keyboard.type(serverName);
+    await this.page.waitForTimeout(500);
+    await this.page.click(`.select2-results li:has-text("${serverName}")`);
+    await this.page.waitForTimeout(500);
+    console.log(`[GmClient] Server selected: ${serverName}`);
 
     const startStr = formatDateTime(start);
     const endStr   = formatDateTime(end);

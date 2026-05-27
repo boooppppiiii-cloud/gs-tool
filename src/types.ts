@@ -214,6 +214,7 @@ export interface HistoryRecord {
   serverConfig: ServerContext;
   result: AnalysisResult;
   group?: string;
+  hasCsv?: boolean;
 }
 
 export interface MonthHistory {

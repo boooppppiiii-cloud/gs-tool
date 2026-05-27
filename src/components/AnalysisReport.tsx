@@ -600,6 +600,10 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
               const outburstRecs = executionRecords
                 .filter(r => r.historyRecordId === currentHistoryId && r.outburstIndex === i)
                 .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+              // Feature 3: when viewing a historical analysis, only show outbursts that have records
+              if (currentHistoryId && outburstRecs.length === 0) return null;
+
               const latestRec = outburstRecs[outburstRecs.length - 1];
               const latestReview = latestRec ? leaderReviews.find(r => r.executionRecordId === latestRec.id) : undefined;
               const isNewRound = !!latestRec && latestReview?.decision === '继续推进';
@@ -636,7 +640,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
                         </div>
                       )}
                       <ExecutionRecordUpload
-                        key={`${i}-${isNewRound ? 'new' : 'first'}-${outburstRecs.length}`}
+                        key={`${i}-nr${outburstRecs.filter(rec => leaderReviews.find(r => r.executionRecordId === rec.id)?.decision === '继续推进').length}`}
                         outburstIndex={i}
                         playerName={ob.playerName}
                         outburstTitle={ob.title}
@@ -864,7 +868,7 @@ const PastExecutionRecordCard = React.memo(function PastExecutionRecordCard({
   roundIndex: number;
   review?: LeaderReview;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const decisionStyle: Record<string, string> = {
     '继续推进': 'bg-amber-50 border-amber-200 text-amber-700',
     '打回': 'bg-rose-50 border-rose-200 text-rose-700',
