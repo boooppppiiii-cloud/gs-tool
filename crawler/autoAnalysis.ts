@@ -65,14 +65,28 @@ async function dbPost(endpoint: string, body: object): Promise<Record<string, un
   return res.json() as Promise<Record<string, unknown>>;
 }
 
-async function fetchLatestProfile(userId: string): Promise<ServerProfile | null> {
+async function fetchLatestProfile(userId: string, serverName?: string): Promise<ServerProfile | null> {
   const result = await dbPost('where', { collection: 'serverProfiles', field: 'ownerId', value: userId });
   const profiles = (result.data as ServerProfile[]) ?? [];
   if (profiles.length === 0) {
     console.warn(`[AutoAnalysis] No ServerProfile for userId=${userId}. Create one in the App first.`);
     return null;
   }
+  if (serverName) {
+    const match = profiles.find(p => p.name === serverName);
+    if (!match) {
+      console.warn(`[AutoAnalysis] ServerProfile "${serverName}" not found for userId=${userId}.`);
+      return null;
+    }
+    return match;
+  }
   return profiles[0];
+}
+
+export async function fetchUserServerNames(userId: string): Promise<string[]> {
+  const result = await dbPost('where', { collection: 'serverProfiles', field: 'ownerId', value: userId });
+  const profiles = (result.data as ServerProfile[]) ?? [];
+  return profiles.map(p => p.name).filter(n => /^\d{5}$/.test(n));
 }
 
 async function fetchRecentHistory(userId: string): Promise<HistoryRecord[]> {
@@ -121,11 +135,12 @@ export async function runAnalysis(
   userId: string,
   group: string,
   csvFilePath?: string,
+  serverName?: string,
 ): Promise<void> {
-  console.log(`[AutoAnalysis] userId=${userId}, chat=${chatData.length}, recharge=${rechargeData.length}`);
+  console.log(`[AutoAnalysis] userId=${userId}, server=${serverName ?? '(first)'}, chat=${chatData.length}, recharge=${rechargeData.length}`);
 
   const [profile, recentHistory, publicCases] = await Promise.all([
-    fetchLatestProfile(userId),
+    fetchLatestProfile(userId, serverName),
     fetchRecentHistory(userId),
     fetchPublicCases(),
   ]);

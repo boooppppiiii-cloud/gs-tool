@@ -5,12 +5,10 @@
  *   npm run now    — run immediately (for testing)
  *   npm start      — start scheduler (09:00 and 18:00 daily)
  *
- * Before running, complete setup:
- *   1. npm install && npx playwright install chromium
- *   2. cp .env.crawler.example .env.crawler  (fill in values)
- *   3. Edit users.json with all GS member configs
- *   4. npm run auth:chat      (manual captcha)
- *   5. npm run auth:recharge  (manual QR scan)
+ * Env vars (for --now mode):
+ *   CRAWL_HOURS        — hours of data to collect (default: time-range logic)
+ *   CRAWL_SERVER_NAME  — only crawl this specific server (5-digit zone id)
+ *   CRAWL_OWNER_ID     — only crawl servers belonging to this user
  */
 
 import * as cron from 'node-cron';
@@ -19,7 +17,7 @@ import * as path from 'path';
 import { config, loadUsers, GsUser } from './config';
 import { GmClient, SessionExpiredError } from './gmClient';
 import { parseChatCsv, parseRechargeRows } from './parser';
-import { runAnalysis } from './autoAnalysis';
+import { runAnalysis, fetchUserServerNames } from './autoAnalysis';
 
 function setSessionStatus(backend: 'chat' | 'recharge', status: 'ok' | 'expired'): void {
   const file = path.join(config.SESSIONS_DIR, 'status.json');
@@ -36,10 +34,8 @@ function getTimeRange(): { start: Date; end: Date } {
   const start = new Date(now);
 
   if (hour >= 9 && hour < 18) {
-    // Evening run (18:00): from today 09:00 to now
     start.setHours(9, 0, 0, 0);
   } else {
-    // Morning run (09:00): from yesterday 18:00 to now
     if (hour < 9) start.setDate(start.getDate() - 1);
     start.setHours(18, 0, 0, 0);
   }
@@ -49,7 +45,6 @@ function getTimeRange(): { start: Date; end: Date } {
 async function collectForUser(user: GsUser, start: Date, end: Date): Promise<void> {
   console.log(`  [${user.serverName}] Starting collection (userId: ${user.gsUserId})`);
 
-  // ── Chat records ───────────────────────────────────────────────────────
   const chatClient = new GmClient('chat');
   await chatClient.launch();
   let chatData;
@@ -66,7 +61,6 @@ async function collectForUser(user: GsUser, start: Date, end: Date): Promise<voi
     return;
   }
 
-  // ── Recharge records (per player ID) ──────────────────────────────────
   const rechargeClient = new GmClient('recharge');
   await rechargeClient.launch();
   const allRechargeRows: string[][] = [];
@@ -80,22 +74,54 @@ async function collectForUser(user: GsUser, start: Date, end: Date): Promise<voi
   }
   const rechargeData = parseRechargeRows(allRechargeRows);
 
-  // ── AI analysis + CloudBase write ─────────────────────────────────────
-  await runAnalysis(chatData, rechargeData, user.gsUserId, user.gsGroup, csvPath);
+  await runAnalysis(chatData, rechargeData, user.gsUserId, user.gsGroup, csvPath, user.serverName);
   console.log(`  [${user.serverName}] ✓ Daily report generated`);
 }
 
-async function collectAll(): Promise<void> {
+async function collectAll(opts: { isScheduled?: boolean } = {}): Promise<void> {
   const hoursOverride = process.env.CRAWL_HOURS ? parseInt(process.env.CRAWL_HOURS, 10) : null;
   const { start, end } = hoursOverride
     ? { start: new Date(Date.now() - hoursOverride * 3_600_000), end: new Date() }
     : getTimeRange();
-  const users = loadUsers();
+
+  // Manual crawl: respect CRAWL_SERVER_NAME / CRAWL_OWNER_ID env vars
+  const filterServerName = process.env.CRAWL_SERVER_NAME?.trim() || null;
+  const filterOwnerId = process.env.CRAWL_OWNER_ID?.trim() || null;
+
+  let users = loadUsers();
+
+  if (filterServerName || filterOwnerId) {
+    // --now mode: narrow down to the specific user+server requested from UI
+    if (filterOwnerId) users = users.filter(u => u.gsUserId === filterOwnerId);
+    if (filterServerName) users = users.filter(u => u.serverName === filterServerName);
+    if (users.length === 0) {
+      console.warn(`[Crawler] No users.json entry matched serverName=${filterServerName} ownerId=${filterOwnerId}. Check users.json.`);
+      return;
+    }
+  } else if (opts.isScheduled) {
+    // Scheduled run: only crawl servers the user currently has configured in CloudBase
+    const filtered: GsUser[] = [];
+    for (const u of users) {
+      try {
+        const configured = await fetchUserServerNames(u.gsUserId);
+        if (configured.includes(u.serverName)) {
+          filtered.push(u);
+        } else {
+          console.log(`  [skip] ${u.serverName} not in CloudBase serverProfiles for userId=${u.gsUserId}`);
+        }
+      } catch (e) {
+        console.warn(`  [warn] Could not fetch profiles for userId=${u.gsUserId}:`, e);
+        // fail-open: include the user so scheduled runs don't silently stop
+        filtered.push(u);
+      }
+    }
+    users = filtered;
+  }
 
   console.log(`\n${'='.repeat(60)}`);
   console.log(`[Crawler] Run started: ${new Date().toLocaleString('zh-CN')}`);
   console.log(`[Crawler] Period: ${start.toLocaleString('zh-CN')} → ${end.toLocaleString('zh-CN')}`);
-  console.log(`[Crawler] Users: ${users.length}`);
+  console.log(`[Crawler] Users: ${users.length}${filterServerName ? ` (server=${filterServerName})` : ''}${filterOwnerId ? ` (owner=${filterOwnerId})` : ''}`);
 
   let successCount = 0;
   for (const user of users) {
@@ -119,8 +145,8 @@ async function collectAll(): Promise<void> {
 }
 
 // ── Cron schedule ─────────────────────────────────────────────────────────
-cron.schedule(config.CRON_MORNING, collectAll, { timezone: 'Asia/Shanghai' });
-cron.schedule(config.CRON_EVENING, collectAll, { timezone: 'Asia/Shanghai' });
+cron.schedule(config.CRON_MORNING, () => collectAll({ isScheduled: true }), { timezone: 'Asia/Shanghai' });
+cron.schedule(config.CRON_EVENING, () => collectAll({ isScheduled: true }), { timezone: 'Asia/Shanghai' });
 
 console.log('[Crawler] Scheduler started (Asia/Shanghai)');
 console.log(`  Morning: ${config.CRON_MORNING}`);

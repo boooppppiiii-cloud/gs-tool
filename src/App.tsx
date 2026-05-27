@@ -98,6 +98,7 @@ export default function App() {
   const [authingBackend, setAuthingBackend] = React.useState<string | null>(null);
   const [isCollecting, setIsCollecting] = React.useState(false);
   const [collectMsg, setCollectMsg] = React.useState<string | null>(null);
+  const [crawlServerName, setCrawlServerName] = React.useState<string>('');
 
   React.useEffect(() => {
     if (activeTab !== 'analysis') return;
@@ -114,11 +115,16 @@ export default function App() {
   };
 
   const triggerCollect = async () => {
+    if (!crawlServerName) { setCollectMsg('请先选择要爬取的区服'); return; }
     setIsCollecting(true);
     setCollectMsg(null);
     try {
-      await fetch('/api/crawler/collect-now', { method: 'POST' });
-      setCollectMsg('爬取已启动，结果将在几分钟后写入云端');
+      await fetch('/api/crawler/collect-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serverName: crawlServerName, ownerId: user?.id ?? '' }),
+      });
+      setCollectMsg(`已启动 ${crawlServerName} 区服爬取，结果将在几分钟后写入云端`);
     } catch {
       setCollectMsg('启动失败，请检查服务器');
     }
@@ -671,15 +677,32 @@ export default function App() {
                                 })}
                               </div>
                               <div className="border-t border-slate-100 pt-3 space-y-2">
-                                <button
-                                  onClick={triggerCollect}
-                                  disabled={isCollecting}
-                                  className="w-full py-2 text-sm font-bold bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-100 disabled:opacity-50 transition-colors">
-                                  {isCollecting ? '爬取进行中...' : '立即爬取（过去10小时）'}
-                                </button>
-                                {collectMsg && (
-                                  <p className="text-xs text-slate-500 text-center">{collectMsg}</p>
-                                )}
+                                {(() => {
+                                  const crawlableServers = serverProfiles.filter(p => /^\d{5}$/.test(p.name));
+                                  return (
+                                    <>
+                                      <select
+                                        value={crawlServerName}
+                                        onChange={e => setCrawlServerName(e.target.value)}
+                                        className="w-full px-3 py-2 text-sm font-bold border border-slate-200 rounded-2xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                      >
+                                        <option value="">— 选择爬取区服 —</option>
+                                        {crawlableServers.map(p => (
+                                          <option key={p.id} value={p.name}>{p.name}</option>
+                                        ))}
+                                      </select>
+                                      {crawlableServers.length === 0 && (
+                                        <p className="text-[10px] text-amber-600 font-bold text-center">请先在「区服配置」中添加有效区服（五位数字）</p>
+                                      )}
+                                      <button
+                                        onClick={triggerCollect}
+                                        disabled={isCollecting || !crawlServerName}
+                                        className="w-full py-2 text-sm font-bold bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-100 disabled:opacity-50 transition-colors">
+                                        {isCollecting ? '爬取进行中...' : '立即爬取（过去10小时）'}
+                                      </button>
+                                    </>
+                                  );
+                                })()}
                               </div>
                             </div>
                    <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-4">
@@ -779,6 +802,19 @@ export default function App() {
            )}
         </div>
       </main>
+
+      {collectMsg && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <div className={`flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl border text-sm font-bold ${
+            collectMsg.includes('失败')
+              ? 'bg-rose-50 border-rose-200 text-rose-700'
+              : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+          }`}>
+            <span>{collectMsg.includes('失败') ? '✕' : '✓'}</span>
+            {collectMsg}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

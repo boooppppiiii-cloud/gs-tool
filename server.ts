@@ -322,13 +322,19 @@ async function startServer() {
     }
   });
 
-  app.post('/api/crawler/collect-now', (_req: any, res: any) => {
+  app.post('/api/crawler/collect-now', (req: any, res: any) => {
+    const { serverName, ownerId } = req.body ?? {};
     const child = spawn('npm', ['run', 'crawler:now'], {
       cwd: __dirname,
       shell: true,
       detached: true,
       stdio: 'ignore',
-      env: { ...process.env, CRAWL_HOURS: '10' },
+      env: {
+        ...process.env,
+        CRAWL_HOURS: '10',
+        ...(serverName ? { CRAWL_SERVER_NAME: String(serverName) } : {}),
+        ...(ownerId ? { CRAWL_OWNER_ID: String(ownerId) } : {}),
+      },
     });
     child.unref();
     res.json({ ok: true });
