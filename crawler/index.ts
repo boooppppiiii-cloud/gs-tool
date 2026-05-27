@@ -74,7 +74,7 @@ async function collectForUser(user: GsUser, start: Date, end: Date): Promise<voi
   }
   const rechargeData = parseRechargeRows(allRechargeRows);
 
-  await runAnalysis(chatData, rechargeData, user.gsUserId, user.gsGroup, csvPath, user.serverName);
+  await runAnalysis(chatData, rechargeData, user.gsUserId, user.gsGroup, csvPath, user.serverName, { start, end });
   console.log(`  [${user.serverName}] ✓ Daily report generated`);
 }
 

@@ -32,7 +32,7 @@ import Login from './components/Login';
 import AdminPortal from './components/AdminPortal';
 import PortalSelector from './components/PortalSelector';
 import LeaderPortal from './components/LeaderPortal';
-import { ServerProfile, ChatRecord, RechargeRecord, AnalysisResult, MonthHistory, HistoryRecord, AnalysisCase, User, ExecutionRecord, LeaderReview } from './types';
+import { ServerProfile, ChatRecord, RechargeRecord, AnalysisResult, MonthHistory, HistoryRecord, AnalysisCase, User, ExecutionRecord, LeaderReview, CrawlerChatRecord } from './types';
 import { analyzeGameEcology } from './lib/gemini';
 
 import { auth } from './lib/firebase';
@@ -91,6 +91,7 @@ export default function App() {
   const [executionRecords, setExecutionRecords] = React.useState<ExecutionRecord[]>([]);
   const [dismissedOutbursts, setDismissedOutbursts] = React.useState<{ historyRecordId: string; outburstIndex: number }[]>([]);
   const [leaderReviews, setLeaderReviews] = React.useState<LeaderReview[]>([]);
+  const [crawlerChatLogs, setCrawlerChatLogs] = React.useState<CrawlerChatRecord[]>([]);
   const [activePortal, setActivePortal] = React.useState<'admin' | 'leader' | 'member' | null>(null);
   const [displayName, setDisplayName] = React.useState<string>('');
 
@@ -210,13 +211,14 @@ export default function App() {
     if (!user) return;
     try {
       await syncFromCloud(user.id);
-      const [profiles, historyData, casesData, execData, dismissed, reviewsData] = await Promise.all([
+      const [profiles, historyData, casesData, execData, dismissed, reviewsData, crawlerLogs] = await Promise.all([
         dataService.fetchServerProfiles(user.id),
         dataService.fetchHistory(user.id),
         dataService.fetchCases(user.id),
         dataService.fetchExecutionRecords(user.id),
         dataService.fetchDismissedOutbursts(),
         dataService.fetchLeaderReviewsForUser(user.id),
+        dataService.fetchCrawlerChatLogs(user.id),
       ]);
       setServerProfiles(profiles);
       setHistory(historyData);
@@ -224,6 +226,7 @@ export default function App() {
       setExecutionRecords(execData);
       setDismissedOutbursts(dismissed);
       setLeaderReviews(reviewsData);
+      setCrawlerChatLogs(crawlerLogs);
     } catch (err) {
       console.error('Failed to load user data', err);
     }
@@ -644,12 +647,12 @@ export default function App() {
            {activeTab === 'analysis' && (
              <div className="space-y-8 animate-in fade-in duration-500">
                {analysisSubTab === 'history' ? (
-                 <HistoryView history={history} onSelect={handleSelectHistory} onDelete={handleDeleteHistory} />
+                 <HistoryView history={history} crawlerChatLogs={crawlerChatLogs} onSelect={handleSelectHistory} onDelete={handleDeleteHistory} />
                ) : (
                  <div className="space-y-8">
                    {!analysisResult ? (
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-                        <ExcelUpload onDataLoaded={handleDataLoaded} isAnalyzing={isAnalyzing} />
+                        <ExcelUpload onDataLoaded={handleDataLoaded} isAnalyzing={isAnalyzing} crawlerLogs={crawlerChatLogs} />
                         <div className="space-y-6">
                            <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm space-y-3">
                               <h4 className="text-base font-black text-slate-800">GM 后台认证</h4>

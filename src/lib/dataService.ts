@@ -1,4 +1,4 @@
-import { ServerProfile, AnalysisResult, AnalysisCase, HistoryRecord, MonthHistory, ExecutionRecord, LeaderReview } from '../types';
+import { ServerProfile, AnalysisResult, AnalysisCase, HistoryRecord, MonthHistory, ExecutionRecord, LeaderReview, CrawlerChatRecord } from '../types';
 import { cloudSet, cloudDelete, cloudFetchAll, cloudFetchWhere } from './cloudSync';
 
 // Module-level current user, set on login/logout
@@ -357,6 +357,20 @@ export async function updateLeaderReview(id: string, updates: Partial<LeaderRevi
   if (idx >= 0) { reviews[idx] = { ...reviews[idx], ...updates }; save(REVIEW_KEY, reviews); cloudSet('leaderReviews', id, reviews[idx]); }
 }
 
+// ---------------- Crawler Chat Logs ----------------
+const CRAWLER_LOGS_KEY = 'gs_crawlerChatLogs';
+
+export async function fetchCrawlerChatLogs(userId: string): Promise<CrawlerChatRecord[]> {
+  const local = load<CrawlerChatRecord>(CRAWLER_LOGS_KEY).filter(r => r.userId === userId);
+  const cloud = await cloudFetchWhere<CrawlerChatRecord>('crawler_chat_logs', 'userId', userId).catch(() => [] as CrawlerChatRecord[]);
+  const map = new Map<string, CrawlerChatRecord>();
+  local.forEach(x => map.set(x.id, x));
+  cloud.forEach(x => map.set(x.id, x));
+  const merged = Array.from(map.values()).sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  save(CRAWLER_LOGS_KEY, merged);
+  return merged;
+}
+
 // ---------------- Dismissed Outbursts ----------------
 const DISMISSED_KEY = 'gs_dismissedOutbursts';
 
@@ -385,19 +399,21 @@ function mergeToLocalStorage<T extends { id: string }>(key: string, cloudItems: 
 
 export async function syncFromCloud(userId: string): Promise<void> {
   try {
-    const [profiles, historyItems, caseItems, execItems, reviewItems, dismissedItems] = await Promise.all([
+    const [profiles, historyItems, caseItems, execItems, reviewItems, dismissedItems, crawlerLogs] = await Promise.all([
       cloudFetchWhere<ServerProfile>('serverProfiles', 'ownerId', userId),
       cloudFetchWhere<HistoryRecord & { userId: string }>('analysisHistory', 'userId', userId),
       cloudFetchAll<AnalysisCase>('cases'),
       cloudFetchWhere<ExecutionRecord>('execRecords', 'ownerId', userId),
       cloudFetchAll<LeaderReview>('leaderReviews'),
       cloudFetchAll<{ id: string; historyRecordId: string; outburstIndex: number }>('dismissedOutbursts'),
+      cloudFetchWhere<CrawlerChatRecord>('crawler_chat_logs', 'userId', userId).catch(() => [] as CrawlerChatRecord[]),
     ]);
     mergeToLocalStorage('gs_serverProfiles', profiles);
     mergeToLocalStorage('gs_analysisHistory', historyItems);
     mergeToLocalStorage('gs_cases', caseItems);
     mergeToLocalStorage('gs_execRecords', execItems);
     mergeToLocalStorage('gs_leaderReviews', reviewItems);
+    mergeToLocalStorage(CRAWLER_LOGS_KEY, crawlerLogs);
     // dismissedOutbursts: merge by composite key
     const localD = load<{ historyRecordId: string; outburstIndex: number }>(DISMISSED_KEY);
     dismissedItems.forEach(d => {
