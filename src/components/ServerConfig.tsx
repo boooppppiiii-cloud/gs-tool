@@ -237,7 +237,7 @@ export default function ServerConfig({ profiles, activeProfileId, onProfilesChan
                 className={fieldClass('mergeStage')}
               >
                 <option value="">请选择合服阶段</option>
-                {['零合', '一合', '二合', '三合', '四合', '五合'].map(s => (
+                {['零合', '一合', '二合', '三合', '四合', '五合', '六合', '七合'].map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
