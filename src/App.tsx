@@ -368,10 +368,26 @@ export default function App() {
       const historicalCtx = buildHistoricalContext(activeProfile.id);
       logUsage('analysis_with_cases', `引用案例数: ${refCases.length}`, undefined, undefined, refCases.length);
       const result = await analyzeGameEcology(serverContextStr, chatSample, rechargeSample, refCases, persistentPortraitsStr, historicalCtx);
-      setAnalysisResult(result);
+
+      // Filter outbursts to only those whose context messages are found in the analyzed chat batch.
+      // Iron-rule D guarantees timestamps are copied verbatim, so a time|roleName fingerprint is reliable.
+      const analyzedChat = chatData.slice(-1000);
+      const chatSet = new Set(analyzedChat.map(r => `${r.time}|${r.roleName}`));
+      const filteredResult: AnalysisResult = {
+        ...result,
+        playerReports: result.playerReports.map(player => ({
+          ...player,
+          negativeOutbursts: player.negativeOutbursts.filter(outburst =>
+            outburst.context.length === 0 ||
+            outburst.context.some((msg: { time: string; roleName: string }) => chatSet.has(`${msg.time}|${msg.roleName}`))
+          ),
+        })),
+      };
+
+      setAnalysisResult(filteredResult);
       setCurrentHistoryId(null);
-      const negativeCount = result.playerReports?.reduce((sum, r) => sum + (r.negativeOutbursts?.length || 0), 0) ?? 0;
-      const keyPlayerCount = result.identifiedKeyPlayers?.length ?? 0;
+      const negativeCount = filteredResult.playerReports?.reduce((sum, r) => sum + (r.negativeOutbursts?.length || 0), 0) ?? 0;
+      const keyPlayerCount = filteredResult.identifiedKeyPlayers?.length ?? 0;
       logUsage('analysis_complete', `${activeProfile.name} 分析完成`, chatData.length, negativeCount, keyPlayerCount, {
         inputTokens: result._usage?.inputTokens,
         outputTokens: result._usage?.outputTokens,
@@ -407,7 +423,7 @@ export default function App() {
       }
 
       if (user && activeProfile) {
-        await dataService.saveAnalysisRecord(activeProfile, result);
+        await dataService.saveAnalysisRecord(activeProfile, filteredResult);
         await loadUserData();
       }
     } catch (err: any) {
