@@ -9,7 +9,7 @@ interface Props {
   cases: AnalysisCase[];
   executionRecords: ExecutionRecord[];
   dismissedOutbursts?: { historyRecordId: string; outburstIndex: number }[];
-  onTicketClick?: (historyRecordId: string) => void;
+  onTicketClick?: (historyRecordId: string, outburstIndex: number) => void;
 }
 
 interface FlatTicket {
@@ -196,7 +196,7 @@ export default function HomeView({ serverProfiles, history, cases, executionReco
               return (
                 <div
                   key={i}
-                  onClick={() => onTicketClick?.(ticket.historyRecordId)}
+                  onClick={() => onTicketClick?.(ticket.historyRecordId, ticket.outburstIndex)}
                   className={`flex items-center gap-4 px-5 py-3.5 bg-white border border-slate-200 rounded-2xl transition-colors ${
                     clickable ? 'cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30' : 'hover:border-slate-300'
                   }`}

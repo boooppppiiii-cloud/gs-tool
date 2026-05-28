@@ -55,11 +55,13 @@ interface Props {
   leaderReviews?: LeaderReview[];
   serverName?: string;
   gsName?: string;
+  focusedOutburstIndex?: number | null;
+  onClearFocus?: () => void;
 }
 
 const COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 
-export default function AnalysisReport({ result: rawResult, executionRecords = [], currentHistoryId, onSaveRecords, onUpdatePortrait, leaderReviews = [], serverName, gsName }: Props) {
+export default function AnalysisReport({ result: rawResult, executionRecords = [], currentHistoryId, onSaveRecords, onUpdatePortrait, leaderReviews = [], serverName, gsName, focusedOutburstIndex = null, onClearFocus }: Props) {
   const result: AnalysisResult = React.useMemo(() => ({
     ...rawResult,
     identifiedKeyPlayers: rawResult.identifiedKeyPlayers ?? [],
@@ -408,18 +410,32 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
 
       {/* 2. Negative Outbursts (WeChat Style) */}
       <section className="space-y-6">
-        <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-          <AlertTriangle className="w-6 h-6 text-rose-500 adventure-icon" />
-          爆发负面：深度行为溯源
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <AlertTriangle className="w-6 h-6 text-rose-500 adventure-icon" />
+            爆发负面：深度行为溯源
+          </h3>
+          {focusedOutburstIndex != null && (
+            <button
+              onClick={onClearFocus}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors"
+            >
+              查看完整报告（共 {allOutbursts.length} 条）
+            </button>
+          )}
+        </div>
 
         <div className="space-y-8 text-neutral-900">
-          {result.playerReports.map((player) =>
-            player.negativeOutbursts.map((outburst, idx) => {
-              const ratingKey = `${player.roleName}-${idx}`;
+          {allOutbursts
+            .filter((_, i) => focusedOutburstIndex == null || i === focusedOutburstIndex)
+            .map((ob, renderIdx) => {
+              const globalIdx = focusedOutburstIndex != null ? focusedOutburstIndex : renderIdx;
+              const outburst = ob.outburst;
+              const playerName = ob.playerName;
+              const ratingKey = `${playerName}-${globalIdx}`;
               const rated = adviceRatings[ratingKey];
               return (
-                <div key={`${player.roleName}-${idx}`} className="bg-white border border-slate-200 rounded-[40px] overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <div key={`${playerName}-${globalIdx}`} className="bg-white border border-slate-200 rounded-[40px] overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                   {/* ── 标题 + 标签 ── */}
                   <div className="px-8 py-6 bg-rose-50 border-b border-rose-100">
                     <div className="flex items-start justify-between gap-4">
@@ -432,7 +448,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
                         </div>
                         {outburst.tags && outburst.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1.5 pl-6">
-                            {outburst.tags.map(tag => (
+                            {outburst.tags.map((tag: string) => (
                               <span key={tag} className="px-2.5 py-0.5 bg-rose-200 text-rose-700 text-[10px] font-black rounded-full uppercase tracking-tight">
                                 #{tag}
                               </span>
@@ -450,7 +466,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
                     {/* ── 基础信息 ── */}
                     <div className="flex flex-wrap items-center gap-3 text-sm">
                       <span className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700">
-                        <UserCheck className="w-3.5 h-3.5 text-indigo-400" /> 玩家：{player.roleName}
+                        <UserCheck className="w-3.5 h-3.5 text-indigo-400" /> 玩家：{playerName}
                       </span>
                       {outburst.mergeStage && outburst.mergeStage !== '未知' && (
                         <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-100 rounded-xl font-bold text-amber-700">
@@ -484,15 +500,15 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
                             <MessageSquare className="w-3 h-3" /> 溯源上下文
                           </p>
                           <div className="space-y-3 max-h-60 overflow-y-auto bg-slate-50/60 rounded-2xl p-4 border border-slate-100">
-                            {outburst.context.map((msg, midx) => (
-                              <div key={midx} className={`flex ${msg.roleName === player.roleName ? 'justify-start' : 'justify-end'} gap-2 items-start`}>
-                                <div className={`max-w-[80%] space-y-0.5 ${msg.roleName === player.roleName ? '' : 'items-end'}`}>
+                            {outburst.context.map((msg: { roleName: string; content: string; time: string }, midx: number) => (
+                              <div key={midx} className={`flex ${msg.roleName === playerName ? 'justify-start' : 'justify-end'} gap-2 items-start`}>
+                                <div className={`max-w-[80%] space-y-0.5 ${msg.roleName === playerName ? '' : 'items-end'}`}>
                                   <div className="flex items-center gap-2 px-1">
                                     <span className="text-[9px] text-slate-400 font-bold">{msg.roleName}</span>
                                     <span className="text-[9px] text-slate-300">{msg.time}</span>
                                   </div>
                                   <div className={`p-3 rounded-2xl text-xs leading-relaxed ${
-                                    msg.roleName === player.roleName
+                                    msg.roleName === playerName
                                       ? 'bg-white border border-slate-100 text-slate-800'
                                       : 'bg-indigo-600 text-white'
                                   }`}>
@@ -522,7 +538,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
                         </p>
                         <div className="flex items-center gap-1">
                           <button
-                            onClick={() => rateAdvice(ratingKey, 'up', player.roleName, outburst.trigger)}
+                            onClick={() => rateAdvice(ratingKey, 'up', playerName, outburst.trigger)}
                             className={`p-1 rounded-lg transition-colors ${rated === 'up' ? 'text-emerald-600 bg-emerald-50' : rated ? 'text-slate-200' : 'text-slate-300 hover:text-emerald-500 hover:bg-emerald-50'}`}
                             disabled={!!rated}
                             title="这条建议有用"
@@ -530,7 +546,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
                             <ThumbsUp className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => rateAdvice(ratingKey, 'down', player.roleName, outburst.trigger)}
+                            onClick={() => rateAdvice(ratingKey, 'down', playerName, outburst.trigger)}
                             className={`p-1 rounded-lg transition-colors ${rated === 'down' ? 'text-rose-600 bg-rose-50' : rated ? 'text-slate-200' : 'text-slate-300 hover:text-rose-500 hover:bg-rose-50'}`}
                             disabled={!!rated}
                             title="这条建议没用"
@@ -553,7 +569,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
                         </p>
                         {outburst.gsAdvice.resultTags && outburst.gsAdvice.resultTags.length > 0 && (
                           <div className="flex flex-wrap gap-1.5">
-                            {outburst.gsAdvice.resultTags.map(tag => (
+                            {outburst.gsAdvice.resultTags.map((tag: string) => (
                               <span key={tag} className="px-2.5 py-0.5 bg-emerald-200 text-emerald-800 text-[10px] font-black rounded-full">
                                 {tag}
                               </span>
@@ -566,7 +582,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
                 </div>
               );
             })
-          )}
+          }
         </div>
       </section>
 
@@ -597,26 +613,29 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
 
           <div className="space-y-4">
             {allOutbursts.map((ob, i) => {
+              if (focusedOutburstIndex != null && i !== focusedOutburstIndex) return null;
+
               const outburstRecs = executionRecords
                 .filter(r => r.historyRecordId === currentHistoryId && r.outburstIndex === i)
                 .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-              // Feature 3: when viewing a historical analysis, only show outbursts that have records
+              // when viewing a historical analysis, only show outbursts that have records
               if (currentHistoryId && outburstRecs.length === 0) return null;
 
               const latestRec = outburstRecs[outburstRecs.length - 1];
               const latestReview = latestRec ? leaderReviews.find(r => r.executionRecordId === latestRec.id) : undefined;
               const isNewRound = !!latestRec && latestReview?.decision === '继续推进';
+              const isDraft = latestRec?.submissionStatus === '草稿';
               const isFinalState = latestRec?.submissionStatus === '待归档';
               const isLeaderClosed = latestRec?.submissionStatus === '已完成';
-              const needsInput = !latestRec || isNewRound;
+              const needsInput = !latestRec || isNewRound || isDraft;
               const showNewInput = needsInput && !isFinalState && !isLeaderClosed;
               const showAiButton = !isFinalState;
 
               return (
                 <div key={i} className="space-y-2">
-                  {/* Past records (read-only) */}
-                  {outburstRecs.map((rec, round) => (
+                  {/* Past records (read-only) — drafts stay in edit form */}
+                  {outburstRecs.filter(rec => rec.submissionStatus !== '草稿').map((rec, round) => (
                     <PastExecutionRecordCard
                       key={rec.id}
                       record={rec}
@@ -640,11 +659,11 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
                         </div>
                       )}
                       <ExecutionRecordUpload
-                        key={`${i}-nr${outburstRecs.filter(rec => leaderReviews.find(r => r.executionRecordId === rec.id)?.decision === '继续推进').length}`}
+                        key={`${i}-${isDraft ? latestRec!.id : 'new'}-nr${outburstRecs.filter(rec => leaderReviews.find(r => r.executionRecordId === rec.id)?.decision === '继续推进').length}`}
                         outburstIndex={i}
                         playerName={ob.playerName}
                         outburstTitle={ob.title}
-                        existing={undefined}
+                        existing={isDraft && !isNewRound ? latestRec : undefined}
                         onChange={isNewRound ? handleNewRecordChange : handleRecordChange}
                       />
                     </div>

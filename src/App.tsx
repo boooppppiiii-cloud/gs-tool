@@ -104,6 +104,7 @@ export default function App() {
   const [showCrawlLog, setShowCrawlLog] = React.useState(false);
   const [authLog, setAuthLog] = React.useState<string | null>(null);
   const [showAuthLogFor, setShowAuthLogFor] = React.useState<string | null>(null);
+  const [focusedOutburstIndex, setFocusedOutburstIndex] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     const check = () => fetch('/api/crawler/session-status').then(r => r.json()).then(setCrawlerStatus).catch(() => {});
@@ -504,9 +505,15 @@ export default function App() {
     if (parentId === 'knowledge') setKnowledgeTab(childId as 'items' | 'calendar');
   };
 
-  const handleTicketClick = (historyRecordId: string) => {
+  const handleTicketClick = (historyRecordId: string, outburstIndex: number) => {
     const record = history.flatMap(m => m.records).find(r => r.id === historyRecordId);
-    if (record) handleSelectHistory(record);
+    if (record) {
+      setAnalysisResult(record.result);
+      setCurrentHistoryId(record.id);
+      setAnalysisSubTab('current');
+      setActiveTab('analysis');
+      setFocusedOutburstIndex(outburstIndex);
+    }
   };
 
   const handleSelectPortal = (portal: 'admin' | 'leader' | 'member') => {
@@ -838,7 +845,7 @@ export default function App() {
                      <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
                         <div className="flex items-center justify-between">
                            <h2 className="text-3xl font-black text-slate-900 tracking-tight">分析报告已生成</h2>
-                           <button onClick={() => { setAnalysisResult(null); setChatData([]); setRechargeData([]); setError(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="px-6 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-xs hover:bg-indigo-100 transition-colors">重新分析</button>
+                           <button onClick={() => { setAnalysisResult(null); setChatData([]); setRechargeData([]); setError(null); setFocusedOutburstIndex(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="px-6 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-xs hover:bg-indigo-100 transition-colors">重新分析</button>
                         </div>
                                                  <AnalysisReport
                                    result={analysisResult}
@@ -847,6 +854,8 @@ export default function App() {
                                    leaderReviews={leaderReviews}
                                    serverName={serverProfiles.find(p => p.id === activeProfileId)?.name}
                                    gsName={serverProfiles.find(p => p.id === activeProfileId)?.gsName}
+                                   focusedOutburstIndex={focusedOutburstIndex}
+                                   onClearFocus={() => setFocusedOutburstIndex(null)}
                                    onSaveRecords={async (records) => {
                                      for (const rec of records) {
                                        await dataService.saveExecutionRecord({ ...rec, ownerId: user?.id ?? '' });
