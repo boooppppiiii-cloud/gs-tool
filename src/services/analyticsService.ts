@@ -83,7 +83,11 @@ export function logUsage(
 
 export async function fetchAllAnalyticsLogs(): Promise<UsageLog[]> {
   const res = await fetch('/api/admin/logs');
-  if (!res.ok) throw new Error(`Admin logs fetch failed: ${res.status}`);
+  if (!res.ok) {
+    let detail = '';
+    try { detail = ((await res.json()) as { error?: string }).error ?? ''; } catch {}
+    throw new Error(detail || `Admin logs fetch failed: ${res.status}`);
+  }
   const json = await res.json();
   return (json.data || []) as UsageLog[];
 }
