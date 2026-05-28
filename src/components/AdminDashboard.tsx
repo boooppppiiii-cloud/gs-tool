@@ -84,13 +84,17 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'usage' | 'business' | 'analytics'>('usage');
   const [logs, setLogs] = useState<UsageLog[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
+    setError(null);
     try {
       const all = await fetchAllAnalyticsLogs();
       setLogs(all);
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
       console.error('[AdminDashboard] 日志拉取失败', e);
     } finally {
       setLoading(false);
@@ -197,6 +201,18 @@ export default function AdminDashboard() {
 
       {activeTab === 'usage' && (
         <>
+          {error && (
+            <div className="flex items-center gap-3 p-4 bg-rose-50 border border-rose-200 rounded-2xl">
+              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+              <div>
+                <p className="text-xs font-black text-rose-700">打点数据拉取失败</p>
+                <p className="text-xs text-rose-600 font-medium mt-0.5">{error}</p>
+              </div>
+              <button onClick={load} className="ml-auto px-3 py-1.5 text-xs font-black text-rose-600 border border-rose-200 rounded-xl hover:bg-rose-100 transition-colors">
+                重试
+              </button>
+            </div>
+          )}
           {loading && logs.length === 0 ? (
             <div className="flex items-center justify-center py-24 text-slate-400">
               <RefreshCw className="w-5 h-5 animate-spin mr-2" />
@@ -565,10 +581,10 @@ function AnalyticsDashboard({ logs, loading }: { logs: UsageLog[]; loading: bool
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} tickFormatter={(v) => `$${v}`} />
                 <Tooltip
                   contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number, name: string) => [
-                    name === 'cost' ? `$${value}` : value.toLocaleString(),
+                  formatter={((value: unknown, name: unknown) => [
+                    name === 'cost' ? `$${value ?? 0}` : Number(value ?? 0).toLocaleString(),
                     name === 'cost' ? 'API成本' : 'Token总量',
-                  ]}
+                  ]) as any}
                 />
                 <Legend formatter={(v) => v === 'cost' ? 'API成本 (USD)' : 'Token总量'} />
                 <Line type="monotone" dataKey="cost" name="cost" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4 }} activeDot={{ r: 6 }} />

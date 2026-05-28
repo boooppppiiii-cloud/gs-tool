@@ -197,12 +197,11 @@ async function startServer() {
       if (!db) {
         return res.status(503).json({ error: `Admin SDK 未就绪: ${getAdminDbError()}` });
       }
-      const result = await db
-        .collection('usage_logs')
-        .orderBy('timestamp', 'desc')
-        .limit(1000)
-        .get();
-      res.json({ data: result.data });
+      const result = await db.collection('usage_logs').limit(1000).get();
+      const sorted = (result.data as any[]).sort((a, b) =>
+        String(b.timestamp || '').localeCompare(String(a.timestamp || ''))
+      );
+      res.json({ data: sorted });
     } catch (e: any) {
       console.error('[Admin Logs] 查询失败:', e);
       res.status(500).json({ error: String(e?.message || e) });
