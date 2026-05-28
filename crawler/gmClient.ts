@@ -163,22 +163,19 @@ export class GmClient {
     await elDatePickerSet(this.page, SEL_ORDER_START, startStr);
     await elDatePickerSet(this.page, SEL_ORDER_END, endStr);
 
-    // TODO: click order query button — selector not yet provided
-    // await this.page.click('/* order search button in #pane-order */');
-    await this.page.waitForTimeout(1000);
+    await this.page.waitForTimeout(1500);
 
     // Scrape order table rows (all pages)
     const allRows: string[][] = [];
     while (true) {
-      const rows = await this.page.$$eval('table tbody tr', (trs) =>
+      const rows = await this.page.$$eval('#pane-order table tbody tr', (trs) =>
         trs.map(tr =>
           Array.from(tr.querySelectorAll('td')).map(td => (td as Element & { innerText: string }).innerText.trim())
         )
       );
       allRows.push(...rows.filter(r => r.length > 0));
 
-      // TODO: update pagination selector for the order table
-      const nextBtn = await this.page.$('button.next-page:not([disabled])');
+      const nextBtn = await this.page.$('.el-pagination .btn-next:not([disabled])');
       if (!nextBtn) break;
       await nextBtn.click();
       await this.page.waitForTimeout(600);

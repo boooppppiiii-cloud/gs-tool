@@ -104,17 +104,24 @@ export default function App() {
   const [showCrawlLog, setShowCrawlLog] = React.useState(false);
 
   React.useEffect(() => {
-    if (activeTab !== 'analysis') return;
     const check = () => fetch('/api/crawler/session-status').then(r => r.json()).then(setCrawlerStatus).catch(() => {});
     check();
     const id = setInterval(check, 60_000);
     return () => clearInterval(id);
-  }, [activeTab]);
+  }, []);
 
   const triggerAuth = async (b: 'chat' | 'recharge') => {
     setAuthingBackend(b);
     await fetch(`/api/crawler/auth/${b}`, { method: 'POST' });
-    setTimeout(() => setAuthingBackend(null), 3000);
+    // Poll every 5s until session is restored (auth takes 1-3 minutes)
+    const poll = setInterval(async () => {
+      try {
+        const status: { chat: string; recharge: string } = await fetch('/api/crawler/session-status').then(r => r.json());
+        setCrawlerStatus(status);
+        if (status[b] === 'ok') { clearInterval(poll); setAuthingBackend(null); }
+      } catch {}
+    }, 5000);
+    setTimeout(() => { clearInterval(poll); setAuthingBackend(null); }, 300_000);
   };
 
   const triggerCollect = async () => {
@@ -534,6 +541,19 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white flex font-sans text-slate-800">
+      {/* GM 后台登录过期全局提醒 */}
+      {(crawlerStatus.chat === 'expired' || crawlerStatus.recharge === 'expired') && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-500 text-white text-sm font-bold py-2.5 px-6 flex items-center gap-3 shadow-lg">
+          <AlertTriangleIcon className="w-4 h-4 shrink-0" />
+          <span>GM 后台登录已过期：{[crawlerStatus.chat === 'expired' ? '聊天后台' : null, crawlerStatus.recharge === 'expired' ? '充值后台' : null].filter(Boolean).join('、')} — 请前往「专家分析 → 实时分析」重新认证</span>
+          <button
+            onClick={() => { setActiveTab('analysis'); setAnalysisSubTab('current'); setAnalysisResult(null); }}
+            className="ml-auto px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-black transition-colors whitespace-nowrap"
+          >
+            立即前往
+          </button>
+        </div>
+      )}
       {/* Sidebar Navigation */}
       <aside
         className={`bg-white flex flex-col transition-[width] duration-200 z-50 sticky top-0 h-screen border-r border-slate-200 ${
@@ -794,7 +814,7 @@ export default function App() {
                      <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
                         <div className="flex items-center justify-between">
                            <h2 className="text-3xl font-black text-slate-900 tracking-tight">分析报告已生成</h2>
-                           <button onClick={() => setAnalysisResult(null)} className="px-6 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-xs hover:bg-indigo-100 transition-colors">重新分析</button>
+                           <button onClick={() => { setAnalysisResult(null); setChatData([]); setRechargeData([]); setError(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="px-6 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-xs hover:bg-indigo-100 transition-colors">重新分析</button>
                         </div>
                                                  <AnalysisReport
                                    result={analysisResult}

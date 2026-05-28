@@ -388,7 +388,6 @@ async function startServer() {
         ...process.env,
         CRAWL_HOURS: '10',
         ...(serverName ? { CRAWL_SERVER_NAME: String(serverName) } : {}),
-        ...(ownerId ? { CRAWL_OWNER_ID: String(ownerId) } : {}),
       },
     });
     child.unref();
@@ -409,11 +408,14 @@ async function startServer() {
     if (backend !== 'chat' && backend !== 'recharge') {
       return res.status(400).json({ error: 'invalid backend' });
     }
+    const logPath = path.join(__dirname, 'crawler', 'sessions', `auth_${backend}.log`);
+    fs.writeFileSync(logPath, `[${new Date().toISOString()}] Auth started\n`, 'utf-8');
+    const logStream = fs.createWriteStream(logPath, { flags: 'a' });
     const child = spawn('npm', ['run', `auth:${backend}`], {
       cwd: __dirname,
       shell: true,
       detached: true,
-      stdio: 'ignore',
+      stdio: ['ignore', logStream, logStream],
     });
     child.unref();
     res.json({ ok: true });
