@@ -479,6 +479,7 @@ export default function App() {
     setCurrentHistoryId(record.id);
     setAnalysisSubTab('current');
     setActiveTab('analysis');
+    setFocusedOutburstIndex(null);
   };
 
   const handleDeleteHistory = async (_month: string, id: string) => {

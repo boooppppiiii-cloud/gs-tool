@@ -620,7 +620,8 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
                 .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
               // when viewing a historical analysis, only show outbursts that have records
-              if (currentHistoryId && outburstRecs.length === 0) return null;
+              // ticket-focus mode (focusedOutburstIndex != null) always shows the form to allow new records
+              if (currentHistoryId && focusedOutburstIndex == null && outburstRecs.length === 0) return null;
 
               const latestRec = outburstRecs[outburstRecs.length - 1];
               const latestReview = latestRec ? leaderReviews.find(r => r.executionRecordId === latestRec.id) : undefined;
