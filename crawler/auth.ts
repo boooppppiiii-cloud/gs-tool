@@ -101,12 +101,16 @@ async function authRecharge(): Promise<void> {
 
   await page.goto(config.GM_RECHARGE_URL, { waitUntil: 'networkidle' });
 
+  console.log('  等待扫码完成（最长 5 分钟）...');
   await Promise.race([
     popupClosed,
-    new Promise<void>(resolve => {
-      process.stdout.write('如未弹出二维码窗口，扫码完成后可直接按 Enter...');
-      process.stdin.once('data', () => resolve());
-    }),
+    page.waitForURL(
+      url => !url.toString().includes('login') && !url.toString().includes('qr'),
+      { timeout: 300_000 }
+    ).catch(() => {}),
+    new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error('认证超时（5分钟）')), 305_000)
+    ),
   ]);
 
   const sessionPath = path.join(config.SESSIONS_DIR, 'recharge.json');
