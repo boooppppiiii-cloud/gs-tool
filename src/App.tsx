@@ -102,22 +102,30 @@ export default function App() {
   const [crawlServerName, setCrawlServerName] = React.useState<string>('');
   const [crawlLog, setCrawlLog] = React.useState<string | null>(null);
   const [showCrawlLog, setShowCrawlLog] = React.useState(false);
+  const [authLog, setAuthLog] = React.useState<string | null>(null);
+  const [showAuthLogFor, setShowAuthLogFor] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const check = () => fetch('/api/crawler/session-status').then(r => r.json()).then(setCrawlerStatus).catch(() => {});
     check();
-    const id = setInterval(check, 60_000);
+    const id = setInterval(check, 15_000);
     return () => clearInterval(id);
   }, []);
 
   const triggerAuth = async (b: 'chat' | 'recharge') => {
     setAuthingBackend(b);
+    setShowAuthLogFor(b);
+    setAuthLog('正在启动认证进程...');
     await fetch(`/api/crawler/auth/${b}`, { method: 'POST' });
-    // Poll every 5s until session is restored (auth takes 1-3 minutes)
+    // Poll every 5s: refresh session status + auth log until restored
     const poll = setInterval(async () => {
       try {
-        const status: { chat: string; recharge: string } = await fetch('/api/crawler/session-status').then(r => r.json());
+        const [status, logRes] = await Promise.all([
+          fetch('/api/crawler/session-status').then(r => r.json()) as Promise<{ chat: string; recharge: string }>,
+          fetch(`/api/crawler/auth-log/${b}`).then(r => r.json()).catch(() => ({ log: '' })),
+        ]);
         setCrawlerStatus(status);
+        if (logRes.log) setAuthLog(logRes.log);
         if (status[b] === 'ok') { clearInterval(poll); setAuthingBackend(null); }
       } catch {}
     }, 5000);
@@ -717,20 +725,36 @@ export default function App() {
                                   const expired = crawlerStatus[b] === 'expired';
                                   const label = b === 'chat' ? '聊天后台' : '充值后台';
                                   return (
-                                    <div key={b} className={`flex items-center justify-between p-3 rounded-2xl border ${expired ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
-                                      <span className={`text-sm font-bold flex items-center gap-2 ${expired ? 'text-amber-700' : 'text-slate-600'}`}>
-                                        {expired
-                                          ? <AlertTriangleIcon className="w-4 h-4" />
-                                          : <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />}
-                                        {label}
-                                        {expired && <span className="text-xs font-bold text-amber-600">已过期</span>}
-                                      </span>
-                                      <button
-                                        onClick={() => triggerAuth(b)}
-                                        disabled={authingBackend === b}
-                                        className={`px-3 py-1 text-xs font-bold rounded-xl transition-colors disabled:opacity-50 ${expired ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600'}`}>
-                                        {authingBackend === b ? '启动中...' : '重新认证'}
-                                      </button>
+                                    <div key={b} className="space-y-1">
+                                      <div className={`flex items-center justify-between p-3 rounded-2xl border ${expired ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
+                                        <span className={`text-sm font-bold flex items-center gap-2 ${expired ? 'text-amber-700' : 'text-slate-600'}`}>
+                                          {expired
+                                            ? <AlertTriangleIcon className="w-4 h-4" />
+                                            : <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />}
+                                          {label}
+                                          {expired && <span className="text-xs font-bold text-amber-600">已过期</span>}
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                          <button
+                                            onClick={() => triggerAuth(b)}
+                                            disabled={authingBackend === b}
+                                            className={`px-3 py-1 text-xs font-bold rounded-xl transition-colors disabled:opacity-50 ${expired ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600'}`}>
+                                            {authingBackend === b ? '启动中...' : '重新认证'}
+                                          </button>
+                                          {showAuthLogFor === b && (
+                                            <button
+                                              onClick={() => setShowAuthLogFor(showAuthLogFor === b ? null : b)}
+                                              className="px-2 py-1 text-[10px] font-bold text-slate-400 hover:text-slate-600 rounded-lg transition-colors">
+                                              {showAuthLogFor === b ? '收起' : '日志'}
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                      {showAuthLogFor === b && authLog && (
+                                        <pre className="text-[10px] text-slate-500 bg-slate-50 rounded-xl p-3 max-h-32 overflow-auto whitespace-pre-wrap break-all border border-slate-100">
+                                          {authLog}
+                                        </pre>
+                                      )}
                                     </div>
                                   );
                                 })}

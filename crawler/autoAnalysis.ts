@@ -66,19 +66,21 @@ async function dbPost(endpoint: string, body: object): Promise<Record<string, un
 }
 
 async function fetchLatestProfile(userId: string, serverName?: string): Promise<ServerProfile | null> {
-  const result = await dbPost('where', { collection: 'serverProfiles', field: 'ownerId', value: userId });
-  const profiles = (result.data as ServerProfile[]) ?? [];
+  // Primary: query by ownerId (works when users.json gsUserId === Firebase UID)
+  let profiles = ((await dbPost('where', { collection: 'serverProfiles', field: 'ownerId', value: userId })).data as ServerProfile[]) ?? [];
+
+  // Fallback: query by serverName (works even when gsUserId is a CloudBase UID)
+  if (profiles.length === 0 && serverName) {
+    console.warn(`[AutoAnalysis] No profile for ownerId=${userId}, trying serverName="${serverName}"...`);
+    profiles = ((await dbPost('where', { collection: 'serverProfiles', field: 'name', value: serverName })).data as ServerProfile[]) ?? [];
+  }
+
   if (profiles.length === 0) {
-    console.warn(`[AutoAnalysis] No ServerProfile for userId=${userId}. Create one in the App first.`);
+    console.warn(`[AutoAnalysis] No ServerProfile found for userId=${userId}${serverName ? ` or serverName=${serverName}` : ''}. Create one in the App first.`);
     return null;
   }
   if (serverName) {
-    const match = profiles.find(p => p.name === serverName);
-    if (!match) {
-      console.warn(`[AutoAnalysis] ServerProfile "${serverName}" not found for userId=${userId}.`);
-      return null;
-    }
-    return match;
+    return profiles.find(p => p.name === serverName) ?? profiles[0];
   }
   return profiles[0];
 }
@@ -191,12 +193,16 @@ export async function runAnalysis(
   result._usage = { inputTokens, outputTokens };
   console.log(`[AutoAnalysis] Key players: ${result.identifiedKeyPlayers?.length ?? 0}, Reports: ${result.playerReports?.length ?? 0}`);
 
+  // Use profile.ownerId (Firebase UID) so App queries by user.id can find these records.
+  // userId param is gsUserId from users.json which may be a CloudBase UID, not Firebase UID.
+  const appUserId = profile.ownerId;
+
   // Persist to CloudBase
   const histId = `hist_${Date.now()}`;
   await dbPost('upsert', {
     collection: 'analysisHistory',
     id: histId,
-    data: { id: histId, timestamp: new Date().toISOString(), serverConfig: profile, result, userId, group, hasCsv: !!csvContent },
+    data: { id: histId, timestamp: new Date().toISOString(), serverConfig: profile, result, userId: appUserId, group, hasCsv: !!csvContent },
   });
 
   if (csvContent) {
@@ -204,7 +210,7 @@ export async function runAnalysis(
       await dbPost('upsert', {
         collection: 'chat_csv_files',
         id: histId,
-        data: { recordId: histId, userId, content: csvContent },
+        data: { recordId: histId, userId: appUserId, content: csvContent },
       });
       console.log(`[AutoAnalysis] CSV uploaded (${csvContent.length} chars)`);
     } catch (e) {
@@ -220,7 +226,7 @@ export async function runAnalysis(
         id: crawlId,
         data: {
           id: crawlId,
-          userId,
+          userId: appUserId,
           serverName: profile.name,
           timestamp: new Date().toISOString(),
           crawlStart: crawlPeriod.start.toISOString(),

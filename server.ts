@@ -403,6 +403,17 @@ async function startServer() {
     }
   });
 
+  app.get('/api/crawler/auth-log/:backend', (req: any, res: any) => {
+    const { backend } = req.params as { backend: string };
+    if (backend !== 'chat' && backend !== 'recharge') return res.status(400).json({ error: 'invalid backend' });
+    const logPath = path.join(__dirname, 'crawler', 'sessions', `auth_${backend}.log`);
+    try {
+      res.json({ log: fs.readFileSync(logPath, 'utf-8') });
+    } catch {
+      res.json({ log: '(暂无认证日志)' });
+    }
+  });
+
   app.post('/api/crawler/auth/:backend', (req: any, res: any) => {
     const { backend } = req.params as { backend: string };
     if (backend !== 'chat' && backend !== 'recharge') {
