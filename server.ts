@@ -436,28 +436,18 @@ async function startServer() {
   });
 
   app.get('/api/crawler/playwright-status', (req: any, res: any) => {
-    try {
-      const { chromium } = require('playwright') as typeof import('playwright');
-      const execPath = chromium.executablePath();
-      const exists = fs.existsSync(execPath);
-      res.json({ installed: exists, execPath });
-    } catch (e: any) {
-      res.json({ installed: false, error: String(e?.message || e) });
-    }
-  });
-
-  app.post('/api/crawler/install-playwright', (req: any, res: any) => {
-    const logPath = path.join(__dirname, 'crawler', 'sessions', 'playwright_install.log');
-    fs.writeFileSync(logPath, `[${new Date().toISOString()}] 开始安装 Chromium...\n`, 'utf-8');
-    const logStream = fs.createWriteStream(logPath, { flags: 'a' });
-    const child = spawn('npx', ['playwright', 'install', 'chromium'], {
-      cwd: path.join(__dirname, 'crawler'),
-      shell: true,
-      detached: true,
-      stdio: ['ignore', logStream, logStream],
-    });
-    child.unref();
-    res.json({ ok: true });
+    const localAppData = process.env.LOCALAPPDATA || '';
+    const pf = process.env.ProgramFiles || 'C:\\Program Files';
+    const pf86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+    const candidates = [
+      `${pf}\\Google\\Chrome\\Application\\chrome.exe`,
+      `${pf86}\\Google\\Chrome\\Application\\chrome.exe`,
+      `${localAppData}\\Google\\Chrome\\Application\\chrome.exe`,
+      `${pf}\\Microsoft\\Edge\\Application\\msedge.exe`,
+      `${pf86}\\Microsoft\\Edge\\Application\\msedge.exe`,
+    ];
+    const found = candidates.find(p => fs.existsSync(p));
+    res.json({ installed: !!found, execPath: found });
   });
 
   // Vite middleware for development

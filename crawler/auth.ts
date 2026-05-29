@@ -13,6 +13,20 @@ import * as path from 'path';
 import { chromium } from 'playwright';
 import { config } from './config';
 
+function findSystemBrowser(): string | undefined {
+  const localAppData = process.env.LOCALAPPDATA || '';
+  const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+  const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+  const candidates = [
+    `${programFiles}\\Google\\Chrome\\Application\\chrome.exe`,
+    `${programFilesX86}\\Google\\Chrome\\Application\\chrome.exe`,
+    `${localAppData}\\Google\\Chrome\\Application\\chrome.exe`,
+    `${programFiles}\\Microsoft\\Edge\\Application\\msedge.exe`,
+    `${programFilesX86}\\Microsoft\\Edge\\Application\\msedge.exe`,
+  ];
+  return candidates.find(p => fs.existsSync(p));
+}
+
 function setSessionStatus(backend: 'chat' | 'recharge', status: 'ok' | 'expired'): void {
   const file = path.join(config.SESSIONS_DIR, 'status.json');
   try {
@@ -42,7 +56,10 @@ async function authChat(): Promise<void> {
   console.log('  3. 点击登录按钮');
   console.log('  4. 等待跳转后程序自动保存 session\n');
 
-  const browser = await chromium.launch({ headless: false, slowMo: 100 });
+  const executablePath = findSystemBrowser();
+  if (!executablePath) throw new Error('未找到 Chrome 或 Edge 浏览器，请安装后重试');
+  console.log(`使用浏览器：${executablePath}`);
+  const browser = await chromium.launch({ headless: false, slowMo: 100, executablePath });
   const context = await browser.newContext();
   const page = await context.newPage();
 
@@ -85,7 +102,10 @@ async function authRecharge(): Promise<void> {
   console.log('  2. 弹出的二维码窗口中，用手机扫码完成登录');
   console.log('  3. 扫码后弹窗自动关闭，程序随即保存登录状态\n');
 
-  const browser = await chromium.launch({ headless: false });
+  const executablePath = findSystemBrowser();
+  if (!executablePath) throw new Error('未找到 Chrome 或 Edge 浏览器，请安装后重试');
+  console.log(`使用浏览器：${executablePath}`);
+  const browser = await chromium.launch({ headless: false, executablePath });
   const context = await browser.newContext();
   const page = await context.newPage();
 

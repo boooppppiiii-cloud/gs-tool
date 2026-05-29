@@ -773,16 +773,7 @@ export default function App() {
                               {playwrightStatus?.installed === false && (
                                 <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs">
                                   <AlertTriangleIcon className="w-4 h-4 text-amber-500 shrink-0" />
-                                  <span className="text-amber-700 font-bold flex-1">Chromium 浏览器未安装，点击"重新认证"不会弹出窗口</span>
-                                  <button
-                                    onClick={async () => {
-                                      await fetch('/api/crawler/install-playwright', { method: 'POST' });
-                                      alert('安装已启动，约 1-3 分钟完成，请稍后重试认证');
-                                    }}
-                                    className="px-3 py-1 bg-amber-500 text-white font-black rounded-xl hover:bg-amber-600 transition-colors whitespace-nowrap"
-                                  >
-                                    一键安装
-                                  </button>
+                                  <span className="text-amber-700 font-bold">未检测到 Chrome 或 Edge 浏览器，点击"重新认证"将无法弹出窗口，请先安装 Chrome 或 Edge</span>
                                 </div>
                               )}
                               <div className="space-y-2">
