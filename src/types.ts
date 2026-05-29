@@ -87,6 +87,7 @@ export interface AnalysisResult {
   playerReports: PlayerBehaviorReport[];
   rechargeReport: RechargeReport;
   serverEcology: string; // AI generated ecology summary
+  chatTopics?: string[]; // AI generated topic list
   gsCommunicationReports?: GsCommunicationReport[];
   _usage?: { inputTokens: number; outputTokens: number };
 }

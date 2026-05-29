@@ -305,6 +305,7 @@ ${p.rechargeSample || '本时段无充值数据'}
     }
   ],
   "rechargeReport": { "totalPaid": 0, "totalUnpaid": 0, "playerSummaries": [], "paymentProfile": "", "rechargeData": [] },
-  "serverEcology": ""
+  "serverEcology": "",
+  "chatTopics": ["话题1", "话题2"]
 }`;
 }

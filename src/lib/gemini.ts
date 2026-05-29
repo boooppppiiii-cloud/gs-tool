@@ -249,7 +249,11 @@ ${rechargeData}
 - 每位玩家 totalPaid 等于其所有条目累加值。
 - 判定是否转端：依据充值记录中的渠道/平台字段，无相关字段则填 false 并在 conversionDetails 注明"充值数据中无转端字段"。
 
-## 任务六：GS维护质量分析（仅基于 Sheet1 聊天数据）
+## 任务六：聊天话题摘要（仅基于 Sheet1 聊天数据）
+- 提炼本次聊天中出现的 3-8 个话题，每条 15 字内，用简短短句表达（如"讨论合服后装备被削"、"争论行会名额分配"）。
+- 只基于聊天数据中明确讨论的内容，禁止推测。
+
+## 任务七：GS维护质量分析（仅基于 Sheet1 聊天数据）
 
 GS角色名已在背景信息中标注（"角色名:xxx"），以此识别GS在聊天中的发言。
 
@@ -368,6 +372,7 @@ GS角色名已在背景信息中标注（"角色名:xxx"），以此识别GS在�
     "rechargeData": [{ "name": "金额挡位", "value": 数字 }]
   },
   "serverEcology": "区服生态总结约100字（只基于本次数据，不联想）",
+  "chatTopics": ["话题简句1", "话题简句2"],
   "gsCommunicationReports": [
     {
       "roleName": "玩家名",
@@ -437,6 +442,7 @@ GS角色名已在背景信息中标注（"角色名:xxx"），以此识别GS在�
       rechargeData: raw.rechargeReport?.rechargeData ?? [],
     },
     serverEcology: raw.serverEcology ?? '',
+    chatTopics: raw.chatTopics ?? [],
     gsCommunicationReports: (raw.gsCommunicationReports ?? []).map((r: any) => ({
       roleName: r.roleName ?? '',
       activeCount: r.activeCount ?? 0,

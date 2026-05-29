@@ -873,6 +873,7 @@ export default function App() {
                                    gsName={serverProfiles.find(p => p.id === activeProfileId)?.gsName}
                                    focusedOutburstIndex={focusedOutburstIndex}
                                    onClearFocus={() => setFocusedOutburstIndex(null)}
+                                   chatData={chatData}
                                    onSaveRecords={async (records) => {
                                      for (const rec of records) {
                                        await dataService.saveExecutionRecord({ ...rec, ownerId: user?.id ?? '' });
