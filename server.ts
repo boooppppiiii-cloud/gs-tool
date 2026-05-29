@@ -435,6 +435,31 @@ async function startServer() {
     res.json({ ok: true });
   });
 
+  app.get('/api/crawler/playwright-status', (req: any, res: any) => {
+    try {
+      const { chromium } = require('playwright') as typeof import('playwright');
+      const execPath = chromium.executablePath();
+      const exists = fs.existsSync(execPath);
+      res.json({ installed: exists, execPath });
+    } catch (e: any) {
+      res.json({ installed: false, error: String(e?.message || e) });
+    }
+  });
+
+  app.post('/api/crawler/install-playwright', (req: any, res: any) => {
+    const logPath = path.join(__dirname, 'crawler', 'sessions', 'playwright_install.log');
+    fs.writeFileSync(logPath, `[${new Date().toISOString()}] 开始安装 Chromium...\n`, 'utf-8');
+    const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+    const child = spawn('npx', ['playwright', 'install', 'chromium'], {
+      cwd: path.join(__dirname, 'crawler'),
+      shell: true,
+      detached: true,
+      stdio: ['ignore', logStream, logStream],
+    });
+    child.unref();
+    res.json({ ok: true });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

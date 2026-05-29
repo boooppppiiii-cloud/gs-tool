@@ -98,6 +98,7 @@ export default function App() {
 
   const [crawlerStatus, setCrawlerStatus] = React.useState<{ chat: string; recharge: string }>({ chat: 'ok', recharge: 'ok' });
   const [authingBackend, setAuthingBackend] = React.useState<string | null>(null);
+  const [playwrightStatus, setPlaywrightStatus] = React.useState<{ installed: boolean } | null>(null);
   const [isCollecting, setIsCollecting] = React.useState(false);
   const [collectMsg, setCollectMsg] = React.useState<string | null>(null);
   const [crawlServerName, setCrawlServerName] = React.useState<string>('');
@@ -113,6 +114,10 @@ export default function App() {
     check();
     const id = setInterval(check, 15_000);
     return () => clearInterval(id);
+  }, []);
+
+  React.useEffect(() => {
+    fetch('/api/crawler/playwright-status').then(r => r.json()).then(setPlaywrightStatus).catch(() => {});
   }, []);
 
   React.useEffect(() => {
@@ -765,6 +770,21 @@ export default function App() {
                         <div className="space-y-6">
                            <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm space-y-3">
                               <h4 className="text-base font-black text-slate-800">GM 后台认证</h4>
+                              {playwrightStatus?.installed === false && (
+                                <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs">
+                                  <AlertTriangleIcon className="w-4 h-4 text-amber-500 shrink-0" />
+                                  <span className="text-amber-700 font-bold flex-1">Chromium 浏览器未安装，点击"重新认证"不会弹出窗口</span>
+                                  <button
+                                    onClick={async () => {
+                                      await fetch('/api/crawler/install-playwright', { method: 'POST' });
+                                      alert('安装已启动，约 1-3 分钟完成，请稍后重试认证');
+                                    }}
+                                    className="px-3 py-1 bg-amber-500 text-white font-black rounded-xl hover:bg-amber-600 transition-colors whitespace-nowrap"
+                                  >
+                                    一键安装
+                                  </button>
+                                </div>
+                              )}
                               <div className="space-y-2">
                                 {(['chat', 'recharge'] as const).map(b => {
                                   const expired = crawlerStatus[b] === 'expired';
