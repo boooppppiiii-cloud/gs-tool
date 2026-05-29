@@ -104,10 +104,14 @@ async function chatCompletion(
     }),
   });
   if (!res.ok) {
-    const err = await res.text();
     if (res.status === 429) {
-      throw new Error('Gemini API 免费配额已用尽，请等待明日重置或前往 aistudio.google.com 检查配额。');
+      let body: any = {};
+      try { body = await res.json(); } catch {}
+      const errStr = typeof body.error === 'string' ? body.error : JSON.stringify(body.error ?? '');
+      const isDaily = /DAILY|daily|per day|quota_exceeded/i.test(errStr);
+      throw new Error(isDaily ? '__DAILY_QUOTA__' : '__RATE_LIMIT__');
     }
+    const err = await res.text();
     throw new Error(`Gemini API 错误: ${res.status} ${err.slice(0, 200)}`);
   }
   const data = await res.json();

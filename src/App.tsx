@@ -18,7 +18,8 @@ import {
   Crown,
   PlayCircle,
   AlertTriangle as AlertTriangleIcon,
-  LayoutGrid
+  LayoutGrid,
+  Clock,
 } from 'lucide-react';
 import ServerConfig from './components/ServerConfig';
 import ExcelUpload from './components/ExcelUpload';
@@ -105,6 +106,7 @@ export default function App() {
   const [authLog, setAuthLog] = React.useState<string | null>(null);
   const [showAuthLogFor, setShowAuthLogFor] = React.useState<string | null>(null);
   const [focusedOutburstIndex, setFocusedOutburstIndex] = React.useState<number | null>(null);
+  const [rateLimitCountdown, setRateLimitCountdown] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     const check = () => fetch('/api/crawler/session-status').then(r => r.json()).then(setCrawlerStatus).catch(() => {});
@@ -112,6 +114,18 @@ export default function App() {
     const id = setInterval(check, 15_000);
     return () => clearInterval(id);
   }, []);
+
+  React.useEffect(() => {
+    if (rateLimitCountdown === null) return;
+    if (rateLimitCountdown === 0) {
+      setRateLimitCountdown(null);
+      startAnalysis();
+      return;
+    }
+    const id = setTimeout(() => setRateLimitCountdown(c => (c ?? 1) - 1), 1000);
+    return () => clearTimeout(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rateLimitCountdown]);
 
   const triggerAuth = async (b: 'chat' | 'recharge') => {
     setAuthingBackend(b);
@@ -428,7 +442,14 @@ export default function App() {
       }
     } catch (err: any) {
       console.error(err);
-      setError(err?.message || '分析过程中发生错误，请重试');
+      const msg = err?.message ?? '';
+      if (msg === '__RATE_LIMIT__') {
+        setRateLimitCountdown(65);
+      } else if (msg === '__DAILY_QUOTA__') {
+        setError('Gemini API 今日免费配额已用尽，请明日再试或前往 aistudio.google.com 升级配额。');
+      } else {
+        setError(msg || '分析过程中发生错误，请重试');
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -850,6 +871,15 @@ export default function App() {
                                 )}
                               </button>
                            </div>
+                           {rateLimitCountdown !== null && (
+                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-3 text-amber-800 text-sm font-bold">
+                              <div className="flex items-center gap-3">
+                                <Clock className="w-5 h-5 shrink-0 text-amber-500" />
+                                <span>Gemini API 请求过频，{rateLimitCountdown} 秒后自动重试...</span>
+                              </div>
+                              <button onClick={() => setRateLimitCountdown(null)} className="text-amber-500 hover:text-amber-700 text-xs font-bold px-3 py-1 rounded-lg hover:bg-amber-100 transition-colors shrink-0">取消</button>
+                            </div>
+                           )}
                            {error && (
                             <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-700 text-sm font-bold">
                               <AlertTriangleIcon className="w-5 h-5 shrink-0" />

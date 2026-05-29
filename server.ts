@@ -52,11 +52,12 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3): P
   let lastRes: Response | undefined;
   for (let i = 0; i <= retries; i++) {
     const res = await fetch(url, options);
-    if (res.status !== 503 && res.status !== 429) return res;
+    if (res.status === 429) return res; // rate-limited — return immediately, let client handle retry
+    if (res.status !== 503) return res;
     lastRes = res;
     if (i < retries) {
       const wait = (i + 1) * 3000;
-      console.log(`[Gemini] ${res.status}，${wait / 1000}s 后重试 (${i + 1}/${retries})...`);
+      console.log(`[Gemini] 503，${wait / 1000}s 后重试 (${i + 1}/${retries})...`);
       await new Promise(r => setTimeout(r, wait));
     }
   }
@@ -174,7 +175,10 @@ async function startServer() {
       const rawText = await response.text();
       const safeStatus = response.status >= 100 && response.status <= 599 ? response.status : 502;
       console.log(`[Gemini] status=${response.status} body=${rawText.slice(0, 200)}`);
-      if (!response.ok) return res.status(safeStatus).json({ error: rawText });
+      if (!response.ok) {
+        if (response.status === 429) return res.status(429).json({ error: rawText, retryAfter: 65 });
+        return res.status(safeStatus).json({ error: rawText });
+      }
       const data = JSON.parse(rawText);
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
       res.json({
