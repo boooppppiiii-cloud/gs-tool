@@ -817,7 +817,7 @@ export default function App() {
                               </div>
                               <div className="border-t border-slate-100 pt-3 space-y-2">
                                 {(() => {
-                                  const crawlableServers = serverProfiles.filter(p => /^\d{5}$/.test(p.name));
+                                  const crawlableServers = serverProfiles.filter(p => /^\d+$/.test(p.name));
                                   return (
                                     <>
                                       <select

@@ -17,7 +17,7 @@ interface Props {
   onUpdateProfile: (id: string, updates: Partial<ServerProfile>) => void;
 }
 
-const SERVER_NAME_RE = /^\d{5}$/;
+const SERVER_NAME_RE = /^\d+$/;
 
 function validateProfile(p: ServerProfile): Record<string, string> {
   const errs: Record<string, string> = {};
@@ -195,8 +195,8 @@ export default function ServerConfig({ profiles, activeProfileId, onProfilesChan
                 type="text"
                 value={activeProfile.name}
                 onChange={(e) => updateProfile(activeProfile.id, { name: e.target.value })}
-                placeholder="五位数字，如 27596"
-                maxLength={5}
+                placeholder="纯数字，如 27596 或 422"
+                maxLength={10}
                 className={fieldClass('name') + ' font-bold'}
               />
               {attempted && errors.name ? (

@@ -88,7 +88,7 @@ async function fetchLatestProfile(userId: string, serverName?: string): Promise<
 export async function fetchUserServerNames(userId: string): Promise<string[]> {
   const result = await dbPost('where', { collection: 'serverProfiles', field: 'ownerId', value: userId });
   const profiles = (result.data as ServerProfile[]) ?? [];
-  return profiles.map(p => p.name).filter(n => /^\d{5}$/.test(n));
+  return profiles.map(p => p.name).filter(n => /^\d+$/.test(n));
 }
 
 async function fetchRecentHistory(userId: string): Promise<HistoryRecord[]> {
