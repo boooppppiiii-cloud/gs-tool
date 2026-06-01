@@ -111,6 +111,9 @@ async function chatCompletion(
       const isDaily = /DAILY|daily|per day|quota_exceeded/i.test(errStr);
       throw new Error(isDaily ? '__DAILY_QUOTA__' : '__RATE_LIMIT__');
     }
+    if (res.status === 503) {
+      throw new Error('__OVERLOAD__');
+    }
     const err = await res.text();
     throw new Error(`Gemini API 错误: ${res.status} ${err.slice(0, 200)}`);
   }

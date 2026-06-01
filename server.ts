@@ -56,8 +56,8 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3): P
     if (res.status !== 503) return res;
     lastRes = res;
     if (i < retries) {
-      const wait = (i + 1) * 3000;
-      console.log(`[Gemini] 503，${wait / 1000}s 后重试 (${i + 1}/${retries})...`);
+      const wait = (i + 1) * 15_000;
+      console.log(`[Gemini] 503 过载，${wait / 1000}s 后重试 (${i + 1}/${retries})...`);
       await new Promise(r => setTimeout(r, wait));
     }
   }

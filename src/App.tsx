@@ -452,6 +452,8 @@ export default function App() {
         setRateLimitCountdown(65);
       } else if (msg === '__DAILY_QUOTA__') {
         setError('Gemini API 今日免费配额已用尽，请明日再试或前往 aistudio.google.com 升级配额。');
+      } else if (msg === '__OVERLOAD__') {
+        setError('Gemini 服务器当前过载，系统已自动重试 90 秒仍未恢复，请稍后手动重试。');
       } else {
         setError(msg || '分析过程中发生错误，请重试');
       }
