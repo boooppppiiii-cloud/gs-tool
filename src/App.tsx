@@ -108,6 +108,7 @@ export default function App() {
   const [showAuthLogFor, setShowAuthLogFor] = React.useState<string | null>(null);
   const [focusedOutburstIndex, setFocusedOutburstIndex] = React.useState<number | null>(null);
   const [rateLimitCountdown, setRateLimitCountdown] = React.useState<number | null>(null);
+  const [analysisStep, setAnalysisStep] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const check = () => fetch('/api/crawler/session-status').then(r => r.json()).then(setCrawlerStatus).catch(() => {});
@@ -361,6 +362,20 @@ export default function App() {
     });
     const _analysisStartTime = Date.now();
 
+    const ANALYSIS_STEPS = [
+      '正在提取重点玩家信息...',
+      '正在深度分析玩家画像...',
+      '正在生成 GS 处置建议...',
+      '正在汇总区服生态...',
+      '即将完成，等待 AI 输出...',
+    ];
+    let _stepIdx = 0;
+    setAnalysisStep(ANALYSIS_STEPS[0]);
+    const _stepTimer = setInterval(() => {
+      _stepIdx = Math.min(_stepIdx + 1, ANALYSIS_STEPS.length - 1);
+      setAnalysisStep(ANALYSIS_STEPS[_stepIdx]);
+    }, 12_000);
+
     try {
       const gsPersonaStr = activeProfile.gsPersona ? 
         `GS人设: [角色名:${activeProfile.gsName || '未设置'}, 年龄:${activeProfile.gsPersona.age || '未知'}, 家乡:${activeProfile.gsPersona.hometown || '未知'}, 职业:${activeProfile.gsPersona.occupation || '未知'}, 家庭:${activeProfile.gsPersona.family || '未知'}, 生活作息:${activeProfile.gsPersona.lifestyle || '未知'}, 其他:${activeProfile.gsPersona.others || '无'}]` 
@@ -376,21 +391,21 @@ export default function App() {
           return `玩家[${name}]: ${portrait.summary} (付费习惯:${portrait.paymentHabits}, 性格:${portrait.personality}, 游戏习惯:${portrait.gameHabits}, 现实人设:${portrait.realLifePersona})`;
         }).join('\n') : '';
 
-      const chatSample = chatData.slice(-1000).map(r => 
+      const chatSample = chatData.slice(-500).map(r =>
         `[${r.time}] ${r.roleName}(${r.type}): ${r.content} ${r.target ? `-> ${r.target}` : ''}`
       ).join('\n');
-      const rechargeSample = rechargeData.map(r => 
+      const rechargeSample = rechargeData.slice(-200).map(r =>
         `${r.roleName}: ${r.amount} (${r.status}, ${r.method})`
       ).join('\n');
 
-      const refCases = cases.slice(0, 10);
+      const refCases = cases.slice(0, 5);
       const historicalCtx = buildHistoricalContext(activeProfile.id);
       logUsage('analysis_with_cases', `引用案例数: ${refCases.length}`, undefined, undefined, refCases.length);
       const result = await analyzeGameEcology(serverContextStr, chatSample, rechargeSample, refCases, persistentPortraitsStr, historicalCtx);
 
       // Filter outbursts to only those whose context messages are found in the analyzed chat batch.
       // Iron-rule D guarantees timestamps are copied verbatim, so a time|roleName fingerprint is reliable.
-      const analyzedChat = chatData.slice(-1000);
+      const analyzedChat = chatData.slice(-500);
       const chatSet = new Set(analyzedChat.map(r => `${r.time}|${r.roleName}`));
       const filteredResult: AnalysisResult = {
         ...result,
@@ -458,6 +473,8 @@ export default function App() {
         setError(msg || '分析过程中发生错误，请重试');
       }
     } finally {
+      clearInterval(_stepTimer);
+      setAnalysisStep(null);
       setIsAnalyzing(false);
     }
   };
@@ -875,7 +892,7 @@ export default function App() {
                                 className="w-full py-4 mt-4 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-30 disabled:hover:translate-y-0 hover:-translate-y-0.5 transition-[background-color,transform] flex items-center justify-center gap-3 group"
                               >
                                 {isAnalyzing ? (
-                                  <span>大数据模型正在深度演算...</span>
+                                  <span>{analysisStep ?? '正在初始化分析...'}</span>
                                 ) : (
                                   <span className="flex items-center justify-center gap-3">
                                     <PlayCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />

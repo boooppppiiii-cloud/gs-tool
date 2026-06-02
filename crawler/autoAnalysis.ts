@@ -162,7 +162,7 @@ export async function runAnalysis(
         .join('\n')
     : '';
 
-  const chatSample = chatData.slice(-1000)
+  const chatSample = chatData.slice(-500)
     .map(r => `[${r.time}] ${r.roleName}(${r.type}): ${r.content}${r.target ? ` -> ${r.target}` : ''}`)
     .join('\n');
 

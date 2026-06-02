@@ -10,19 +10,33 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 import { chromium } from 'playwright';
 import { config } from './config';
 
 function findSystemBrowser(): string | undefined {
+  const regKeys = [
+    'HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\chrome.exe',
+    'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\chrome.exe',
+    'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\msedge.exe',
+  ];
+  for (const key of regKeys) {
+    try {
+      const out = execSync(`reg query "${key}" /ve`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] });
+      const match = out.match(/REG_SZ\s+(.+)/);
+      const p = match?.[1]?.trim();
+      if (p && fs.existsSync(p)) return p;
+    } catch {}
+  }
   const localAppData = process.env.LOCALAPPDATA || '';
-  const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
-  const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+  const pf = process.env.ProgramFiles || 'C:\\Program Files';
+  const pf86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
   const candidates = [
-    `${programFiles}\\Google\\Chrome\\Application\\chrome.exe`,
-    `${programFilesX86}\\Google\\Chrome\\Application\\chrome.exe`,
     `${localAppData}\\Google\\Chrome\\Application\\chrome.exe`,
-    `${programFiles}\\Microsoft\\Edge\\Application\\msedge.exe`,
-    `${programFilesX86}\\Microsoft\\Edge\\Application\\msedge.exe`,
+    `${pf}\\Google\\Chrome\\Application\\chrome.exe`,
+    `${pf86}\\Google\\Chrome\\Application\\chrome.exe`,
+    `${pf86}\\Microsoft\\Edge\\Application\\msedge.exe`,
+    `${pf}\\Microsoft\\Edge\\Application\\msedge.exe`,
   ];
   return candidates.find(p => fs.existsSync(p));
 }

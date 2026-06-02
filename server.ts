@@ -422,29 +422,48 @@ async function startServer() {
     if (backend !== 'chat' && backend !== 'recharge') {
       return res.status(400).json({ error: 'invalid backend' });
     }
-    const logPath = path.join(__dirname, 'crawler', 'sessions', `auth_${backend}.log`);
-    fs.writeFileSync(logPath, `[${new Date().toISOString()}] Auth started\n`, 'utf-8');
-    const logStream = fs.createWriteStream(logPath, { flags: 'a' });
-    const child = spawn('npm', ['run', `auth:${backend}`], {
-      cwd: __dirname,
-      shell: true,
-      detached: true,
-      stdio: ['ignore', logStream, logStream],
-    });
-    child.unref();
-    res.json({ ok: true });
+    try {
+      const logPath = path.join(__dirname, 'crawler', 'sessions', `auth_${backend}.log`);
+      fs.writeFileSync(logPath, `[${new Date().toISOString()}] Auth started\n`, 'utf-8');
+      const fd = fs.openSync(logPath, 'a');
+      const child = spawn('npm', ['run', `auth:${backend}`], {
+        cwd: __dirname,
+        shell: true,
+        detached: true,
+        stdio: ['ignore', fd, fd],
+      });
+      fs.closeSync(fd);
+      child.unref();
+      res.json({ ok: true });
+    } catch (e: any) {
+      console.error('[Auth] 启动失败:', e);
+      res.status(500).json({ error: String(e?.message || e) });
+    }
   });
 
   app.get('/api/crawler/playwright-status', (req: any, res: any) => {
+    const regKeys = [
+      'HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\chrome.exe',
+      'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\chrome.exe',
+      'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\msedge.exe',
+    ];
+    for (const key of regKeys) {
+      try {
+        const out = require('child_process').execSync(`reg query "${key}" /ve`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }) as string;
+        const match = out.match(/REG_SZ\s+(.+)/);
+        const p = match?.[1]?.trim();
+        if (p && fs.existsSync(p)) return res.json({ installed: true, execPath: p });
+      } catch {}
+    }
     const localAppData = process.env.LOCALAPPDATA || '';
     const pf = process.env.ProgramFiles || 'C:\\Program Files';
     const pf86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
     const candidates = [
+      `${localAppData}\\Google\\Chrome\\Application\\chrome.exe`,
       `${pf}\\Google\\Chrome\\Application\\chrome.exe`,
       `${pf86}\\Google\\Chrome\\Application\\chrome.exe`,
-      `${localAppData}\\Google\\Chrome\\Application\\chrome.exe`,
-      `${pf}\\Microsoft\\Edge\\Application\\msedge.exe`,
       `${pf86}\\Microsoft\\Edge\\Application\\msedge.exe`,
+      `${pf}\\Microsoft\\Edge\\Application\\msedge.exe`,
     ];
     const found = candidates.find(p => fs.existsSync(p));
     res.json({ installed: !!found, execPath: found });
