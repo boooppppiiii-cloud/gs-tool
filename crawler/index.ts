@@ -17,7 +17,7 @@ import * as path from 'path';
 import { config, loadUsers, GsUser } from './config';
 import { GmClient, SessionExpiredError } from './gmClient';
 import { parseChatCsv, parseRechargeRows } from './parser';
-import { runAnalysis, fetchUserServerNames } from './autoAnalysis';
+import { runAnalysis, fetchUserServerNames, fetchLastRechargeCrawlEnd, storeRechargeRecords, fetchAllStoredRecharge } from './autoAnalysis';
 
 function setSessionStatus(backend: 'chat' | 'recharge', status: 'ok' | 'expired'): void {
   const file = path.join(config.SESSIONS_DIR, 'status.json');
@@ -45,6 +45,7 @@ function getTimeRange(): { start: Date; end: Date } {
 async function collectForUser(user: GsUser, start: Date, end: Date): Promise<void> {
   console.log(`  [${user.serverName}] Starting collection (userId: ${user.gsUserId})`);
 
+  // ── 1. 聊天爬取（使用传入的时间窗口）──────────────────────────────────────
   const chatClient = new GmClient('chat');
   await chatClient.launch();
   let chatData;
@@ -52,7 +53,6 @@ async function collectForUser(user: GsUser, start: Date, end: Date): Promise<voi
   let csvContent: string | undefined;
   try {
     csvPath = await chatClient.exportChatCsv(user.serverName, start, end);
-    // Read content before parseChatCsv deletes the temp file
     try { csvContent = fs.readFileSync(csvPath, 'utf-8'); } catch {}
     chatData = parseChatCsv(csvPath);
   } finally {
@@ -64,20 +64,34 @@ async function collectForUser(user: GsUser, start: Date, end: Date): Promise<voi
     return;
   }
 
+  // ── 2. 充值爬取（独立时间范围：首次3天，后续增量不重叠）──────────────────
+  const lastCrawlEnd = await fetchLastRechargeCrawlEnd(user.gsUserId, user.serverName);
+  const rechargeStart = lastCrawlEnd ?? new Date(Date.now() - 3 * 24 * 3600_000);
+  const rechargeEnd = new Date();
+
+  console.log(`  [${user.serverName}] Recharge range: ${rechargeStart.toLocaleString('zh-CN')} → ${rechargeEnd.toLocaleString('zh-CN')} (${lastCrawlEnd ? '增量' : '首次3天'})`);
+
   const rechargeClient = new GmClient('recharge');
   await rechargeClient.launch();
   const allRechargeRows: string[][] = [];
   try {
     for (const playerId of user.rechargePlayerIds) {
-      const rows = await rechargeClient.scrapeRechargeById(playerId, start, end);
+      const rows = await rechargeClient.scrapeRechargeById(playerId, rechargeStart, rechargeEnd);
       allRechargeRows.push(...rows);
     }
   } finally {
     await rechargeClient.close();
   }
-  const rechargeData = parseRechargeRows(allRechargeRows);
+  const newRechargeRecords = parseRechargeRows(allRechargeRows);
 
-  await runAnalysis(chatData, rechargeData, user.gsUserId, user.gsGroup, csvContent, user.serverName, { start, end });
+  // 持久化新增充值记录，更新上次爬取结束时间
+  await storeRechargeRecords(newRechargeRecords, user.gsUserId, user.serverName, rechargeEnd);
+
+  // ── 3. 分析：使用该区服全量历史充值数据 ────────────────────────────────────
+  const allStoredRecharge = await fetchAllStoredRecharge(user.gsUserId, user.serverName);
+  console.log(`  [${user.serverName}] All stored recharge records: ${allStoredRecharge.length}`);
+
+  await runAnalysis(chatData, allStoredRecharge, user.gsUserId, user.gsGroup, csvContent, user.serverName, { start, end });
   console.log(`  [${user.serverName}] ✓ Daily report generated`);
 }
 

@@ -22,7 +22,7 @@ function findSystemBrowser(): string | undefined {
   ];
   for (const key of regKeys) {
     try {
-      const out = execSync(`reg query "${key}" /ve`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] });
+      const out = execSync(`reg query "${key}" /ve 2>nul`, { encoding: 'utf-8' });
       const match = out.match(/REG_SZ\s+(.+)/);
       const p = match?.[1]?.trim();
       if (p && fs.existsSync(p)) return p;

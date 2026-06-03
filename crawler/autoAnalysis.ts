@@ -255,6 +255,55 @@ export async function runAnalysis(
   console.log(`[AutoAnalysis] Saved analysisHistory/${histId}`);
 }
 
+// ── 充值持久化 ────────────────────────────────────────────────────────────────
+
+export async function fetchLastRechargeCrawlEnd(userId: string, serverName: string): Promise<Date | null> {
+  try {
+    const result = await dbPost('where', { collection: 'recharge_meta', field: 'userId', value: userId });
+    const metas = (result.data as Array<{ userId: string; serverName: string; lastCrawlEnd: string }>) ?? [];
+    const meta = metas.find(m => m.serverName === serverName);
+    return meta?.lastCrawlEnd ? new Date(meta.lastCrawlEnd) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function storeRechargeRecords(
+  records: RechargeRecord[],
+  userId: string,
+  serverName: string,
+  crawlEnd: Date,
+): Promise<void> {
+  const metaId = `meta_${userId}_${serverName.replace(/[^a-z0-9]/gi, '_')}`;
+  await dbPost('upsert', {
+    collection: 'recharge_meta',
+    id: metaId,
+    data: { id: metaId, userId, serverName, lastCrawlEnd: crawlEnd.toISOString() },
+  });
+  const crawledAt = crawlEnd.toISOString();
+  for (const r of records) {
+    const id = `rc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    await dbPost('upsert', {
+      collection: 'recharge_store',
+      id,
+      data: { id, userId, serverName, roleName: r.roleName, amount: r.amount, status: r.status, method: r.method, crawledAt },
+    });
+  }
+  console.log(`[AutoAnalysis] Stored ${records.length} new recharge records for ${serverName}`);
+}
+
+export async function fetchAllStoredRecharge(userId: string, serverName: string): Promise<RechargeRecord[]> {
+  try {
+    const result = await dbPost('where', { collection: 'recharge_store', field: 'userId', value: userId });
+    const all = (result.data as Array<RechargeRecord & { serverName: string }>) ?? [];
+    return all.filter(r => r.serverName === serverName);
+  } catch {
+    return [];
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function buildPrompt(p: { serverContextStr: string; persistentPortraitsStr: string; hotCasesStr: string; historicalSection: string; chatSample: string; rechargeSample: string }): string {
   return `你是一个资深的《傲世传奇》游戏生态专家，负责对玩家聊天记录和充值数据进行客观分析。
 
