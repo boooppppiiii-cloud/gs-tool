@@ -382,12 +382,10 @@ async function startServer() {
     try {
       const logPath = path.join(__dirname, 'crawler', 'sessions', 'crawl_last.log');
       fs.writeFileSync(logPath, `[${new Date().toISOString()}] Crawl started\n`, 'utf-8');
-      const fd = fs.openSync(logPath, 'a');
       const child = spawn('npm', ['run', 'crawler:now'], {
         cwd: __dirname,
         shell: true,
-        detached: true,
-        stdio: ['ignore', fd, fd],
+        stdio: 'ignore',
         env: {
           ...process.env,
           CRAWL_HOURS: '10',
@@ -395,7 +393,6 @@ async function startServer() {
           ...(ownerId    ? { CRAWL_OWNER_ID:    String(ownerId)    } : {}),
         },
       });
-      fs.closeSync(fd);
       child.unref();
       res.json({ ok: true });
     } catch (e: any) {
@@ -431,15 +428,12 @@ async function startServer() {
     }
     try {
       const logPath = path.join(__dirname, 'crawler', 'sessions', `auth_${backend}.log`);
-      fs.writeFileSync(logPath, `[${new Date().toISOString()}] Auth started\n`, 'utf-8');
-      const fd = fs.openSync(logPath, 'a');
+      fs.writeFileSync(logPath, `[${new Date().toISOString()}] 认证进程已启动，浏览器窗口即将弹出，请完成认证操作\n`, 'utf-8');
       const child = spawn('npm', ['run', `auth:${backend}`], {
         cwd: __dirname,
         shell: true,
-        detached: true,
-        stdio: ['ignore', fd, fd],
+        stdio: 'ignore',
       });
-      fs.closeSync(fd);
       child.unref();
       res.json({ ok: true });
     } catch (e: any) {
@@ -454,7 +448,7 @@ async function startServer() {
     // 1. where.exe — searches PATH + registered App Paths simultaneously
     for (const name of ['chrome.exe', 'msedge.exe']) {
       try {
-        const out = (execS(`where "${name}" 2>nul`, { encoding: 'utf-8' }) as string).trim();
+        const out = (execS(`where ${name} 2>nul`, { encoding: 'utf-8' }) as string).trim();
         const firstLine = out.split('\n')[0].trim();
         if (firstLine && fs.existsSync(firstLine)) return res.json({ installed: true, execPath: firstLine });
       } catch {}
