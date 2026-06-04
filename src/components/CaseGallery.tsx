@@ -222,7 +222,7 @@ export default function CaseGallery({ cases, user, onVote, onView, onRefresh }: 
                         区服：{c.serverName}
                       </span>
                       <span className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700">
-                        GS：{c.gsName || '系统默认'}
+                        生态：{c.gsName || '系统默认'}
                       </span>
                       <span className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-700">
                         玩家：{c.playerName || '匿名'}

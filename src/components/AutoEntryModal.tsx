@@ -48,7 +48,7 @@ export default function AutoEntryModal({ isOpen, onClose, user, onSuccess }: Pro
     try {
       const prompt = `你是一个资深游戏生态运营知识库管理员。你的任务是从杂乱的运营复盘文档中，萃取出对 RAG 检索最有价值的结构化经验。
 
-提炼原则：极其精简，去掉废话；保留案例中的【玩家心理画像】、【GS具体操作话术】和【可复用策略】。
+提炼原则：极其精简，去掉废话；保留案例中的【玩家心理画像】、【生态具体操作话术】和【可复用策略】。
 
 输入文本：
 ${text}
@@ -59,7 +59,7 @@ ${text}
 - case_background: 从文本中提取案例背景（3-5句话，无则填""）
 - core_scenario: 触发事件的核心场景或玩家语录（即负面触发点）
 - player_portrait: 玩家心理剖析
-- gs_discourse: GS的具体介入身份与话术（即具体处置动作，分步骤描述）
+- gs_discourse: 生态的具体介入身份与话术（即具体处置动作，分步骤描述）
 - reusable_strategy: 可复用策略总结（即处置策略）`;
 
       const res = await fetch('/api/gemini/chat/completions', {

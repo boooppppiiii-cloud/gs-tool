@@ -28,7 +28,7 @@ function validateProfile(p: ServerProfile): Record<string, string> {
   }
   if (!p.openingDate) errs.openingDate = '确切开服日期为必填项';
   if (!p.mergeStage) errs.mergeStage = '合服阶段为必填项';
-  if (!p.gsName?.trim()) errs.gsName = 'GS 角色名为必填项';
+  if (!p.gsName?.trim()) errs.gsName = '生态角色名为必填项';
   return errs;
 }
 
@@ -253,20 +253,20 @@ export default function ServerConfig({ profiles, activeProfileId, onProfilesChan
           <div className="pt-6 border-t border-slate-100 space-y-6">
             <div className="flex items-center gap-2">
               <UserCircle className="w-4 h-4 text-indigo-600" />
-              <h3 className="text-xs font-bold text-slate-800">GS 角色与人设</h3>
+              <h3 className="text-xs font-bold text-slate-800">生态角色与人设</h3>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* GS 角色名 — 必填 */}
               <div className="space-y-1.5 md:col-span-2">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-                  GS 角色名<RequiredBadge />
+                  生态角色名<RequiredBadge />
                 </label>
                 <input
                   type="text"
                   value={activeProfile.gsName || ''}
                   onChange={(e) => updateProfile(activeProfile.id, { gsName: e.target.value })}
-                  placeholder="填写 GS 在游戏内使用的角色名"
+                  placeholder="填写生态在游戏内使用的角色名"
                   className={fieldClass('gsName') + ' font-bold'}
                 />
                 {attempted && errors.gsName && (
@@ -353,7 +353,7 @@ export default function ServerConfig({ profiles, activeProfileId, onProfilesChan
               保存并应用全局配置
             </button>
             <p className="text-[9px] text-center text-slate-400 font-bold uppercase tracking-widest">
-              保存后系统将自动关联该区服的 GS 人设与历史画像进行分析
+              保存后系统将自动关联该区服的生态人设与历史画像进行分析
             </p>
           </div>
         </div>

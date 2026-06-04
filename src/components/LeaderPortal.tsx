@@ -316,7 +316,7 @@ function DashboardTab({ profiles, history, execRecords, dismissedOutbursts, onDi
         </select>
       </div>
 
-      {gsProfiles.length === 0 ? <EmptyState text="该 GS 暂无上传区服" /> : (
+      {gsProfiles.length === 0 ? <EmptyState text="该生态暂无上传区服" /> : (
         <div className="space-y-3">
           {gsProfiles.map(profile => {
             const profHistory = history.filter(h =>
@@ -373,7 +373,7 @@ function DashboardTab({ profiles, history, execRecords, dismissedOutbursts, onDi
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {[
                         { label: '玩家活跃度', value: `${totalContextMsgs} 条消息` },
-                        { label: 'GS 活跃度', value: `${gsActivityCount} 次跟进` },
+                        { label: '生态活跃度', value: `${gsActivityCount} 次跟进` },
                         { label: '画像完成度', value: keyPlayerCount > 0 ? `${portraitCount}/${keyPlayerCount}` : `${portraitCount} 个` },
                         { label: '工单完成率', value: profExecs.length > 0 ? `${completedExecs}/${profExecs.length}` : '暂无工单' },
                       ].map(s => (
@@ -693,7 +693,7 @@ const TicketCard = React.memo(function TicketCard({ record, review, history, isE
           )}
 
           {/* 1. Execution record */}
-          <Section title="GS执行记录">
+          <Section title="生态执行记录">
             <div className="space-y-3">
               <InfoRow label="分类" value={record.category} />
               <InfoRow label="记录日期" value={record.date} />
@@ -750,7 +750,7 @@ const TicketCard = React.memo(function TicketCard({ record, review, history, isE
                 </div>
                 {[
                   { label: '执行摘要', value: aiResult.summary },
-                  { label: 'GS执行合理性', value: aiResult.reasonabilityCheck },
+                  { label: '生态执行合理性', value: aiResult.reasonabilityCheck },
                   { label: '疑点与风险', value: aiResult.riskPoints },
                 ].map(item => (
                   <div key={item.label}>
@@ -766,7 +766,7 @@ const TicketCard = React.memo(function TicketCard({ record, review, history, isE
           <Section title="组长跟进">
             <div className="space-y-4">
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">玩家负面是否由 GS 造成</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">玩家负面是否由生态造成</p>
                 <div className="flex gap-2">
                   {([true, false, null] as const).map(v => (
                     <button key={String(v)} onClick={() => setIsGsCaused(v)}
@@ -848,7 +848,7 @@ const CASE_FIELD_LABELS: Record<string, string> = {
   outburstReason: '玩家负面原因',
   triggerPoint: '负面触发点',
   caseBackground: '案例背景',
-  gsAction: 'GS处置动作',
+  gsAction: '生态处置动作',
   disposalPlan: '处置方案',
   caseResult: '案例结果',
 };
@@ -897,7 +897,7 @@ const ArchiveCard = React.memo(function ArchiveCard({ record, histRecord, profil
 触发点：${outburst?.ob.triggerPoint ?? outburst?.ob.trigger ?? '未知'}
 AI建议处置动作：${outburst?.ob.gsAdvice?.action ?? '未知'}
 
-【GS实际执行记录】
+【生态实际执行记录】
 分类：${record.category}
 描述：${record.description || '无'}
 案例结果与反思：${(record as any).reflection || '无'}
@@ -909,7 +909,7 @@ AI建议处置动作：${outburst?.ob.gsAdvice?.action ?? '未知'}
   "outburstReason": "玩家负面原因（50字内）",
   "triggerPoint": "负面触发点（30字内）",
   "caseBackground": "案例背景（100字内，描述事件发生的背景）",
-  "gsAction": "GS处置动作总结（100字内）",
+  "gsAction": "生态处置动作总结（100字内）",
   "disposalPlan": "处置策略总结（80字内）",
   "caseResult": "案例结果评估（50字内）"
 }`;
@@ -1075,7 +1075,7 @@ function ReportTab({ profiles, history, execRecords, leaderReviews }: {
     return { gs, found, executed, closed, followed: relatedReviews.length };
   });
 
-  if (gsNames.length === 0) return <EmptyState text="暂无 GS 数据" />;
+  if (gsNames.length === 0) return <EmptyState text="暂无生态数据" />;
 
   return (
     <div className="space-y-6">
@@ -1083,7 +1083,7 @@ function ReportTab({ profiles, history, execRecords, leaderReviews }: {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-200">
-              {['GS 名称', '发现问题数', 'GS执行完成数', '结案达成数', '管理主动跟进数'].map(h => (
+              {['生态名称', '发现问题数', '生态执行完成数', '结案达成数', '管理主动跟进数'].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{h}</th>
               ))}
             </tr>
@@ -1143,7 +1143,7 @@ function ProfileTab({ user, leaderGroup, groups, onGroupChange, onLogout }: {
           <h3 className="text-sm font-black text-slate-800">所属组别</h3>
         </div>
         <p className="text-xs text-slate-400 leading-relaxed">
-          选择你所在的运营小组，系统会根据此分组筛选你负责的下属GS数据。
+          选择你所在的运营小组，系统会根据此分组筛选你负责的下属生态数据。
         </p>
         <div className="flex flex-wrap gap-2">
           {groups.map(g => (

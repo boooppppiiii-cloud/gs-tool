@@ -33,7 +33,7 @@ import Login from './components/Login';
 import AdminPortal from './components/AdminPortal';
 import PortalSelector from './components/PortalSelector';
 import LeaderPortal from './components/LeaderPortal';
-import { ServerProfile, ChatRecord, RechargeRecord, AnalysisResult, MonthHistory, HistoryRecord, AnalysisCase, User, ExecutionRecord, LeaderReview, CrawlerChatRecord } from './types';
+import { ServerProfile, ChatRecord, RechargeRecord, AnalysisResult, MonthHistory, HistoryRecord, AnalysisCase, User, ExecutionRecord, LeaderReview } from './types';
 import { analyzeGameEcology } from './lib/gemini';
 
 import { auth } from './lib/firebase';
@@ -92,34 +92,11 @@ export default function App() {
   const [executionRecords, setExecutionRecords] = React.useState<ExecutionRecord[]>([]);
   const [dismissedOutbursts, setDismissedOutbursts] = React.useState<{ historyRecordId: string; outburstIndex: number }[]>([]);
   const [leaderReviews, setLeaderReviews] = React.useState<LeaderReview[]>([]);
-  const [crawlerChatLogs, setCrawlerChatLogs] = React.useState<CrawlerChatRecord[]>([]);
   const [activePortal, setActivePortal] = React.useState<'admin' | 'leader' | 'member' | null>(null);
   const [displayName, setDisplayName] = React.useState<string>('');
-
-  const [crawlerStatus, setCrawlerStatus] = React.useState<{ chat: string; recharge: string }>({ chat: 'ok', recharge: 'ok' });
-  const [authingBackend, setAuthingBackend] = React.useState<string | null>(null);
-  const [playwrightStatus, setPlaywrightStatus] = React.useState<{ installed: boolean } | null>(null);
-  const [isCollecting, setIsCollecting] = React.useState(false);
-  const [collectMsg, setCollectMsg] = React.useState<string | null>(null);
-  const [crawlServerName, setCrawlServerName] = React.useState<string>('');
-  const [crawlLog, setCrawlLog] = React.useState<string | null>(null);
-  const [showCrawlLog, setShowCrawlLog] = React.useState(false);
-  const [authLog, setAuthLog] = React.useState<string | null>(null);
-  const [showAuthLogFor, setShowAuthLogFor] = React.useState<string | null>(null);
   const [focusedOutburstIndex, setFocusedOutburstIndex] = React.useState<number | null>(null);
   const [rateLimitCountdown, setRateLimitCountdown] = React.useState<number | null>(null);
   const [analysisStep, setAnalysisStep] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    const check = () => fetch('/api/crawler/session-status').then(r => r.json()).then(setCrawlerStatus).catch(() => {});
-    check();
-    const id = setInterval(check, 15_000);
-    return () => clearInterval(id);
-  }, []);
-
-  React.useEffect(() => {
-    fetch('/api/crawler/playwright-status').then(r => r.json()).then(setPlaywrightStatus).catch(() => {});
-  }, []);
 
   React.useEffect(() => {
     if (rateLimitCountdown === null) return;
@@ -132,71 +109,6 @@ export default function App() {
     return () => clearTimeout(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rateLimitCountdown]);
-
-  const triggerAuth = async (b: 'chat' | 'recharge') => {
-    setAuthingBackend(b);
-    setShowAuthLogFor(b);
-    setAuthLog('正在启动认证进程...');
-    await fetch(`/api/crawler/auth/${b}`, { method: 'POST' });
-    // Poll every 5s: refresh session status + auth log until restored
-    const poll = setInterval(async () => {
-      try {
-        const [status, logRes] = await Promise.all([
-          fetch('/api/crawler/session-status').then(r => r.json()) as Promise<{ chat: string; recharge: string }>,
-          fetch(`/api/crawler/auth-log/${b}`).then(r => r.json()).catch(() => ({ log: '' })),
-        ]);
-        setCrawlerStatus(status);
-        if (logRes.log) setAuthLog(logRes.log);
-        if (status[b] === 'ok') { clearInterval(poll); setAuthingBackend(null); }
-      } catch {}
-    }, 5000);
-    setTimeout(() => { clearInterval(poll); setAuthingBackend(null); }, 300_000);
-  };
-
-  const triggerCollect = async () => {
-    if (!crawlServerName) { setCollectMsg('请先选择要爬取的区服'); return; }
-    setIsCollecting(true);
-    setCollectMsg(null);
-    try {
-      await fetch('/api/crawler/collect-now', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ serverName: crawlServerName, ownerId: user?.id ?? '' }),
-      });
-      setCollectMsg(`已启动 ${crawlServerName} 区服爬取，结果将在几分钟后写入云端`);
-    } catch {
-      setCollectMsg('启动失败，请检查服务器');
-    }
-    setTimeout(() => { setIsCollecting(false); setCollectMsg(null); }, 8000);
-  };
-
-  const handleAnalyzeFromCrawl = async (log: import('./types').CrawlerChatRecord) => {
-    try {
-      const res = await fetch('/api/db/getDoc', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ collection: 'chat_csv_files', id: log.csvFileId }),
-      });
-      const { data } = await res.json();
-      if (!data?.content) {
-        setCollectMsg('未找到 CSV 数据，请重新爬取');
-        setTimeout(() => setCollectMsg(null), 4000);
-        return;
-      }
-      const lines = (data.content as string).split(/\r?\n/).filter((l: string) => l.trim());
-      const chatRecords: ChatRecord[] = lines.slice(1).map((line: string) => {
-        const cols = line.split(',').map((c: string) => c.trim().replace(/^"|"$/g, ''));
-        return { time: cols[2] ?? '', roleName: cols[3] ?? '', type: cols[4] ?? '', content: cols[5] ?? '', target: cols[7] ?? '' };
-      }).filter((r: ChatRecord) => r.roleName && r.content);
-      setChatData(chatRecords);
-      setRechargeData([]);
-      setAnalysisResult(null);
-      setAnalysisSubTab('current');
-    } catch {
-      setCollectMsg('加载数据失败，请重试');
-      setTimeout(() => setCollectMsg(null), 4000);
-    }
-  };
 
   const PRESET_GROUPS = ['杭州三组', '杭州五组', '杭州对抗组', '山东一组', '山东对抗组', '山东对抗二组', '山东二组', '山东九组', '山东三组'];
   const [memberGroup, setMemberGroup] = React.useState<string>(PRESET_GROUPS[0]);
@@ -273,24 +185,17 @@ export default function App() {
     }
   }, [user]);
 
-  React.useEffect(() => {
-    if (analysisSubTab === 'history' && user) {
-      dataService.fetchCrawlerChatLogs(user.id).then(logs => setCrawlerChatLogs(logs));
-    }
-  }, [analysisSubTab, user?.id]);
-
   const loadUserData = async () => {
     if (!user) return;
     try {
       await syncFromCloud(user.id);
-      const [profiles, historyData, casesData, execData, dismissed, reviewsData, crawlerLogs] = await Promise.all([
+      const [profiles, historyData, casesData, execData, dismissed, reviewsData] = await Promise.all([
         dataService.fetchServerProfiles(user.id),
         dataService.fetchHistory(user.id),
         dataService.fetchCases(user.id),
         dataService.fetchExecutionRecords(user.id),
         dataService.fetchDismissedOutbursts(),
         dataService.fetchLeaderReviewsForUser(user.id),
-        dataService.fetchCrawlerChatLogs(user.id),
       ]);
       setServerProfiles(profiles);
       setHistory(historyData);
@@ -298,7 +203,6 @@ export default function App() {
       setExecutionRecords(execData);
       setDismissedOutbursts(dismissed);
       setLeaderReviews(reviewsData);
-      setCrawlerChatLogs(crawlerLogs);
     } catch (err) {
       console.error('Failed to load user data', err);
     }
@@ -365,7 +269,7 @@ export default function App() {
     const ANALYSIS_STEPS = [
       '正在提取重点玩家信息...',
       '正在深度分析玩家画像...',
-      '正在生成 GS 处置建议...',
+      '正在生成生态处置建议...',
       '正在汇总区服生态...',
       '即将完成，等待 AI 输出...',
     ];
@@ -378,8 +282,8 @@ export default function App() {
 
     try {
       const gsPersonaStr = activeProfile.gsPersona ? 
-        `GS人设: [角色名:${activeProfile.gsName || '未设置'}, 年龄:${activeProfile.gsPersona.age || '未知'}, 家乡:${activeProfile.gsPersona.hometown || '未知'}, 职业:${activeProfile.gsPersona.occupation || '未知'}, 家庭:${activeProfile.gsPersona.family || '未知'}, 生活作息:${activeProfile.gsPersona.lifestyle || '未知'}, 其他:${activeProfile.gsPersona.others || '无'}]` 
-        : 'GS人设: 未提供';
+        `生态人设: [角色名:${activeProfile.gsName || '未设置'}, 年龄:${activeProfile.gsPersona.age || '未知'}, 家乡:${activeProfile.gsPersona.hometown || '未知'}, 职业:${activeProfile.gsPersona.occupation || '未知'}, 家庭:${activeProfile.gsPersona.family || '未知'}, 生活作息:${activeProfile.gsPersona.lifestyle || '未知'}, 其他:${activeProfile.gsPersona.others || '无'}]`
+        : '生态人设: 未提供';
       
       const ecologyStr = activeProfile.serverEcology ? `区服生态总结: ${activeProfile.serverEcology}` : '区服生态总结: 未提供';
       
@@ -618,19 +522,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white flex font-sans text-slate-800">
-      {/* GM 后台登录过期全局提醒 */}
-      {(crawlerStatus.chat === 'expired' || crawlerStatus.recharge === 'expired') && (
-        <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-500 text-white text-sm font-bold py-2.5 px-6 flex items-center gap-3 shadow-lg">
-          <AlertTriangleIcon className="w-4 h-4 shrink-0" />
-          <span>GM 后台登录已过期：{[crawlerStatus.chat === 'expired' ? '聊天后台' : null, crawlerStatus.recharge === 'expired' ? '充值后台' : null].filter(Boolean).join('、')} — 请前往「专家分析 → 实时分析」重新认证</span>
-          <button
-            onClick={() => { setActiveTab('analysis'); setAnalysisSubTab('current'); setAnalysisResult(null); }}
-            className="ml-auto px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-black transition-colors whitespace-nowrap"
-          >
-            立即前往
-          </button>
-        </div>
-      )}
       {/* Sidebar Navigation */}
       <aside
         className={`bg-white flex flex-col transition-[width] duration-200 z-50 sticky top-0 h-screen border-r border-slate-200 ${
@@ -640,12 +531,17 @@ export default function App() {
         {/* Logo */}
         <div className="px-4 py-5 flex items-center justify-between overflow-hidden border-b border-slate-100">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-center shrink-0">
-              <Crown className="w-5 h-5 text-indigo-600" />
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #10b981 0%, #6366f1 100%)' }}>
+              <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22V12" />
+                <path d="M12 12C10 8 7 6 4 6c0 4 2 7 8 6" />
+                <path d="M12 12c2-4 5-6 8-6 0 4-2 7-8 6" />
+                <path d="M5 20h14" />
+              </svg>
             </div>
             {isSidebarOpen && (
               <span className="font-black text-base tracking-tight whitespace-nowrap text-slate-800 leading-none">
-                傲世传奇专家
+                传奇生态助手
               </span>
             )}
           </div>
@@ -780,143 +676,52 @@ export default function App() {
            {activeTab === 'analysis' && (
              <div className="space-y-8 animate-in fade-in duration-500">
                {analysisSubTab === 'history' ? (
-                 <HistoryView history={history} crawlerChatLogs={crawlerChatLogs} onSelect={handleSelectHistory} onDelete={handleDeleteHistory} onAnalyze={handleAnalyzeFromCrawl} />
+                 <HistoryView history={history} onSelect={handleSelectHistory} onDelete={handleDeleteHistory} />
                ) : (
                  <div className="space-y-8">
                    {!analysisResult ? (
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-                        <ExcelUpload onDataLoaded={handleDataLoaded} isAnalyzing={isAnalyzing} crawlerLogs={crawlerChatLogs} />
-                        <div className="space-y-6">
-                           <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm space-y-3">
-                              <h4 className="text-base font-black text-slate-800">GM 后台认证</h4>
-                              {playwrightStatus?.installed === false && (
-                                <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs">
-                                  <AlertTriangleIcon className="w-4 h-4 text-amber-500 shrink-0" />
-                                  <span className="text-amber-700 font-bold">未检测到 Chrome 或 Edge 浏览器，点击"重新认证"将无法弹出窗口，请先安装 Chrome 或 Edge</span>
-                                </div>
-                              )}
-                              <div className="space-y-2">
-                                {(['chat', 'recharge'] as const).map(b => {
-                                  const expired = crawlerStatus[b] === 'expired';
-                                  const label = b === 'chat' ? '聊天后台' : '充值后台';
-                                  return (
-                                    <div key={b} className="space-y-1">
-                                      <div className={`flex items-center justify-between p-3 rounded-2xl border ${expired ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
-                                        <span className={`text-sm font-bold flex items-center gap-2 ${expired ? 'text-amber-700' : 'text-slate-600'}`}>
-                                          {expired
-                                            ? <AlertTriangleIcon className="w-4 h-4" />
-                                            : <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />}
-                                          {label}
-                                          {expired && <span className="text-xs font-bold text-amber-600">已过期</span>}
-                                        </span>
-                                        <div className="flex items-center gap-1">
-                                          <button
-                                            onClick={() => triggerAuth(b)}
-                                            disabled={authingBackend === b}
-                                            className={`px-3 py-1 text-xs font-bold rounded-xl transition-colors disabled:opacity-50 ${expired ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600'}`}>
-                                            {authingBackend === b ? '启动中...' : '重新认证'}
-                                          </button>
-                                          {showAuthLogFor === b && (
-                                            <button
-                                              onClick={() => setShowAuthLogFor(showAuthLogFor === b ? null : b)}
-                                              className="px-2 py-1 text-[10px] font-bold text-slate-400 hover:text-slate-600 rounded-lg transition-colors">
-                                              {showAuthLogFor === b ? '收起' : '日志'}
-                                            </button>
-                                          )}
-                                        </div>
-                                      </div>
-                                      {showAuthLogFor === b && authLog && (
-                                        <pre className="text-[10px] text-slate-500 bg-slate-50 rounded-xl p-3 max-h-32 overflow-auto whitespace-pre-wrap break-all border border-slate-100">
-                                          {authLog}
-                                        </pre>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              <div className="border-t border-slate-100 pt-3 space-y-2">
-                                {(() => {
-                                  const crawlableServers = serverProfiles.filter(p => /^\d+$/.test(p.name));
-                                  return (
-                                    <>
-                                      <select
-                                        value={crawlServerName}
-                                        onChange={e => setCrawlServerName(e.target.value)}
-                                        className="w-full px-3 py-2 text-sm font-bold border border-slate-200 rounded-2xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                                      >
-                                        <option value="">— 选择爬取区服 —</option>
-                                        {crawlableServers.map(p => (
-                                          <option key={p.id} value={p.name}>{p.name}</option>
-                                        ))}
-                                      </select>
-                                      {crawlableServers.length === 0 && (
-                                        <p className="text-[10px] text-amber-600 font-bold text-center">请先在「区服配置」中添加有效区服（五位数字）</p>
-                                      )}
-                                      <button
-                                        onClick={triggerCollect}
-                                        disabled={isCollecting || !crawlServerName}
-                                        className="w-full py-2 text-sm font-bold bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-100 disabled:opacity-50 transition-colors">
-                                        {isCollecting ? '爬取进行中...' : '立即爬取（过去10小时）'}
-                                      </button>
-                                      <button
-                                        onClick={async () => {
-                                          const r = await fetch('/api/crawler/last-log');
-                                          const { log } = await r.json();
-                                          setCrawlLog(log);
-                                          setShowCrawlLog(v => !v);
-                                        }}
-                                        className="w-full py-1.5 text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors">
-                                        {showCrawlLog ? '收起运行日志' : '查看上次运行日志'}
-                                      </button>
-                                      {showCrawlLog && crawlLog && (
-                                        <pre className="text-[10px] text-slate-500 bg-slate-50 rounded-xl p-3 max-h-48 overflow-auto whitespace-pre-wrap break-all">
-                                          {crawlLog}
-                                        </pre>
-                                      )}
-                                    </>
-                                  );
-                                })()}
-                              </div>
-                            </div>
-                   <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-4">
-                              <h4 className="text-xl font-black text-slate-800">就绪检查</h4>
-                              <p className="text-sm text-slate-500 font-medium">在开始深度神经网络分析前，请确保数据源完整。</p>
-                              <div className="space-y-3">
-                                 <StatusCheck label="已选择分析区服" checked={!!activeProfileId} />
-                                 <StatusCheck label="聊天原始记录已提取" checked={chatData.length > 0} />
-                                 <StatusCheck label="充值聚合数据已上传" checked={rechargeData.length > 0} />
-                              </div>
-                              <button
-                                onClick={startAnalysis}
-                                disabled={!activeProfileId || chatData.length === 0 || isAnalyzing}
-                                className="w-full py-4 mt-4 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-30 disabled:hover:translate-y-0 hover:-translate-y-0.5 transition-[background-color,transform] flex items-center justify-center gap-3 group"
-                              >
-                                {isAnalyzing ? (
-                                  <span>{analysisStep ?? '正在初始化分析...'}</span>
-                                ) : (
-                                  <span className="flex items-center justify-center gap-3">
-                                    <PlayCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                                    执行专家全量分析
-                                  </span>
-                                )}
-                              </button>
+                     <div className="space-y-6">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                         <ExcelUpload onDataLoaded={handleDataLoaded} isAnalyzing={isAnalyzing} />
+                         <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-4">
+                           <h4 className="text-xl font-black text-slate-800">就绪检查</h4>
+                           <p className="text-sm text-slate-500 font-medium">在开始深度神经网络分析前，请确保数据源完整。</p>
+                           <div className="space-y-3">
+                             <StatusCheck label="已选择分析区服" checked={!!activeProfileId} />
+                             <StatusCheck label="聊天原始记录已提取" checked={chatData.length > 0} />
+                             <StatusCheck label="充值聚合数据已上传" checked={rechargeData.length > 0} />
                            </div>
-                           {rateLimitCountdown !== null && (
-                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-3 text-amber-800 text-sm font-bold">
-                              <div className="flex items-center gap-3">
-                                <Clock className="w-5 h-5 shrink-0 text-amber-500" />
-                                <span>Gemini API 请求过频，{rateLimitCountdown} 秒后自动重试...</span>
-                              </div>
-                              <button onClick={() => setRateLimitCountdown(null)} className="text-amber-500 hover:text-amber-700 text-xs font-bold px-3 py-1 rounded-lg hover:bg-amber-100 transition-colors shrink-0">取消</button>
-                            </div>
-                           )}
-                           {error && (
-                            <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-700 text-sm font-bold">
-                              <AlertTriangleIcon className="w-5 h-5 shrink-0" />
-                              {error}
-                            </div>
-                           )}
-                        </div>
+                           <button
+                             onClick={startAnalysis}
+                             disabled={!activeProfileId || chatData.length === 0 || isAnalyzing}
+                             className="w-full py-4 mt-4 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-30 disabled:hover:translate-y-0 hover:-translate-y-0.5 transition-[background-color,transform] flex items-center justify-center gap-3 group"
+                           >
+                             {isAnalyzing ? (
+                               <span>{analysisStep ?? '正在初始化分析...'}</span>
+                             ) : (
+                               <span className="flex items-center justify-center gap-3">
+                                 <PlayCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                                 执行专家全量分析
+                               </span>
+                             )}
+                           </button>
+                         </div>
+                       </div>
+                       {rateLimitCountdown !== null && (
+                         <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-3 text-amber-800 text-sm font-bold">
+                           <div className="flex items-center gap-3">
+                             <Clock className="w-5 h-5 shrink-0 text-amber-500" />
+                             <span>Gemini API 请求过频，{rateLimitCountdown} 秒后自动重试...</span>
+                           </div>
+                           <button onClick={() => setRateLimitCountdown(null)} className="text-amber-500 hover:text-amber-700 text-xs font-bold px-3 py-1 rounded-lg hover:bg-amber-100 transition-colors shrink-0">取消</button>
+                         </div>
+                       )}
+                       {error && (
+                         <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-700 text-sm font-bold">
+                           <AlertTriangleIcon className="w-5 h-5 shrink-0" />
+                           {error}
+                         </div>
+                       )}
                      </div>
                    ) : (
                      <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
@@ -988,18 +793,6 @@ export default function App() {
         </div>
       </main>
 
-      {collectMsg && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
-          <div className={`flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl border text-sm font-bold ${
-            collectMsg.includes('失败')
-              ? 'bg-rose-50 border-rose-200 text-rose-700'
-              : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-          }`}>
-            <span>{collectMsg.includes('失败') ? '✕' : '✓'}</span>
-            {collectMsg}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

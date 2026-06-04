@@ -6,10 +6,10 @@
 import React from 'react';
 import {
   Upload, CheckCircle2, AlertTriangle as AlertTriangleIcon, Loader2,
-  Database, ChevronDown, ImageIcon, X, Scan,
+  ImageIcon, X, Scan,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { ChatRecord, RechargeRecord, CrawlerChatRecord } from '../types';
+import { ChatRecord, RechargeRecord } from '../types';
 import { logUsage } from '../services/analyticsService';
 
 // ── Internal types for image extraction ──────────────────────────────────────
@@ -23,10 +23,9 @@ type ExtractResult =
 interface Props {
   onDataLoaded: (chat: ChatRecord[], recharge: RechargeRecord[], fileName: string) => void;
   isAnalyzing: boolean;
-  crawlerLogs?: CrawlerChatRecord[];
 }
 
-type Mode = 'upload' | 'crawler' | 'image';
+type Mode = 'upload' | 'image';
 
 function parseCsvContent(text: string): ChatRecord[] {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -38,15 +37,10 @@ function parseCsvContent(text: string): ChatRecord[] {
   return records;
 }
 
-export default function ExcelUpload({ onDataLoaded, isAnalyzing, crawlerLogs = [] }: Props) {
+export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
   // ── Upload mode ────────────────────────────────────────────────────────────
   const [fileName, setFileName] = React.useState<string | null>(null);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
-
-  // ── Crawler mode ───────────────────────────────────────────────────────────
-  const [loadingCrawlId, setLoadingCrawlId] = React.useState<string | null>(null);
-  const [selectedCrawlId, setSelectedCrawlId] = React.useState<string | null>(null);
-  const [crawlerError, setCrawlerError] = React.useState<string | null>(null);
 
   // ── Image mode ─────────────────────────────────────────────────────────────
   const [imgItems, setImgItems] = React.useState<{ file: File; dataUrl: string }[]>([]);
@@ -95,31 +89,6 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing, crawlerLogs = [
     } catch (err) {
       console.error(err);
       setUploadError('文件解析失败，请确认格式正确（Excel: Sheet1聊天/Sheet2充值；CSV: 逗号分隔聊天记录）');
-    }
-  };
-
-  // ── Crawler handler ────────────────────────────────────────────────────────
-  const handleSelectCrawlerLog = async (log: CrawlerChatRecord) => {
-    setLoadingCrawlId(log.id);
-    setCrawlerError(null);
-    try {
-      const res = await fetch('/api/db/getDoc', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ collection: 'chat_csv_files', id: log.csvFileId }),
-      });
-      const { data } = await res.json();
-      if (!data?.content) throw new Error('CSV 内容为空');
-      const chatRecords = parseCsvContent(data.content);
-      setSelectedCrawlId(log.id);
-      setFileName(`${log.serverName} · ${new Date(log.crawlStart).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} → ${new Date(log.crawlEnd).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`);
-      onDataLoaded(chatRecords, [], log.serverName);
-      logUsage('crawler_log_selected', `server=${log.serverName} rows=${log.rowCount}`);
-    } catch (err) {
-      console.error(err);
-      setCrawlerError('爬虫记录加载失败，请重试');
-    } finally {
-      setLoadingCrawlId(null);
     }
   };
 
@@ -224,20 +193,6 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing, crawlerLogs = [
   const needsMapping = wechatMessages.length > 0 && !imgReady;
   const totalExtracted = gameMessages.length + wechatMessages.length;
 
-  // ── Crawler logs grouped by month ─────────────────────────────────────────
-  const logsByMonth = React.useMemo(() => {
-    const groups: { month: string; logs: CrawlerChatRecord[] }[] = [];
-    const seen = new Map<string, CrawlerChatRecord[]>();
-    crawlerLogs.forEach(l => {
-      const m = l.timestamp.slice(0, 7);
-      if (!seen.has(m)) seen.set(m, []);
-      seen.get(m)!.push(l);
-    });
-    seen.forEach((logs, month) => groups.push({ month, logs }));
-    groups.sort((a, b) => b.month.localeCompare(a.month));
-    return groups;
-  }, [crawlerLogs]);
-
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
       {/* Mode tabs */}
@@ -257,17 +212,6 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing, crawlerLogs = [
           }`}
         >
           <ImageIcon className="w-3.5 h-3.5" /> 图片识别
-        </button>
-        <button
-          onClick={() => setMode('crawler')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold transition-colors ${
-            mode === 'crawler' ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600' : 'text-slate-500 hover:bg-slate-50'
-          }`}
-        >
-          <Database className="w-3.5 h-3.5" /> 爬虫记录
-          {crawlerLogs.length > 0 && (
-            <span className="px-1.5 py-0.5 bg-indigo-600 text-white rounded-full text-[10px] leading-none">{crawlerLogs.length}</span>
-          )}
         </button>
       </div>
 
@@ -442,67 +386,6 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing, crawlerLogs = [
         </div>
       )}
 
-      {/* ── Crawler mode ─────────────────────────────────────────────────────── */}
-      {mode === 'crawler' && (
-        <div className="p-4 space-y-3 max-h-96 overflow-y-auto">
-          {crawlerLogs.length === 0 ? (
-            <div className="py-12 text-center space-y-2">
-              <Database className="w-10 h-10 text-slate-300 mx-auto" />
-              <p className="text-sm font-bold text-slate-500">暂无爬虫记录</p>
-              <p className="text-xs text-slate-400">完成一次「立即爬取」后记录将自动出现在此处</p>
-            </div>
-          ) : (
-            <>
-              {selectedCrawlId && (
-                <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 font-bold">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                  已加载：{fileName} — 点击下方按钮开始分析
-                </div>
-              )}
-              {crawlerError && (
-                <div className="flex items-center gap-2 px-4 py-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-bold">
-                  <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0" /> {crawlerError}
-                </div>
-              )}
-              {logsByMonth.map(({ month, logs }) => (
-                <div key={month} className="space-y-1">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{month}</p>
-                  {logs.map(log => (
-                    <button
-                      key={log.id}
-                      onClick={() => handleSelectCrawlerLog(log)}
-                      disabled={!!loadingCrawlId || isAnalyzing}
-                      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-colors disabled:opacity-50 ${
-                        selectedCrawlId === log.id
-                          ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
-                          : 'bg-slate-50 border-slate-200 hover:bg-indigo-50 hover:border-indigo-200'
-                      }`}
-                    >
-                      <div className="space-y-0.5 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-black text-slate-800">{log.serverName}</span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-200 text-slate-600 rounded-full">{log.rowCount.toLocaleString()} 条</span>
-                          {selectedCrawlId === log.id && <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />}
-                        </div>
-                        <p className="text-[10px] text-slate-400 font-medium">
-                          {new Date(log.crawlStart).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          {' → '}
-                          {new Date(log.crawlEnd).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                      {loadingCrawlId === log.id ? (
-                        <Loader2 className="w-4 h-4 text-indigo-500 animate-spin shrink-0" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 -rotate-90" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-      )}
     </div>
   );
 }

@@ -223,13 +223,3 @@ export interface MonthHistory {
   records: HistoryRecord[];
 }
 
-export interface CrawlerChatRecord {
-  id: string;          // "crawl_xxx"
-  userId: string;
-  serverName: string;
-  timestamp: string;   // ISO — when the crawl completed
-  crawlStart: string;  // ISO — data window start
-  crawlEnd: string;    // ISO — data window end
-  rowCount: number;
-  csvFileId: string;   // points to chat_csv_files collection entry
-}

@@ -13,23 +13,23 @@ export async function qualityCheckExecution(
   riskPoints: string;
   rating: '优' | '良' | '需改进' | '存在问题';
 }> {
-  const prompt = `你是一个游戏运营质量审计专家，负责核验GS（游戏运营人员）的工单执行质量。
+  const prompt = `你是一个游戏运营质量审计专家，负责核验生态（游戏运营人员）的工单执行质量。
 
 【原始负面事件】
 事件标题：${outburstTitle}
 负面触发点：${outburstTrigger}
 
-【AI建议的GS处置动作】
+【AI建议的生态处置动作】
 ${gsAdviceAction}
 
-【GS实际执行记录】
+【生态实际执行记录】
 分类：${category}
 执行描述：${executionDescription || '（无描述）'}
 
 请从以下四个维度进行综合质检，严格返回JSON对象（不要markdown包裹）：
 {
   "summary": "执行情况一句话摘要（30字内）",
-  "consistencyCheck": "GS实际执行与建议方案的一致性评估（50字内）",
+  "consistencyCheck": "生态实际执行与建议方案的一致性评估（50字内）",
   "reasonabilityCheck": "处置策略合理性与适当性评估（50字内）",
   "riskPoints": "识别到的疑点、风险或改进建议（50字内，无风险填'暂无明显风险'）",
   "rating": "综合评级，只能是以下四者之一：优/良/需改进/存在问题"
@@ -55,7 +55,7 @@ export async function generateCaseSummary(params: {
   executionReflection: string;
   disposalPlan: string;
 }): Promise<{ title: string; outburstReason: string; summary: string; reflection: string }> {
-  const prompt = `你是一个游戏运营案例撰写专家，帮助GS将一次负面事件处置过程整理为可复用的案例经验。
+  const prompt = `你是一个游戏运营案例撰写专家，帮助生态将一次负面事件处置过程整理为可复用的案例经验。
 
 【玩家及负面事件】
 玩家：${params.playerName}
@@ -65,7 +65,7 @@ export async function generateCaseSummary(params: {
 【聊天上下文片段】
 ${params.contextText || '（无）'}
 
-【GS执行记录】
+【生态执行记录】
 执行描述：${params.executionDescription || '（无）'}
 复盘反思：${params.executionReflection || '（无）'}
 
@@ -134,7 +134,7 @@ export async function analyzeGameEcology(
   historicalContext: string = ""
 ): Promise<AnalysisResult> {
   const hotCasesStr = referenceCases.map(c =>
-    `案例[${c.title}]: 玩家爆发负面原因:${c.outburstReason}, GS具体处置动作:${c.gsAction}, 案例结果:${c.caseResult}`
+    `案例[${c.title}]: 玩家爆发负面原因:${c.outburstReason}, 生态具体处置动作:${c.gsAction}, 案例结果:${c.caseResult}`
   ).join('\n');
 
   const historicalSection = historicalContext
@@ -162,8 +162,8 @@ B. 【聊天与充值严格隔离分析】
 
 C. 【充值额度严格计算】
    - 必须逐行读取 Sheet2，对每位玩家的所有充值条目金额进行逐笔累加，不得估算、不得凑整、不得遗漏。
-   - GS运营账号（背景信息中标注的GS角色、GS小号）不纳入任何充值统计，直接跳过，不生成其充值报告。
-   - totalPaid 必须等于所有非GS玩家充值金额之和；单个玩家 totalPaid 必须等于该玩家所有充值条目之和。
+   - 生态运营账号（背景信息中标注的生态角色、生态小号）不纳入任何充值统计，直接跳过，不生成其充值报告。
+   - totalPaid 必须等于所有非生态玩家充值金额之和；单个玩家 totalPaid 必须等于该玩家所有充值条目之和。
    - 若充值数据中某玩家金额存疑或格式异常，在 conversionDetails 字段注明"数据存疑：[原始内容]"，不得擅自修正。
 
 D. 【时间戳原文照搬】
@@ -178,7 +178,7 @@ ${serverContext}
 # 已有的重点玩家画像（之前的分析结论，可结合本次数据更新——仅更新有新数据支撑的字段）
 ${persistentPortraits || '暂无存量画像'}
 
-# 参考案例库（生成GS处置方案时检索，有相似案例须明确引用）
+# 参考案例库（生成生态处置方案时检索，有相似案例须明确引用）
 ${hotCasesStr || '暂无参考案例'}
 
 # 待分析数据
@@ -192,7 +192,7 @@ ${rechargeData}
 
 ## 任务一：识别重点玩家（仅基于 Sheet1 聊天数据 + Sheet2 充值数据，禁止凭空添加）
 - 基于聊天活跃度、充值金额（来自Sheet2）、言论影响力，筛选1-3位最值得关注的玩家。
-- GS账号不纳入重点玩家范围。
+- 生态账号不纳入重点玩家范围。
 
 ## 任务二：重点玩家结构化画像分析
 
@@ -243,15 +243,15 @@ ${rechargeData}
 - 溯源上下文 3-5 条消息：time 字段原文照抄，内容原文照抄，不做任何改写。
 - 负面触发点：结合背景信息中的游戏机制进行归因，无法归因则填"需人工核实"。
 
-## 任务四：GS处置建议
+## 任务四：生态处置建议
 - 先检索参考案例库，有相似案例须注明"参考了案例[xxx]的处理逻辑"。
 - 视角要求（强制）：以区服内老玩家身份与其交流，自然、真实、有人情味。
 - 严禁客服腔：禁止"亲爱的玩家"、"感谢您的支持"、"我们会积极优化"等官方话术。
-- 参考背景信息中 GS 人设与区服生态，确保语气风格符合角色设定。
+- 参考背景信息中生态人设与区服生态，确保语气风格符合角色设定。
 - 每条负面爆发须生成：title（15字内案例标题）、tags（1-3个关键标签）、mergeStage（从聊天推断合服阶段，无法推断填"未知"）、caseBackground（3-5句话案例背景）、gsAdvice.resultEvaluation（预期处置效果）、gsAdvice.resultTags（1-2个结果标签，如"付费转化"、"流失挽回"、"关系维护"等）。
 
 ## 任务五：充值分析（仅基于 Sheet2 充值数据）
-- 逐行累加每位玩家充值金额，GS账号跳过。
+- 逐行累加每位玩家充值金额，生态账号跳过。
 - 统计 totalPaid（全部玩家总额）、totalUnpaid（未付款订单总额，若无则为0）。
 - 每位玩家 totalPaid 等于其所有条目累加值。
 - 判定是否转端：依据充值记录中的渠道/平台字段，无相关字段则填 false 并在 conversionDetails 注明"充值数据中无转端字段"。
@@ -260,14 +260,14 @@ ${rechargeData}
 - 提炼本次聊天中出现的 3-8 个话题，每条 15 字内，用简短短句表达（如"讨论合服后装备被削"、"争论行会名额分配"）。
 - 只基于聊天数据中明确讨论的内容，禁止推测。
 
-## 任务七：GS维护质量分析（仅基于 Sheet1 聊天数据）
+## 任务七：生态维护质量分析（仅基于 Sheet1 聊天数据）
 
-GS角色名已在背景信息中标注（"角色名:xxx"），以此识别GS在聊天中的发言。
+生态角色名已在背景信息中标注（"角色名:xxx"），以此识别生态在聊天中的发言。
 
 ### 沟通类型判定规则
-- **主动沟通**：①GS作为言论发起方；②高价值玩家作为承接方；③双方发言存在语义关联。
-- **被动沟通**：①GS作为承接方；②核心玩家作为发起方；③双方发言存在语义关联。
-- **不良沟通**：①GS作为发起方；②沟通频道为私聊（type字段含"私聊"或target字段指向特定玩家）；③高价值用户无承接回应。
+- **主动沟通**：①生态作为言论发起方；②高价值玩家作为承接方；③双方发言存在语义关联。
+- **被动沟通**：①生态作为承接方；②核心玩家作为发起方；③双方发言存在语义关联。
+- **不良沟通**：①生态作为发起方；②沟通频道为私聊（type字段含"私聊"或target字段指向特定玩家）；③高价值用户无承接回应。
 
 ### 沟通单位计数规则
 当双方语义关联由存在转为消失（即话题转移或一方停止回应），本次沟通记为1个单位。不良沟通直接按次数计，无需等待语义消失。
@@ -277,11 +277,11 @@ GS角色名已在背景信息中标注（"角色名:xxx"），以此识别GS在�
 - **游戏外沟通**：谈论游戏外的生活话题。
 
 ### 负面介入核查
-- 若某玩家存在负面爆发，检查GS与该玩家是否存在与该负面事件语义相关的互动记录。有则 hasIntervened=true，无则 false。
+- 若某玩家存在负面爆发，检查生态与该玩家是否存在与该负面事件语义相关的互动记录。有则 hasIntervened=true，无则 false。
 - 无负面爆发的玩家：interventionSummary 填"无负面工单"，hasIntervened 填 false。
 
 ### 覆盖范围
-对 identifiedKeyPlayers 中的每位玩家生成一条记录。若某玩家与GS完全没有互动，各计数填0。
+对 identifiedKeyPlayers 中的每位玩家生成一条记录。若某玩家与生态完全没有互动，各计数填0。
 
 # 输出格式（严格JSON，不要任何 markdown 包裹）
 
@@ -365,11 +365,11 @@ GS角色名已在背景信息中标注（"角色名:xxx"），以此识别GS在�
     }
   ],
   "rechargeReport": {
-    "totalPaid": 数字（所有非GS玩家充值额逐笔累加）,
+    "totalPaid": 数字（所有非生态玩家充值额逐笔累加）,
     "totalUnpaid": 数字（无则为0）,
     "playerSummaries": [
       {
-        "roleName": "玩家名（GS账号不出现在此列表）",
+        "roleName": "玩家名（生态账号不出现在此列表）",
         "totalPaid": 数字（该玩家所有条目金额逐笔累加）,
         "isConverted": true或false,
         "conversionDetails": "转端判定依据或'充值数据中无转端字段'",
@@ -392,7 +392,7 @@ GS角色名已在背景信息中标注（"角色名:xxx"），以此识别GS在�
         "outGame": 游戏外沟通单位数（整数）
       },
       "hasIntervened": true或false,
-      "interventionSummary": "一句话描述GS介入情况（无负面工单填'无负面工单'；有负面但无介入填'未发现介入记录'；有介入则描述介入方式）"
+      "interventionSummary": "一句话描述生态介入情况（无负面工单填'无负面工单'；有负面但无介入填'未发现介入记录'；有介入则描述介入方式）"
     }
   ]
 }

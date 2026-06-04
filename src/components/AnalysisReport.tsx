@@ -344,7 +344,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
               })),
               new Paragraph({
                 children: [
-                  new TextRun({ text: "GS 专家处置方案：", bold: true, size: 28 }),
+                  new TextRun({ text: "生态专家处置方案：", bold: true, size: 28 }),
                 ],
                 spacing: { before: 200 },
               }),
@@ -434,7 +434,7 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
                           {p.name}
                         </span>
                         {isKey && <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-600 text-[9px] font-black rounded-full uppercase leading-none shrink-0">重点</span>}
-                        {isGs && <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-600 text-[9px] font-black rounded-full uppercase leading-none shrink-0">GS</span>}
+                        {isGs && <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-600 text-[9px] font-black rounded-full uppercase leading-none shrink-0">生态</span>}
                         <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden mx-1">
                           <div
                             className={`h-full rounded-full ${isGs ? 'bg-emerald-400' : isKey ? 'bg-indigo-400' : 'bg-slate-300'}`}
@@ -1042,7 +1042,7 @@ const PastExecutionRecordCard = React.memo(function PastExecutionRecordCard({
             <div className={`p-3 rounded-xl border ${dc} space-y-1.5`}>
               <p className="text-[10px] font-black uppercase tracking-widest">组长审批意见</p>
               {review.isGsCaused !== null && (
-                <p className="text-xs">GS 责任：{review.isGsCaused ? '是' : '否'}</p>
+                <p className="text-xs">生态责任：{review.isGsCaused ? '是' : '否'}</p>
               )}
               {review.comment && (
                 <p className="text-xs leading-relaxed">{review.comment}</p>
@@ -1071,7 +1071,7 @@ function GsCommunicationSection({ reports }: { reports: GsCommunicationReport[] 
       <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <MessageCircle className="w-6 h-6 text-indigo-600" />
-          <h3 className="text-xl font-bold text-slate-800">GS 维护质量分析</h3>
+          <h3 className="text-xl font-bold text-slate-800">生态维护质量分析</h3>
         </div>
         <div className="flex items-center gap-2">
           {needsIntervention > 0 && (
@@ -1123,7 +1123,7 @@ function GsCommunicationSection({ reports }: { reports: GsCommunicationReport[] 
                 <p className="text-sm font-black text-slate-800 truncate">{r.roleName}</p>
                 {interventionStatus === 'intervened' && (
                   <span className="mt-1 flex items-center gap-0.5 text-[10px] font-bold text-emerald-600">
-                    <CheckCircle2 className="w-3 h-3" /> GS已介入
+                    <CheckCircle2 className="w-3 h-3" /> 生态已介入
                   </span>
                 )}
                 {interventionStatus === 'missing' && (
@@ -1238,7 +1238,7 @@ function FeedbackPanel() {
       )}
 
       <div className="space-y-2">
-        <p className="text-sm font-bold text-slate-600">GS 处置建议的实用性如何？</p>
+        <p className="text-sm font-bold text-slate-600">生态处置建议的实用性如何？</p>
         <div className="flex gap-2 flex-wrap">
           {['非常有用，会采纳', '部分参考', '参考价值有限'].map(opt => (
             <button

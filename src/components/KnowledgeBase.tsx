@@ -37,7 +37,7 @@ const GAME_CALENDAR: CalendarEvent[] = Array.from({ length: 60 }, (_, i) => {
   if (day === 1) {
     activity = '【开服庆典】等级榜开启, 首充返利';
     item = '圣战套装、限时特权卡';
-    maintenance = '新区导入, 组织行会成立, 确立GS核心号';
+    maintenance = '新区导入, 组织行会成立, 确立生态核心号';
   } else if (day === 3) {
     activity = '【转生开启】首次转生竞赛';
     item = '转生材料包, 高级经验珠';

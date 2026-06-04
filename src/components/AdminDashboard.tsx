@@ -756,14 +756,14 @@ function BusinessDashboard() {
           <div className="px-8 py-6 border-b border-slate-100">
             <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
               <Users className="w-5 h-5 text-indigo-600" />
-              GS 执行排行
+              生态执行排行
             </h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/50">
-                  {['GS', '分析次数', '发现工单', '已结案', '结案率'].map(h => (
+                  {['生态', '分析次数', '发现工单', '已结案', '结案率'].map(h => (
                     <th key={h} className="px-6 py-3 text-[10px] uppercase font-black text-slate-400 tracking-widest">{h}</th>
                   ))}
                 </tr>
@@ -930,7 +930,7 @@ function FeedbackSummary({ logs }: { logs: UsageLog[] }) {
               ))}
             </div>
             <div className="space-y-2">
-              <p className="text-xs font-bold text-slate-500">GS 建议实用性</p>
+              <p className="text-xs font-bold text-slate-500">生态建议实用性</p>
               {Object.entries(usefulnessCounts).map(([label, count]) => (
                 <RatingBar key={label} label={label} count={count} total={total} color={usefulnessColors[label] || 'bg-slate-100 text-slate-600'} />
               ))}

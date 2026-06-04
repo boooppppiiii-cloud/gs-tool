@@ -160,11 +160,11 @@ export default function CaseGenerationModal({
             />
           </div>
 
-          {/* ③ GS 执行记录 */}
+          {/* ③ 生态执行记录 */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
               <span className="w-4 h-4 rounded-full bg-amber-100 text-amber-600 text-[9px] font-black flex items-center justify-center">③</span>
-              GS 执行记录
+              生态执行记录
             </label>
             <textarea
               value={executionText}

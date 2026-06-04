@@ -46,7 +46,7 @@ export default function ChatSimulation({ profiles }: Props) {
     setMessages([
       {
         role: 'assistant',
-        content: `你好，我是${activeProfile.gsName || 'GS'}。我已经准备好模拟与玩家“${selectedPlayer}”的对话了。你可以扮演玩家进行提问或发起冲突，我会尝试以GS的身份引导话题，维护区服生态。`
+        content: `你好，我是${activeProfile.gsName || '生态'}。我已经准备好模拟与玩家”${selectedPlayer}”的对话了。你可以扮演玩家进行提问或发起冲突，我会尝试以生态的身份引导话题，维护区服生态。`
       }
     ]);
   };
@@ -64,9 +64,9 @@ export default function ChatSimulation({ profiles }: Props) {
       const portrait = activeProfile.persistentPortraits?.[selectedPlayer] as any;
       const gsPersona = activeProfile.gsPersona;
 
-      const systemInstruction = `你是一款名为《傲世传奇》的手游中的 GS (Game Support)。目前你正在进行一场对话模拟。
+      const systemInstruction = `你是一款名为《傲世传奇》的手游中的生态专员。目前你正在进行一场对话模拟。
 
-你的身份 (GS 人设):
+你的身份 (生态人设):
 - 角色名: ${activeProfile.gsName || '系统默认'}
 - 年龄: ${gsPersona?.age || '未知'}
 - 家乡: ${gsPersona?.hometown || '未知'}
@@ -84,7 +84,7 @@ export default function ChatSimulation({ profiles }: Props) {
 
 当前区服生态: ${activeProfile.serverEcology || '稳定'}
 
-目标: 扮演GS角色，稳定玩家情绪，引导健康消费。说话语气符合人设，简练真实，避免大段说教。`;
+目标: 扮演生态角色，稳定玩家情绪，引导健康消费。说话语气符合人设，简练真实，避免大段说教。`;
 
       const history = messages.map(m => ({
         role: m.role === 'assistant' ? 'assistant' : 'user',
@@ -195,7 +195,7 @@ export default function ChatSimulation({ profiles }: Props) {
                 <p className="text-xs text-slate-600 italic">“{(activeProfile.persistentPortraits[selectedPlayer] as any).summary}”</p>
               </div>
               <div className="space-y-2">
-                <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">GS 身份</p>
+                <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">生态身份</p>
                 <p className="text-xs text-slate-800 font-bold">{activeProfile.gsName || '系统默认'}</p>
               </div>
             </div>
@@ -212,7 +212,7 @@ export default function ChatSimulation({ profiles }: Props) {
               </div>
               <div>
                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">智能对话模拟器</h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">AI 扮演 GS · 用户扮演玩家</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">AI 扮演生态 · 用户扮演玩家</p>
               </div>
             </div>
             {isLoading && (
@@ -285,7 +285,7 @@ export default function ChatSimulation({ profiles }: Props) {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder={selectedPlayer ? `作为玩家“${selectedPlayer}”向 GS 说话...` : "请先开始模拟..."}
+                placeholder={selectedPlayer ? `作为玩家”${selectedPlayer}”向生态说话...` : “请先开始模拟...”}
                 disabled={!selectedPlayer || isLoading}
                 className="flex-1 px-8 py-4 bg-white border border-slate-200 rounded-3xl text-sm font-medium focus:ring-4 focus:ring-indigo-500/10 outline-none shadow-sm disabled:opacity-50"
               />

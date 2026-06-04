@@ -15,23 +15,18 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
-  Database,
   Loader2,
-  Sword,
 } from 'lucide-react';
-import { MonthHistory, HistoryRecord, CrawlerChatRecord } from '../types';
+import { MonthHistory, HistoryRecord } from '../types';
 
 interface Props {
   history: MonthHistory[];
-  crawlerChatLogs?: CrawlerChatRecord[];
   onSelect: (record: HistoryRecord) => void;
   onDelete: (month: string, id: string) => void;
-  onAnalyze?: (log: CrawlerChatRecord) => void;
 }
 
-export default function HistoryView({ history, crawlerChatLogs = [], onSelect, onDelete, onAnalyze }: Props) {
+export default function HistoryView({ history, onSelect, onDelete }: Props) {
   const [expandedMonths, setExpandedMonths] = React.useState<string[]>([]);
-  const [expandedCrawlMonths, setExpandedCrawlMonths] = React.useState<string[]>([]);
   const [downloading, setDownloading] = useState<string | null>(null);
 
   const downloadCsv = async (id: string, filename: string) => {
@@ -59,23 +54,6 @@ export default function HistoryView({ history, crawlerChatLogs = [], onSelect, o
   const toggleMonth = (month: string) => {
     setExpandedMonths(prev => prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]);
   };
-
-  const toggleCrawlMonth = (month: string) => {
-    setExpandedCrawlMonths(prev => prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]);
-  };
-
-  // Group crawler logs by month
-  const crawlByMonth = React.useMemo(() => {
-    const map = new Map<string, CrawlerChatRecord[]>();
-    crawlerChatLogs.forEach(l => {
-      const m = l.timestamp.slice(0, 7);
-      if (!map.has(m)) map.set(m, []);
-      map.get(m)!.push(l);
-    });
-    return Array.from(map.entries())
-      .map(([month, logs]) => ({ month, logs }))
-      .sort((a, b) => b.month.localeCompare(a.month));
-  }, [crawlerChatLogs]);
 
   return (
     <div className="space-y-10">
@@ -163,89 +141,6 @@ export default function HistoryView({ history, crawlerChatLogs = [], onSelect, o
         )}
       </section>
 
-      {/* ── 爬虫聊天记录存档 ─────────────────────────── */}
-      <section className="space-y-4">
-        <h3 className="text-base font-black text-slate-700 flex items-center gap-2">
-          <Database className="w-4 h-4 text-emerald-600" /> 爬虫聊天记录
-          {crawlerChatLogs.length > 0 && (
-            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded-full">{crawlerChatLogs.length} 条</span>
-          )}
-        </h3>
-
-        {crawlByMonth.length === 0 ? (
-          <div className="bg-white border border-dashed border-slate-200 rounded-xl p-10 text-center space-y-2">
-            <Database className="w-10 h-10 text-slate-300 mx-auto" />
-            <p className="text-sm font-bold text-slate-500">暂无爬虫记录</p>
-            <p className="text-xs text-slate-400">完成一次「立即爬取」后记录将自动同步至此</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {crawlByMonth.map(({ month, logs }) => (
-              <div key={month} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                <button
-                  onClick={() => toggleCrawlMonth(month)}
-                  className="w-full px-6 py-4 bg-emerald-50/60 border-b border-emerald-100 flex items-center justify-between hover:bg-emerald-50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <CalendarIcon className="w-5 h-5 text-emerald-600" />
-                    <span className="font-black text-slate-800 uppercase tracking-tight">{month}</span>
-                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded-full uppercase">
-                      {logs.length} 次爬取
-                    </span>
-                  </div>
-                  {expandedCrawlMonths.includes(month) ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                </button>
-
-                {expandedCrawlMonths.includes(month) && (
-                  <div className="divide-y divide-slate-100">
-                    {logs.map(log => (
-                      <div key={log.id} className="flex items-center justify-between p-4 hover:bg-slate-50/50 transition-colors">
-                        <div className="flex items-center gap-4 min-w-0">
-                          <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600 shrink-0">
-                            <Database className="w-5 h-5" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-slate-800">{log.serverName}</span>
-                              <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">{log.rowCount.toLocaleString()} 条消息</span>
-                            </div>
-                            <p className="text-xs text-slate-400 mt-0.5">
-                              爬取区间：{new Date(log.crawlStart).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                              {' → '}
-                              {new Date(log.crawlEnd).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-                              <span className="ml-2 text-slate-300">·</span>
-                              <span className="ml-2">{new Date(log.timestamp).toLocaleString('zh-CN')}</span>
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {onAnalyze && (
-                            <button
-                              onClick={() => onAnalyze(log)}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors"
-                              title="一键专家分析"
-                            >
-                              <Sword className="w-3 h-3" /> 一键分析
-                            </button>
-                          )}
-                          <button
-                            onClick={() => downloadCsv(log.csvFileId, `crawl_${log.serverName}_${log.crawlStart.slice(0, 10)}.csv`)}
-                            disabled={downloading === log.csvFileId}
-                            className="p-2 rounded-lg hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 transition-colors disabled:opacity-50"
-                            title="下载 CSV"
-                          >
-                            {downloading === log.csvFileId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 }
