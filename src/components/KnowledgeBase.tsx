@@ -5,7 +5,7 @@ import { cloudFetchAll, cloudSet, cloudUpdate } from '../lib/cloudSync';
 import { logUsage } from '../services/analyticsService';
 import { searchKnowledgeBase, isNotFound } from '../lib/coze';
 
-const ADMIN_EMAIL = '1463432441@qq.com';
+const ADMIN_EMAILS = ['1463432441@qq.com', '19653282176@163.com'];
 
 interface ItemData {
   name: string;
@@ -89,7 +89,7 @@ export default function KnowledgeBase({ activeTab, onTabChange }: KnowledgeBaseP
   useEffect(() => {
     auth.getLoginState().then((state: any) => {
       const email = state?.user?.email || '';
-      setIsAdmin(email === ADMIN_EMAIL);
+      setIsAdmin(ADMIN_EMAILS.includes(email));
     });
   }, []);
 

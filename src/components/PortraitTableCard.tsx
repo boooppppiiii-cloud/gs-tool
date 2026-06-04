@@ -24,7 +24,7 @@ const PortraitTableCard = React.memo(function PortraitTableCard({ player, onUpda
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [saveState, setSaveState] = useState<'idle' | 'saved'>('idle');
 
-  const EDITABLE_LABELS = new Set(['职业', '战力排名']);
+  const EDITABLE_LABELS = new Set(['职业']);
 
   const handleEditChange = (label: string, value: string) => {
     setEditValues(prev => ({ ...prev, [label]: value }));
@@ -35,7 +35,6 @@ const PortraitTableCard = React.memo(function PortraitTableCard({ player, onUpda
     if (!onUpdatePortrait) return;
     const updates: Record<string, string> = {};
     if ('职业' in editValues) updates.occupation = editValues['职业'];
-    if ('战力排名' in editValues) updates.combatRanking = editValues['战力排名'];
     onUpdatePortrait(player.roleName, updates);
     setSaveState('saved');
     setTimeout(() => setSaveState('idle'), 2000);

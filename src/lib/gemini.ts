@@ -307,35 +307,36 @@ GS角色名已在背景信息中标注（"角色名:xxx"），以此识别GS在�
         "dimensions": [
           {
             "name": "维度一：现实属性",
-            "completionRate": 0.57,
+            "completionRate": 已获取条目数/8,
             "items": [
-              { "label": "年龄段", "value": "提取内容或'数据中无记录'", "evidence": "依据原文或''", "obtained": true或false },
-              { "label": "大致职业", "value": "...", "evidence": "...", "obtained": true或false },
-              { "label": "核心在线时段", "value": "...", "evidence": "...", "obtained": true或false },
-              { "label": "生活状态/情绪锚点", "value": "...", "evidence": "...", "obtained": true或false },
-              { "label": "性别", "value": "...", "evidence": "...", "obtained": true或false },
+              { "label": "职业", "value": "提取内容或'数据中无记录'", "evidence": "依据原文或''", "obtained": true或false },
+              { "label": "年龄", "value": "...", "evidence": "...", "obtained": true或false },
               { "label": "居住地", "value": "...", "evidence": "...", "obtained": true或false },
-              { "label": "兴趣爱好", "value": "...", "evidence": "...", "obtained": true或false }
+              { "label": "家庭情况", "value": "...", "evidence": "...", "obtained": true或false },
+              { "label": "收入水平", "value": "从聊天推断，不得用充值金额代替，无则填'数据中无记录'", "evidence": "...", "obtained": true或false },
+              { "label": "游戏消费水平", "value": "仅来自充值记录（Sheet2）", "evidence": "...", "obtained": true或false },
+              { "label": "兴趣爱好", "value": "...", "evidence": "...", "obtained": true或false },
+              { "label": "性格", "value": "...", "evidence": "...", "obtained": true或false }
             ]
           },
           {
             "name": "维度二：游戏行为",
-            "completionRate": 0.4,
+            "completionRate": 已获取条目数/4,
             "items": [
-              { "label": "同盟与从属", "value": "...", "evidence": "...", "obtained": true或false },
-              { "label": "宿敌与仇恨", "value": "...", "evidence": "...", "obtained": true或false },
-              { "label": "用户关系", "value": "核心关系：玩家A(25条)、活跃互动：玩家B(15条)...", "evidence": "...", "obtained": true或false },
-              { "label": "对抗风格", "value": "...", "evidence": "...", "obtained": true或false },
-              { "label": "主要聊天话题", "value": "...", "evidence": "...", "obtained": true或false }
+              { "label": "游玩时间", "value": "活跃时段", "evidence": "...", "obtained": true或false },
+              { "label": "活动参与态度", "value": "...", "evidence": "...", "obtained": true或false },
+              { "label": "游戏状态", "value": "战力/段位/装备进度等", "evidence": "...", "obtained": true或false },
+              { "label": "话术风格", "value": "...", "evidence": "...", "obtained": true或false }
             ]
           },
           {
-            "name": "维度三：消费心理",
-            "completionRate": 0.67,
+            "name": "维度三：游玩心理",
+            "completionRate": 已获取条目数/4,
             "items": [
-              { "label": "核心驱动", "value": "...", "evidence": "...", "obtained": true或false },
-              { "label": "消费偏好", "value": "...", "evidence": "...", "obtained": true或false },
-              { "label": "敏感点/雷区", "value": "...", "evidence": "...", "obtained": true或false }
+              { "label": "对抗风格", "value": "...", "evidence": "...", "obtained": true或false },
+              { "label": "消费偏好", "value": "仅从充值记录（Sheet2）分析消费品类/节点偏好", "evidence": "...", "obtained": true或false },
+              { "label": "消费意向", "value": "仅从聊天记录（Sheet1）分析谈到的消费意愿/期待", "evidence": "...", "obtained": true或false },
+              { "label": "敏感点", "value": "...", "evidence": "...", "obtained": true或false }
             ]
           }
         ],

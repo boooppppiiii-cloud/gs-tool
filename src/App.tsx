@@ -41,7 +41,7 @@ import * as dataService from './lib/dataService';
 import { syncFromCloud } from './lib/dataService';
 import { logUsage, initAnalyticsUser, setAnalyticsGroup } from './services/analyticsService';
 
-const ADMIN_EMAIL = '1463432441@qq.com';
+const ADMIN_EMAILS = ['1463432441@qq.com', '19653282176@163.com'];
 
 type TabId = 'home' | 'server' | 'analysis' | 'gallery' | 'knowledge' | 'profile';
 type NavItem = { id: TabId; label: string; icon: React.ReactElement; children?: { id: string; label: string }[] };
@@ -72,7 +72,7 @@ export default function App() {
     }
   }, [activeTab, user]);
 
-  const isAdmin = user?.username === ADMIN_EMAIL || user?.email === ADMIN_EMAIL;
+  const isAdmin = ADMIN_EMAILS.some(e => user?.username === e || user?.email === e);
 
   const [serverProfiles, setServerProfiles] = React.useState<ServerProfile[]>([]);
   const [activeProfileId, setActiveProfileId] = React.useState<string | null>(null);

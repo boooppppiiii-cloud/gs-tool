@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import { createRequire } from "module";
 import { spawn } from "child_process";
 import fs from "fs";
+import os from "os";
 
 dotenv.config();
 
@@ -379,20 +380,24 @@ async function startServer() {
 
   app.post('/api/crawler/collect-now', (req: any, res: any) => {
     const { serverName, ownerId } = req.body ?? {};
+    const logPath = path.join(__dirname, 'crawler', 'sessions', 'crawl_last.log');
     try {
-      const logPath = path.join(__dirname, 'crawler', 'sessions', 'crawl_last.log');
+      fs.mkdirSync(path.dirname(logPath), { recursive: true });
       fs.writeFileSync(logPath, `[${new Date().toISOString()}] Crawl started\n`, 'utf-8');
-      const child = spawn('npm', ['run', 'crawler:now'], {
-        cwd: __dirname,
-        shell: true,
-        stdio: 'ignore',
-        env: {
-          ...process.env,
-          CRAWL_HOURS: '10',
-          ...(serverName ? { CRAWL_SERVER_NAME: String(serverName) } : {}),
-          ...(ownerId    ? { CRAWL_OWNER_ID:    String(ownerId)    } : {}),
-        },
-      });
+      const nodeExe = process.execPath;
+      const npmCli = process.env.npm_execpath;
+      const env = {
+        ...process.env,
+        CRAWL_HOURS: '10',
+        ...(serverName ? { CRAWL_SERVER_NAME: String(serverName) } : {}),
+        ...(ownerId    ? { CRAWL_OWNER_ID:    String(ownerId)    } : {}),
+      };
+      let child;
+      if (npmCli) {
+        child = spawn(nodeExe, [npmCli, 'run', 'crawler:now'], { cwd: __dirname, stdio: 'ignore', env });
+      } else {
+        child = spawn('npm', ['run', 'crawler:now'], { cwd: __dirname, shell: true, stdio: 'ignore', env });
+      }
       child.unref();
       res.json({ ok: true });
     } catch (e: any) {
@@ -426,19 +431,25 @@ async function startServer() {
     if (backend !== 'chat' && backend !== 'recharge') {
       return res.status(400).json({ error: 'invalid backend' });
     }
+    const logPath = path.join(__dirname, 'crawler', 'sessions', `auth_${backend}.log`);
     try {
-      const logPath = path.join(__dirname, 'crawler', 'sessions', `auth_${backend}.log`);
-      fs.writeFileSync(logPath, `[${new Date().toISOString()}] 认证进程已启动，浏览器窗口即将弹出，请完成认证操作\n`, 'utf-8');
-      const child = spawn('npm', ['run', `auth:${backend}`], {
-        cwd: __dirname,
-        shell: true,
-        stdio: 'ignore',
-      });
+      fs.mkdirSync(path.dirname(logPath), { recursive: true });
+      fs.writeFileSync(logPath, `[${new Date().toISOString()}] 认证进程已启动，浏览器窗口即将弹出\n`, 'utf-8');
+      const nodeExe = process.execPath;
+      const npmCli = process.env.npm_execpath;
+      let child;
+      if (npmCli) {
+        child = spawn(nodeExe, [npmCli, 'run', `auth:${backend}`], { cwd: __dirname, stdio: 'ignore' });
+      } else {
+        child = spawn('npm', ['run', `auth:${backend}`], { cwd: __dirname, shell: true, stdio: 'ignore' });
+      }
       child.unref();
       res.json({ ok: true });
     } catch (e: any) {
+      const msg = String(e?.message || e);
+      try { fs.appendFileSync(logPath, `[启动失败] ${msg}\n`, 'utf-8'); } catch {}
       console.error('[Auth] 启动失败:', e);
-      res.status(500).json({ error: String(e?.message || e) });
+      res.status(500).json({ error: msg });
     }
   });
 
@@ -470,16 +481,19 @@ async function startServer() {
       } catch {}
     }
 
-    // 3. Hardcoded paths
-    const localAppData = process.env.LOCALAPPDATA || '';
+    // 3. Hardcoded paths — use os.homedir() so LOCALAPPDATA env var is not required
+    const homeDir = os.homedir();
+    const localAppData = process.env.LOCALAPPDATA || path.join(homeDir, 'AppData', 'Local');
     const pf = process.env.ProgramFiles || 'C:\\Program Files';
     const pf86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
     const candidates = [
+      path.join(homeDir, 'AppData', 'Local', 'Google', 'Chrome', 'Application', 'chrome.exe'),
       `${localAppData}\\Google\\Chrome\\Application\\chrome.exe`,
       `${pf}\\Google\\Chrome\\Application\\chrome.exe`,
       `${pf86}\\Google\\Chrome\\Application\\chrome.exe`,
       `${pf86}\\Microsoft\\Edge\\Application\\msedge.exe`,
       `${pf}\\Microsoft\\Edge\\Application\\msedge.exe`,
+      path.join(homeDir, 'AppData', 'Local', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
     ];
     const found = candidates.find(p => fs.existsSync(p));
     res.json({ installed: !!found, execPath: found });
