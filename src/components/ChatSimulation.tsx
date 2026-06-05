@@ -285,7 +285,7 @@ export default function ChatSimulation({ profiles }: Props) {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder={selectedPlayer ? `作为玩家”${selectedPlayer}”向生态说话...` : “请先开始模拟...”}
+                placeholder={selectedPlayer ? `作为玩家「${selectedPlayer}」向生态说话...` : '请先开始模拟...'}
                 disabled={!selectedPlayer || isLoading}
                 className="flex-1 px-8 py-4 bg-white border border-slate-200 rounded-3xl text-sm font-medium focus:ring-4 focus:ring-indigo-500/10 outline-none shadow-sm disabled:opacity-50"
               />

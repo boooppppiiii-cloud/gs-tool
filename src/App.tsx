@@ -532,11 +532,11 @@ export default function App() {
         <div className="px-4 py-5 flex items-center justify-between overflow-hidden border-b border-slate-100">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #10b981 0%, #6366f1 100%)' }}>
-              <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22V12" />
-                <path d="M12 12C10 8 7 6 4 6c0 4 2 7 8 6" />
-                <path d="M12 12c2-4 5-6 8-6 0 4-2 7-8 6" />
-                <path d="M5 20h14" />
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="white">
+                <path d="M12 2 L10.5 15 L13.5 15 Z"/>
+                <rect x="7" y="15" width="10" height="2" rx="1"/>
+                <rect x="11" y="17" width="2" height="3.5" rx="1" opacity="0.88"/>
+                <ellipse cx="12" cy="21.5" rx="3" ry="1.4"/>
               </svg>
             </div>
             {isSidebarOpen && (
