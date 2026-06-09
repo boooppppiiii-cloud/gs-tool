@@ -234,14 +234,7 @@ async function startServer() {
       const db = getAdminDb();
       if (!db) return res.status(503).json({ error: `Admin SDK 未就绪: ${getAdminDbError()}` });
       const { collection, id, data } = req.body;
-      try {
-        await db.collection(collection).add({ _id: id, ...data });
-      } catch (e: any) {
-        const code = String(e?.code || e?.message || '');
-        if (code.includes('-502008') || code.toLowerCase().includes('duplicate') || code.toLowerCase().includes('exist')) {
-          await db.collection(collection).doc(id).update(data);
-        } else throw e;
-      }
+      await (db.collection(collection).doc(id) as any).set(data);
       res.json({ ok: true });
     } catch (e: any) {
       console.error('[DB upsert] 失败:', e);
