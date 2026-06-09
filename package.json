@@ -17,6 +17,7 @@
     "crawler:start": "npm --prefix crawler run start"
   },
   "dependencies": {
+    "@clickhouse/client": "^1.20.0",
     "@cloudbase/js-sdk": "^2.28.5",
     "@cloudbase/node-sdk": "^3.18.1",
     "@tailwindcss/vite": "^4.1.14",
@@ -29,6 +30,7 @@
     "file-saver": "^2.0.5",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "mysql2": "^3.22.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.8.1",

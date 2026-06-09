@@ -79,7 +79,9 @@ const PortraitTableCard = React.memo(function PortraitTableCard({ player, onUpda
             <p className="text-2xl font-black text-indigo-600">{Math.round(pt.overallCompletion * 100)}%</p>
           </div>
         </div>
-        <p className="text-sm text-slate-600 italic mt-2 pl-8 leading-relaxed">{player.portrait.summary}</p>
+        <p className="text-sm text-slate-500 mt-2 pl-8 leading-snug">
+          {pt.tableSummary || player.portrait.summary}
+        </p>
       </div>
 
       {/* Basic data */}

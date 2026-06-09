@@ -114,6 +114,7 @@ export interface PortraitTable {
   };
   dimensions: PortraitDimension[];
   overallCompletion: number; // total obtained / total items
+  tableSummary?: string;
 }
 
 export interface PlayerBehaviorReport {

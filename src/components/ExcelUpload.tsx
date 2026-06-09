@@ -6,7 +6,7 @@
 import React from 'react';
 import {
   Upload, CheckCircle2, AlertTriangle as AlertTriangleIcon, Loader2,
-  ImageIcon, X, Scan,
+  ImageIcon, X, Scan, Database, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { ChatRecord, RechargeRecord } from '../types';
@@ -25,7 +25,14 @@ interface Props {
   isAnalyzing: boolean;
 }
 
-type Mode = 'upload' | 'image';
+type Mode = 'upload' | 'image' | 'db';
+
+interface DbPingResult { ch?: string; mysql?: string; chError?: string; mysqlError?: string }
+interface DbColumn { name: string; type: string }
+interface DbExploreResult {
+  clickhouse?: { databases?: string[]; tables?: Record<string, string[]>; error?: string };
+  mysql?: { databases?: string[]; tables?: Record<string, string[]>; error?: string };
+}
 
 function parseCsvContent(text: string): ChatRecord[] {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -55,6 +62,48 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
 
   // ── Mode ───────────────────────────────────────────────────────────────────
   const [mode, setMode] = React.useState<Mode>('upload');
+
+  // ── Database mode ──────────────────────────────────────────────────────────
+  const [dbPing, setDbPing] = React.useState<DbPingResult | null>(null);
+  const [dbExplore, setDbExplore] = React.useState<DbExploreResult | null>(null);
+  const [dbColumns, setDbColumns] = React.useState<{ engine: string; db: string; table: string; cols: DbColumn[] } | null>(null);
+  const [dbLoading, setDbLoading] = React.useState<string | null>(null);
+  const [expandedNodes, setExpandedNodes] = React.useState<Set<string>>(new Set());
+
+  const toggleNode = (key: string) =>
+    setExpandedNodes(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
+
+  const handleDbPing = async () => {
+    setDbLoading('ping');
+    try {
+      const res = await fetch('/api/db/ping');
+      setDbPing(await res.json());
+    } catch { setDbPing({ ch: 'error', mysql: 'error', chError: '无法连接服务器', mysqlError: '无法连接服务器' }); }
+    setDbLoading(null);
+  };
+
+  const handleDbExplore = async () => {
+    setDbLoading('explore');
+    try {
+      const res = await fetch('/api/db/explore');
+      setDbExplore(await res.json());
+    } catch { setDbExplore(null); }
+    setDbLoading(null);
+  };
+
+  const handleDbDescribe = async (engine: string, database: string, table: string) => {
+    setDbLoading(`${engine}/${database}/${table}`);
+    try {
+      const res = await fetch('/api/db/describe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ engine, database, table }),
+      });
+      const data = await res.json();
+      setDbColumns({ engine, db: database, table, cols: data.columns || [] });
+    } catch { setDbColumns(null); }
+    setDbLoading(null);
+  };
 
   // ── Upload handler ─────────────────────────────────────────────────────────
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -212,6 +261,14 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
           }`}
         >
           <ImageIcon className="w-3.5 h-3.5" /> 图片识别
+        </button>
+        <button
+          onClick={() => setMode('db')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold transition-colors ${
+            mode === 'db' ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600' : 'text-slate-500 hover:bg-slate-50'
+          }`}
+        >
+          <Database className="w-3.5 h-3.5" /> 数据库
         </button>
       </div>
 
@@ -382,6 +439,135 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
           )}
           {!isExtracting && !needsMapping && !imgReady && imgItems.length === 0 && (
             <p className="text-center text-xs text-slate-400 py-2">上传截图后点击识别，AI 将自动提取聊天记录</p>
+          )}
+        </div>
+      )}
+
+      {/* ── Database mode ────────────────────────────────────────────────────── */}
+      {mode === 'db' && (
+        <div className="p-5 space-y-4">
+
+          {/* 连接测试 */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-black text-slate-600 uppercase tracking-widest">连接状态</p>
+              <button
+                onClick={handleDbPing}
+                disabled={dbLoading === 'ping'}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                {dbLoading === 'ping' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
+                测试连接
+              </button>
+            </div>
+            {dbPing && (
+              <div className="grid grid-cols-2 gap-2">
+                {(['ch', 'mysql'] as const).map(eng => {
+                  const ok = dbPing[eng] === 'ok';
+                  const err = eng === 'ch' ? dbPing.chError : dbPing.mysqlError;
+                  return (
+                    <div key={eng} className={`flex items-start gap-2 px-3 py-2 rounded-xl border text-xs ${ok ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+                      <span className={`mt-0.5 shrink-0 w-2 h-2 rounded-full ${ok ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                      <div className="min-w-0">
+                        <p className="font-black text-slate-700">{eng === 'ch' ? 'ClickHouse :8123' : 'MySQL :3306'}</p>
+                        <p className={ok ? 'text-emerald-600' : 'text-rose-600'}>{ok ? '连接正常' : (err || '连接失败')}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {!dbPing && (
+              <p className="text-[11px] text-slate-400 leading-relaxed px-1">先在项目根目录的 <code className="bg-slate-100 px-1 rounded">.env</code> 文件中填写数据库连接信息，再点击「测试连接」</p>
+            )}
+          </div>
+
+          {/* 浏览表结构 */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-black text-slate-600 uppercase tracking-widest">数据库结构</p>
+              <button
+                onClick={handleDbExplore}
+                disabled={!!dbLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:opacity-50 transition-colors"
+              >
+                {dbLoading === 'explore' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                浏览所有表
+              </button>
+            </div>
+
+            {dbExplore && (
+              <div className="border border-slate-200 rounded-xl overflow-hidden text-xs">
+                {(['clickhouse', 'mysql'] as const).map(eng => {
+                  const info = dbExplore[eng];
+                  if (!info) return null;
+                  const label = eng === 'clickhouse' ? 'ClickHouse' : 'MySQL';
+                  const color = eng === 'clickhouse' ? 'text-amber-700 bg-amber-50' : 'text-blue-700 bg-blue-50';
+                  return (
+                    <div key={eng} className="border-b border-slate-100 last:border-0">
+                      <button onClick={() => toggleNode(eng)} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-left">
+                        {expandedNodes.has(eng) ? <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                        <span className={`px-1.5 py-0.5 rounded font-black text-[10px] ${color}`}>{label}</span>
+                        {info.error && <span className="text-rose-500 text-[10px] ml-1">{info.error}</span>}
+                      </button>
+                      {expandedNodes.has(eng) && info.tables && Object.entries(info.tables).map(([db, tables]) => (
+                        <div key={db} className="pl-4 border-t border-slate-50">
+                          <button onClick={() => toggleNode(`${eng}/${db}`)} className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 text-left">
+                            {expandedNodes.has(`${eng}/${db}`) ? <ChevronDown className="w-3 h-3 text-slate-300 shrink-0" /> : <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />}
+                            <Database className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span className="font-bold text-slate-700">{db}</span>
+                            <span className="text-slate-400">({(tables as string[]).length} 张表)</span>
+                          </button>
+                          {expandedNodes.has(`${eng}/${db}`) && (tables as string[]).map(tbl => (
+                            <button
+                              key={tbl}
+                              onClick={() => handleDbDescribe(eng === 'clickhouse' ? 'ch' : 'mysql', db, tbl)}
+                              disabled={dbLoading === `${eng === 'clickhouse' ? 'ch' : 'mysql'}/${db}/${tbl}`}
+                              className="w-full flex items-center gap-2 pl-10 pr-3 py-1.5 hover:bg-indigo-50 hover:text-indigo-700 text-left text-slate-600 disabled:opacity-50 transition-colors"
+                            >
+                              {dbLoading === `${eng === 'clickhouse' ? 'ch' : 'mysql'}/${db}/${tbl}`
+                                ? <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                                : <ChevronRight className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100" />}
+                              {tbl}
+                            </button>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 表字段详情 */}
+          {dbColumns && (
+            <div className="space-y-2">
+              <p className="text-xs font-black text-slate-600 uppercase tracking-widest">
+                字段结构：{dbColumns.db}.{dbColumns.table}
+              </p>
+              <div className="border border-slate-200 rounded-xl overflow-hidden text-xs">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="px-3 py-2 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider w-1/2">字段名</th>
+                      <th className="px-3 py-2 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">类型</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dbColumns.cols.map(col => (
+                      <tr key={col.name} className="border-b border-slate-50 last:border-0 hover:bg-indigo-50/50">
+                        <td className="px-3 py-2 font-mono font-bold text-indigo-700">{col.name}</td>
+                        <td className="px-3 py-2 text-slate-500">{col.type}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed px-1 bg-amber-50 border border-amber-100 rounded-lg p-3">
+                <span className="font-bold text-amber-700">下一步：</span> 记录下聊天记录所在的表名和字段名（时间、角色名、消息类型、内容），以及充值记录所在的表名和字段名（金额、角色名、状态），告知开发者后即可实现一键导入数据。
+              </p>
+            </div>
           )}
         </div>
       )}

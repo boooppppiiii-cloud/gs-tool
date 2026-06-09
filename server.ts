@@ -7,6 +7,7 @@ import { createRequire } from "module";
 import { spawn } from "child_process";
 import fs from "fs";
 import os from "os";
+import { createClient as createChClient } from "@clickhouse/client";
 
 dotenv.config();
 
@@ -364,6 +365,129 @@ async function startServer() {
     } catch (e: any) {
       console.error('[Image Extract] 失败:', e);
       res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
+  // ── 数据库直连接口 ──────────────────────────────────────────────────────────
+
+  function getChClient() {
+    return createChClient({
+      url: `http://${process.env.CH_HOST || 'localhost'}:${process.env.CH_PORT || '8123'}`,
+      username: process.env.CH_USER || 'default',
+      password: process.env.CH_PASSWORD || '',
+      database: process.env.CH_DATABASE || 'default',
+      request_timeout: 10_000,
+    });
+  }
+
+  async function getMysqlConn() {
+    const mysql = require('mysql2/promise');
+    return mysql.createConnection({
+      host: process.env.MYSQL_HOST,
+      port: parseInt(process.env.MYSQL_PORT || '3306', 10),
+      user: process.env.MYSQL_USER,
+      password: process.env.MYSQL_PASSWORD,
+      database: process.env.MYSQL_DATABASE || undefined,
+      connectTimeout: 10_000,
+    });
+  }
+
+  // 安全转义标识符中的反引号
+  const safeId = (s: string) => s.replace(/`/g, '``');
+
+  // 测试连通性
+  app.get('/api/db/ping', async (_req: any, res: any) => {
+    const result: Record<string, any> = {};
+    try {
+      const ch = getChClient();
+      const r = await ch.query({ query: 'SELECT 1', format: 'JSONEachRow' });
+      await r.json();
+      await ch.close();
+      result.ch = 'ok';
+    } catch (e: any) {
+      result.ch = 'error';
+      result.chError = e?.message || String(e);
+    }
+    try {
+      const conn = await getMysqlConn();
+      await conn.execute('SELECT 1');
+      await conn.end();
+      result.mysql = 'ok';
+    } catch (e: any) {
+      result.mysql = 'error';
+      result.mysqlError = e?.message || String(e);
+    }
+    res.json(result);
+  });
+
+  // 列出所有库和表
+  app.get('/api/db/explore', async (_req: any, res: any) => {
+    const result: Record<string, any> = { clickhouse: {}, mysql: {} };
+    const SYSTEM_DBS_CH = new Set(['system', 'information_schema', 'INFORMATION_SCHEMA']);
+    const SYSTEM_DBS_MYSQL = new Set(['information_schema', 'performance_schema', 'mysql', 'sys']);
+
+    try {
+      const ch = getChClient();
+      const dbRes = await ch.query({ query: 'SHOW DATABASES', format: 'JSONEachRow' });
+      const dbs: string[] = (await dbRes.json() as any[]).map((r: any) => r.name);
+      result.clickhouse.databases = dbs;
+      result.clickhouse.tables = {} as Record<string, string[]>;
+      for (const db of dbs.filter(d => !SYSTEM_DBS_CH.has(d))) {
+        const tRes = await ch.query({ query: `SHOW TABLES FROM \`${safeId(db)}\``, format: 'JSONEachRow' });
+        result.clickhouse.tables[db] = (await tRes.json() as any[]).map((r: any) => r.name);
+      }
+      await ch.close();
+    } catch (e: any) {
+      result.clickhouse.error = e?.message || String(e);
+    }
+
+    try {
+      const conn = await getMysqlConn();
+      const [dbs] = await conn.execute('SHOW DATABASES') as any[];
+      const dbNames: string[] = dbs.map((r: any) => Object.values(r)[0] as string);
+      result.mysql.databases = dbNames;
+      result.mysql.tables = {} as Record<string, string[]>;
+      for (const db of dbNames.filter(d => !SYSTEM_DBS_MYSQL.has(d))) {
+        const [tables] = await conn.execute(`SHOW TABLES FROM \`${safeId(db)}\``) as any[];
+        result.mysql.tables[db] = tables.map((r: any) => Object.values(r)[0] as string);
+      }
+      await conn.end();
+    } catch (e: any) {
+      result.mysql.error = e?.message || String(e);
+    }
+
+    res.json(result);
+  });
+
+  // 查看表的字段结构
+  app.post('/api/db/describe', async (req: any, res: any) => {
+    const { engine, database, table } = req.body ?? {};
+    if (!engine || !database || !table) return res.status(400).json({ error: '缺少参数' });
+
+    if (engine === 'ch') {
+      try {
+        const ch = getChClient();
+        const r = await ch.query({
+          query: `DESCRIBE TABLE \`${safeId(database)}\`.\`${safeId(table)}\``,
+          format: 'JSONEachRow',
+        });
+        const rows = await r.json() as any[];
+        await ch.close();
+        res.json({ columns: rows.map((row: any) => ({ name: row.name, type: row.type })) });
+      } catch (e: any) {
+        res.status(500).json({ error: e?.message || String(e) });
+      }
+    } else if (engine === 'mysql') {
+      try {
+        const conn = await getMysqlConn();
+        const [rows] = await conn.execute(`DESCRIBE \`${safeId(database)}\`.\`${safeId(table)}\``) as any[];
+        await conn.end();
+        res.json({ columns: rows.map((r: any) => ({ name: r.Field, type: r.Type })) });
+      } catch (e: any) {
+        res.status(500).json({ error: e?.message || String(e) });
+      }
+    } else {
+      res.status(400).json({ error: '无效的 engine，应为 ch 或 mysql' });
     }
   });
 

@@ -215,28 +215,31 @@ ${rechargeData}
 
 **三个维度（每个词条必须单独判断是否有数据支撑）**：
 
-维度一：现实属性（只能来自Sheet1聊天数据）
-①年龄段（从聊天内容中提取，无则obtained=false，value="数据中无记录"，evidence=""）
-②大致职业（同上）
-③核心在线时段（从聊天时间规律分析，无则obtained=false）
-④生活状态/情绪锚点（近期现实压力，从聊天中明确提及的内容提取，无则obtained=false）
-⑤性别（从聊天称谓/自述中判断，无则obtained=false）
-⑥居住地（从聊天中明确提及的地名/方言/时区线索提取，无则obtained=false）
+维度一：现实属性（职业/年龄/居住地/家庭情况/收入水平来自Sheet1聊天；游戏消费水平仅来自Sheet2）
+①职业（从聊天中提取，无则obtained=false）
+②年龄（从聊天内容推断，无则obtained=false）
+③居住地（从聊天中明确提及的地名/方言/时区线索提取，无则obtained=false）
+④家庭情况（从聊天中明确透露的家庭信息提取，无则obtained=false）
+⑤收入水平（从聊天内容推断，不得用充值金额代替，无则obtained=false）
+⑥游戏消费水平（仅来自Sheet2充值记录，无充值数据则obtained=false）
 ⑦兴趣爱好（从聊天中提及的游戏外爱好/话题提取，无则obtained=false）
+⑧性格（从聊天行为/言辞风格综合判断，无则obtained=false）
 
 维度二：游戏行为（只能来自Sheet1聊天数据）
-①同盟与从属（帮会地位与跟随者，从聊天行为提取，无则obtained=false）
-②宿敌与仇恨（敌对玩家或帮会，从聊天内容提取，无则obtained=false）
-③用户关系（统计该玩家与其他玩家的直接交互条数，按以下四个等级判定：边缘接触<5条、普通互动5-10条、活跃互动10-20条、核心关系>20条；列出主要互动对象及等级，无则obtained=false）
-④对抗风格（从PK/战场/仇恨言论中提取，如主动挑衅/被动应战/战略型等，无则obtained=false）
-⑤主要聊天话题（统计该玩家发言中最常涉及的3个话题类别，无则obtained=false）
+①游玩时间（从聊天时间规律分析活跃时段，无则obtained=false）
+②活动参与态度（主动发起/积极响应/消极回避等，从聊天中提取，无则obtained=false）
+③游戏状态（战力/段位/装备进度等，从聊天内容提取，无则obtained=false）
+④话术风格（沟通语气/习惯用词/表达方式，从聊天内容提取，无则obtained=false）
 
-维度三：消费心理（来自Sheet2充值数据+Sheet1聊天数据，来源混用须注明）
-①核心驱动（战力追求/面子/复仇等，无法判断则obtained=false）
-②消费偏好（买断式/概率抽取，从充值数据提取，无则obtained=false）
-③敏感点/雷区（从聊天中明确表达的反感/投诉提取，无则obtained=false）
+维度三：游玩心理（对抗风格/消费偏好来自数据，消费意向仅来自聊天）
+①对抗风格（从PK/战场/仇恨言论中提取，如主动挑衅/被动应战/战略型等，无则obtained=false）
+②消费偏好（仅从Sheet2充值记录分析消费品类/节点偏好，无则obtained=false）
+③消费意向（仅从Sheet1聊天记录诊断：玩家是否曾透露对付费道具的购买意向？有则obtained=true，value格式"有意向购买[道具名]"，evidence填原话；无则obtained=false，value="数据中无记录"）
+④敏感点（从聊天中明确表达的反感/投诉提取，无则obtained=false）
 
-铁律：每个词条 value 只填数据中有据可查的内容；无数据支撑则 obtained=false，value="数据中无记录"，evidence=""。completionRate = 该维度中 obtained=true 的词条数 ÷ 总词条数（保留两位小数）。维度一共7条，维度二共5条，维度三共3条。
+铁律：每个词条 value 只填数据中有据可查的内容；无数据支撑则 obtained=false，value="数据中无记录"，evidence=""。completionRate = 该维度中 obtained=true 的词条数 ÷ 总词条数（保留两位小数）。维度一共8条，维度二共4条，维度三共4条。
+
+tableSummary：综合三个维度中所有 obtained=true 的词条，用一句话（40字内）提炼该玩家最关键的3-4个标签（例："40岁教师，晚间活跃，有意向购买封神武器，对PK挑衅敏感"）。无任何 obtained=true 词条时填"数据不足，暂无总结"。
 
 ## 任务三：负面爆发核查（仅基于 Sheet1 聊天数据）
 - 识别明确出现在聊天记录中的负面情绪/投诉/发泄行为。
@@ -335,12 +338,13 @@ ${rechargeData}
             "items": [
               { "label": "对抗风格", "value": "...", "evidence": "...", "obtained": true或false },
               { "label": "消费偏好", "value": "仅从充值记录（Sheet2）分析消费品类/节点偏好", "evidence": "...", "obtained": true或false },
-              { "label": "消费意向", "value": "仅从聊天记录（Sheet1）分析谈到的消费意愿/期待", "evidence": "...", "obtained": true或false },
+              { "label": "消费意向", "value": "有意向购买[道具名]（原话依据） 或 '数据中无记录'", "evidence": "原话摘录", "obtained": true或false },
               { "label": "敏感点", "value": "...", "evidence": "...", "obtained": true或false }
             ]
           }
         ],
-        "overallCompletion": 0.67
+        "overallCompletion": 0.67,
+        "tableSummary": "一句话总结（40字内），综合已获取词条的核心标签"
       },
       "negativeOutbursts": [
         {
@@ -426,6 +430,7 @@ ${rechargeData}
           })),
         })),
         overallCompletion: pt.overallCompletion ?? 0,
+        tableSummary: pt.tableSummary ?? '',
       } : undefined;
 
       return {
