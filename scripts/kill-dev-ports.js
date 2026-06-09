@@ -1,4 +1,4 @@
-const { execSync } = require('child_process');
+import { execSync } from 'child_process';
 const PORTS = [3000, 24678];
 
 PORTS.forEach(port => {
