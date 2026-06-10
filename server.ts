@@ -533,16 +533,17 @@ async function startServer() {
       const ch = getChClient();
       const r = await ch.query({
         query: `SELECT
-          toString(action_time) AS time,
-          cp_role_id            AS roleName,
-          context_type          AS type,
-          context               AS content,
-          receive_id            AS target
-        FROM zhangyou.zs_role_all_chat_log
-        WHERE server_id   = {serverId:String}
-          AND action_time >= {startTime:DateTime}
-          AND action_time <  {endTime:DateTime}
-        ORDER BY action_time ASC
+          toString(c.action_time) AS time,
+          COALESCE(NULLIF(r.role_name, ''), toString(c.cp_role_id)) AS roleName,
+          c.context_type          AS type,
+          c.context               AS content,
+          c.receive_id            AS target
+        FROM zhangyou.zs_role_all_chat_log c
+        LEFT JOIN zhangyou.zs_game_role r ON c.role_id = r.role_id
+        WHERE c.server_id   = {serverId:String}
+          AND c.action_time >= {startTime:DateTime}
+          AND c.action_time <  {endTime:DateTime}
+        ORDER BY c.action_time ASC
         LIMIT {limit:UInt32}`,
         query_params: {
           serverId: String(serverId),
