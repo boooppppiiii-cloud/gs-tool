@@ -34,14 +34,24 @@ interface DbExploreResult {
   mysql?: { databases?: string[]; tables?: Record<string, string[]>; error?: string };
 }
 
-function parseCsvContent(text: string): ChatRecord[] {
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  const records: ChatRecord[] = lines.slice(1).map(line => {
+function parseCsvContent(text: string): { chat: ChatRecord[]; recharge: RechargeRecord[] } {
+  const sections = text.split(/(?:\r?\n){2,}/);
+  const chatLines = sections[0]?.split(/\r?\n/).filter(l => l.trim()) ?? [];
+  const rechargeLines = sections[1]?.split(/\r?\n/).filter(l => l.trim()) ?? [];
+
+  const chat: ChatRecord[] = chatLines.slice(1).map(line => {
     const cols = line.split(',').map(c => c.trim());
     return { time: cols[2] || '', roleName: cols[3] || '', type: cols[4] || '', content: cols[5] || '', target: cols[7] || '' };
   }).filter(r => r.roleName && r.content);
-  records.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
-  return records;
+  chat.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+
+  // Sheet2 列格式与 Excel 对应：列1=金额(B), 列2=角色名(C), 列6=状态(G), 列7=方式(H)
+  const recharge: RechargeRecord[] = rechargeLines.slice(1).map(line => {
+    const cols = line.split(',').map(c => c.trim());
+    return { amount: cols[1] || '', roleName: cols[2] || '', status: cols[6] || '', method: cols[7] || '' };
+  }).filter(r => r.roleName);
+
+  return { chat, recharge };
 }
 
 export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
@@ -152,8 +162,8 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
       logUsage('excel_upload', `Started processing ${file.name}`);
       if (isCSV) {
         const text = await file.text();
-        const chatRecords = parseCsvContent(text);
-        onDataLoaded(chatRecords, [], file.name);
+        const { chat: chatRecords, recharge: rechargeRecords } = parseCsvContent(text);
+        onDataLoaded(chatRecords, rechargeRecords, file.name);
       } else {
         const data = await file.arrayBuffer();
         const workbook = XLSX.read(data);
@@ -173,7 +183,7 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
       }
     } catch (err) {
       console.error(err);
-      setUploadError('文件解析失败，请确认格式正确（Excel: Sheet1聊天/Sheet2充值；CSV: 逗号分隔聊天记录）');
+      setUploadError('文件解析失败，请确认格式正确（Excel: Sheet1聊天/Sheet2充值；CSV: 空行前聊天记录，空行后充值记录）');
     }
   };
 
@@ -357,7 +367,7 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
           <div className="mt-6 grid grid-cols-3 gap-4 text-xs text-slate-400">
             <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1" /><p>Sheet1: C时间, D角色, E类型, F内容, H目标</p></div>
             <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1" /><p>Sheet2: B金额, C角色, G状态, H方式</p></div>
-            <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1" /><p>CSV: 文件名为区服名，仅含聊天记录</p></div>
+            <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1" /><p>CSV: 空行分隔两表（上聊天/下充值）</p></div>
           </div>
         </div>
       )}

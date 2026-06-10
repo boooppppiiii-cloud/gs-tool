@@ -530,7 +530,14 @@ async function startServer() {
       if (!serverId || !startTime || !endTime) return res.status(400).json({ error: '缺少 serverId、startTime 或 endTime' });
       // datetime-local 传来格式 "2026-06-01T00:00"，转为 ClickHouse DateTime 格式 "2026-06-01 00:00:00"
       const toChDt = (s: string) => s.replace('T', ' ') + (s.length === 16 ? ':00' : '');
-      const ch = getChClient();
+      // import 查询用更长超时（JOIN 可能较慢），与通用 getChClient 的 10s 分开
+      const ch = createChClient({
+        url: `http://${process.env.CH_HOST || 'localhost'}:${process.env.CH_PORT || '8123'}`,
+        username: process.env.CH_USER || 'default',
+        password: process.env.CH_PASSWORD || '',
+        database: process.env.CH_DATABASE || 'default',
+        request_timeout: 60_000,
+      });
       const r = await ch.query({
         query: `SELECT
           toString(c.action_time) AS time,
@@ -539,7 +546,7 @@ async function startServer() {
           c.context               AS content,
           c.receive_id            AS target
         FROM zhangyou.zs_role_all_chat_log c
-        LEFT JOIN zhangyou.zs_game_role r ON c.role_id = r.role_id
+        LEFT JOIN zhangyou.zs_game_role r ON c.role_id = r.role_id AND r.server_id = {serverId:String}
         WHERE c.server_id   = {serverId:String}
           AND c.action_time >= {startTime:DateTime}
           AND c.action_time <  {endTime:DateTime}
