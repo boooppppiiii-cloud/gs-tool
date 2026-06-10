@@ -220,10 +220,19 @@ async function startServer() {
       const db = getAdminDb();
       if (!db) return res.status(503).json({ error: `Admin SDK 未就绪: ${getAdminDbError()}` });
       const log = req.body;
-      await db.collection('usage_logs').add(log);
+      try {
+        await db.collection('usage_logs').add(log);
+      } catch (e: any) {
+        if (e?.code === 'DATABASE_COLLECTION_NOT_EXIST') {
+          await db.createCollection('usage_logs');
+          await db.collection('usage_logs').add(log);
+        } else {
+          throw e;
+        }
+      }
       res.json({ ok: true });
     } catch (e: any) {
-      console.error('[Analytics Write] 写入失败:', e);
+      console.error('[Analytics Write] 写入失败:', e?.message || e);
       res.status(500).json({ error: String(e?.message || e) });
     }
   });
@@ -234,10 +243,22 @@ async function startServer() {
       const db = getAdminDb();
       if (!db) return res.status(503).json({ error: `Admin SDK 未就绪: ${getAdminDbError()}` });
       const { collection, id, data } = req.body;
-      await (db.collection(collection).doc(id) as any).set(data);
+      // 剔除 _id 字段，CloudBase 禁止通过 set() 修改文档 _id
+      const { _id, ...cleanData } = (data ?? {}) as any;
+      const doSet = () => (db.collection(collection).doc(id) as any).set(cleanData);
+      try {
+        await doSet();
+      } catch (e: any) {
+        if (e?.code === 'DATABASE_COLLECTION_NOT_EXIST') {
+          await db.createCollection(collection);
+          await doSet();
+        } else {
+          throw e;
+        }
+      }
       res.json({ ok: true });
     } catch (e: any) {
-      console.error('[DB upsert] 失败:', e);
+      console.error('[DB upsert] 失败 collection=%s id=%s:', req.body?.collection, req.body?.id, e?.message || e);
       res.status(500).json({ error: String(e?.message || e) });
     }
   });
@@ -373,16 +394,22 @@ async function startServer() {
     });
   }
 
-  async function getMysqlConn() {
-    const mysql = require('mysql2/promise');
-    return mysql.createConnection({
-      host: process.env.MYSQL_HOST,
-      port: parseInt(process.env.MYSQL_PORT || '3306', 10),
-      user: process.env.MYSQL_USER,
-      password: process.env.MYSQL_PASSWORD,
-      database: process.env.MYSQL_DATABASE || undefined,
-      connectTimeout: 10_000,
-    });
+  let _mysqlPool: any = null;
+  function getMysqlPool() {
+    if (!_mysqlPool) {
+      const mysql = require('mysql2/promise');
+      _mysqlPool = mysql.createPool({
+        host: process.env.MYSQL_HOST,
+        port: parseInt(process.env.MYSQL_PORT || '3306', 10),
+        user: process.env.MYSQL_USER,
+        password: process.env.MYSQL_PASSWORD,
+        database: process.env.MYSQL_DATABASE || undefined,
+        connectTimeout: 10_000,
+        waitForConnections: true,
+        connectionLimit: 3,
+      });
+    }
+    return _mysqlPool;
   }
 
   // 安全转义标识符中的反引号
@@ -402,13 +429,25 @@ async function startServer() {
       result.chError = e?.message || String(e);
     }
     try {
-      const conn = await getMysqlConn();
-      await conn.execute('SELECT 1');
-      await conn.end();
-      result.mysql = 'ok';
+      const pool = getMysqlPool();
+      const conn = await pool.getConnection();
+      try {
+        await conn.execute('SELECT 1');
+        result.mysql = 'ok';
+      } finally {
+        conn.release();
+      }
     } catch (e: any) {
       result.mysql = 'error';
       result.mysqlError = e?.message || String(e);
+    }
+    // 附带服务器出口 IP，便于白名单排查
+    try {
+      const ipRes = await fetch('https://api.ipify.org?format=json');
+      const { ip } = await ipRes.json() as any;
+      result.serverIp = ip;
+    } catch {
+      result.serverIp = '获取失败';
     }
     res.json(result);
   });
@@ -481,6 +520,45 @@ async function startServer() {
       }
     } else {
       res.status(400).json({ error: '无效的 engine，应为 ch 或 mysql' });
+    }
+  });
+
+  // 从 ClickHouse 导入聊天记录（按区服+时间范围）
+  app.post('/api/db/import/chat', async (req: any, res: any) => {
+    try {
+      const { serverId, startTime, endTime, limit = 2000 } = req.body ?? {};
+      if (!serverId || !startTime || !endTime) return res.status(400).json({ error: '缺少 serverId、startTime 或 endTime' });
+      // datetime-local 传来格式 "2026-06-01T00:00"，转为 ClickHouse DateTime 格式 "2026-06-01 00:00:00"
+      const toChDt = (s: string) => s.replace('T', ' ') + (s.length === 16 ? ':00' : '');
+      const ch = getChClient();
+      const r = await ch.query({
+        query: `SELECT
+          toString(action_time) AS time,
+          cp_role_id            AS roleName,
+          context_type          AS type,
+          context               AS content,
+          receive_id            AS target
+        FROM zhangyou.zs_role_all_chat_log
+        WHERE server_id   = {serverId:String}
+          AND action_time >= {startTime:DateTime}
+          AND action_time <  {endTime:DateTime}
+        ORDER BY action_time ASC
+        LIMIT {limit:UInt32}`,
+        query_params: {
+          serverId: String(serverId),
+          startTime: toChDt(String(startTime)),
+          endTime: toChDt(String(endTime)),
+          limit: Math.min(Number(limit) || 2000, 5000),
+        },
+        format: 'JSONEachRow',
+      });
+      const rows = await r.json() as any[];
+      await ch.close();
+      const playerCount = new Set(rows.map((r: any) => r.roleName)).size;
+      res.json({ records: rows, count: rows.length, playerCount });
+    } catch (e: any) {
+      console.error('[DB import/chat]', e);
+      res.status(500).json({ error: String(e?.message || e) });
     }
   });
 

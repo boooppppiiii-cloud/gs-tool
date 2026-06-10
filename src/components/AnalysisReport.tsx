@@ -91,11 +91,19 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
   // Flatten all outbursts across player reports for execution record tracking
   const allOutbursts = React.useMemo(() => {
     const flat: { playerName: string; title: string; trigger: string; outburst: any }[] = [];
-    result.playerReports.forEach(p => {
-      (p.negativeOutbursts ?? []).forEach(o => {
-        flat.push({ playerName: p.roleName, title: (o as any).title ?? o.trigger, trigger: o.trigger, outburst: o });
+    // 优先使用顶层 allNegativeOutbursts（覆盖全部玩家，含非重点玩家）
+    if (result.allNegativeOutbursts?.length) {
+      result.allNegativeOutbursts.forEach(o => {
+        flat.push({ playerName: o.playerName, title: o.title ?? o.trigger, trigger: o.trigger, outburst: o });
       });
-    });
+    } else {
+      // 兼容旧历史记录（仅含 playerReports 内的 negativeOutbursts）
+      result.playerReports.forEach(p => {
+        (p.negativeOutbursts ?? []).forEach(o => {
+          flat.push({ playerName: p.roleName, title: (o as any).title ?? o.trigger, trigger: o.trigger, outburst: o });
+        });
+      });
+    }
     return flat;
   }, [result]);
 
@@ -529,6 +537,11 @@ export default function AnalysisReport({ result: rawResult, executionRecords = [
         </div>
 
         <div className="space-y-8 text-neutral-900">
+          {allOutbursts.length === 0 && (
+            <div className="text-center py-10 text-slate-400">
+              <p className="text-sm font-medium">本次聊天数据中未识别到明显负面爆发</p>
+            </div>
+          )}
           {allOutbursts
             .filter((_, i) => focusedOutburstIndex == null || i === focusedOutburstIndex)
             .map((ob, renderIdx) => {

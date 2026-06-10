@@ -4,7 +4,11 @@ async function dbPost(path: string, body: object): Promise<any> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`DB proxy ${path} error: ${res.status}`);
+  if (!res.ok) {
+    let errMsg = '';
+    try { const b = await res.json(); errMsg = b.error ?? ''; } catch {}
+    throw new Error(`DB proxy ${path} error: ${res.status}${errMsg ? ` — ${errMsg}` : ''}`);
+  }
   return res.json();
 }
 

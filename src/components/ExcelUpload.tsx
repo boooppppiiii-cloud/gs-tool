@@ -27,7 +27,7 @@ interface Props {
 
 type Mode = 'upload' | 'image' | 'db';
 
-interface DbPingResult { ch?: string; mysql?: string; chError?: string; mysqlError?: string }
+interface DbPingResult { ch?: string; mysql?: string; chError?: string; mysqlError?: string; serverIp?: string }
 interface DbColumn { name: string; type: string }
 interface DbExploreResult {
   clickhouse?: { databases?: string[]; tables?: Record<string, string[]>; error?: string };
@@ -69,6 +69,15 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
   const [dbColumns, setDbColumns] = React.useState<{ engine: string; db: string; table: string; cols: DbColumn[] } | null>(null);
   const [dbLoading, setDbLoading] = React.useState<string | null>(null);
   const [expandedNodes, setExpandedNodes] = React.useState<Set<string>>(new Set());
+  const [dbImportServerId, setDbImportServerId] = React.useState('');
+  const toLocalDt = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const [dbImportStartTime, setDbImportStartTime] = React.useState(() => toLocalDt(new Date(Date.now() - 7*24*60*60*1000)));
+  const [dbImportEndTime, setDbImportEndTime] = React.useState(() => toLocalDt(new Date()));
+  const [dbImportResult, setDbImportResult] = React.useState<{ count: number; playerCount: number } | null>(null);
+  const [dbImportError, setDbImportError] = React.useState<string | null>(null);
 
   const toggleNode = (key: string) =>
     setExpandedNodes(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
@@ -88,6 +97,33 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
       const res = await fetch('/api/db/explore');
       setDbExplore(await res.json());
     } catch { setDbExplore(null); }
+    setDbLoading(null);
+  };
+
+  const handleDbImportChat = async () => {
+    if (!dbImportServerId.trim() || !dbImportStartTime || !dbImportEndTime) return;
+    setDbLoading('import');
+    setDbImportError(null);
+    setDbImportResult(null);
+    try {
+      const res = await fetch('/api/db/import/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serverId: dbImportServerId.trim(),
+          startTime: dbImportStartTime,
+          endTime: dbImportEndTime,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '导入失败');
+      if (!data.count) throw new Error('该时间段内未找到聊天记录，请检查区服ID和时间范围');
+      onDataLoaded(data.records, [], `DB:${dbImportServerId.trim()}`);
+      setDbImportResult({ count: data.count, playerCount: data.playerCount ?? 0 });
+      logUsage('db_import_chat', `${data.count} records, ${data.playerCount} players`);
+    } catch (e: any) {
+      setDbImportError(e.message);
+    }
     setDbLoading(null);
   };
 
@@ -461,20 +497,28 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
               </button>
             </div>
             {dbPing && (
-              <div className="grid grid-cols-2 gap-2">
-                {(['ch', 'mysql'] as const).map(eng => {
-                  const ok = dbPing[eng] === 'ok';
-                  const err = eng === 'ch' ? dbPing.chError : dbPing.mysqlError;
-                  return (
-                    <div key={eng} className={`flex items-start gap-2 px-3 py-2 rounded-xl border text-xs ${ok ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
-                      <span className={`mt-0.5 shrink-0 w-2 h-2 rounded-full ${ok ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                      <div className="min-w-0">
-                        <p className="font-black text-slate-700">{eng === 'ch' ? 'ClickHouse :8123' : 'MySQL :3306'}</p>
-                        <p className={ok ? 'text-emerald-600' : 'text-rose-600'}>{ok ? '连接正常' : (err || '连接失败')}</p>
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  {(['ch', 'mysql'] as const).map(eng => {
+                    const ok = dbPing[eng] === 'ok';
+                    const err = eng === 'ch' ? dbPing.chError : dbPing.mysqlError;
+                    return (
+                      <div key={eng} className={`flex items-start gap-2 px-3 py-2 rounded-xl border text-xs ${ok ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+                        <span className={`mt-0.5 shrink-0 w-2 h-2 rounded-full ${ok ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                        <div className="min-w-0">
+                          <p className="font-black text-slate-700">{eng === 'ch' ? 'ClickHouse :8123' : 'MySQL :3306'}</p>
+                          <p className={ok ? 'text-emerald-600' : 'text-rose-600'}>{ok ? '连接正常' : (err || '连接失败')}</p>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+                {(dbPing.ch !== 'ok' || dbPing.mysql !== 'ok') && dbPing.serverIp && (
+                  <p className="text-[11px] text-slate-500 px-1">
+                    当前服务器出口 IP：<span className="font-mono font-bold text-slate-700">{dbPing.serverIp}</span>
+                    <span className="text-slate-400 ml-1">（如连接失败请将此 IP 提交给技术人员更新白名单）</span>
+                  </p>
+                )}
               </div>
             )}
             {!dbPing && (
@@ -564,11 +608,62 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
                   </tbody>
                 </table>
               </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed px-1 bg-amber-50 border border-amber-100 rounded-lg p-3">
-                <span className="font-bold text-amber-700">下一步：</span> 记录下聊天记录所在的表名和字段名（时间、角色名、消息类型、内容），以及充值记录所在的表名和字段名（金额、角色名、状态），告知开发者后即可实现一键导入数据。
-              </p>
             </div>
           )}
+
+          {/* 导入聊天记录 */}
+          <div className="space-y-3 pt-1 border-t border-slate-100">
+            <p className="text-xs font-black text-slate-600 uppercase tracking-widest">导入聊天记录</p>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">区服 ID</label>
+              <input
+                type="text"
+                value={dbImportServerId}
+                onChange={e => setDbImportServerId(e.target.value)}
+                placeholder="server_id 的值，如 S1、101"
+                className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">开始时间</label>
+                <input
+                  type="datetime-local"
+                  value={dbImportStartTime}
+                  onChange={e => setDbImportStartTime(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">结束时间</label>
+                <input
+                  type="datetime-local"
+                  value={dbImportEndTime}
+                  onChange={e => setDbImportEndTime(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                />
+              </div>
+            </div>
+            <button
+              onClick={handleDbImportChat}
+              disabled={!dbImportServerId.trim() || !dbImportStartTime || !dbImportEndTime || !!dbLoading}
+              className="w-full py-2 flex items-center justify-center gap-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+            >
+              {dbLoading === 'import' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
+              {dbLoading === 'import' ? '查询中...' : '导入聊天记录'}
+            </button>
+            {dbImportResult && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 font-bold">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                已导入 {dbImportResult.count} 条 / {dbImportResult.playerCount} 名玩家，点击下方按钮开始分析
+              </div>
+            )}
+            {dbImportError && (
+              <div className="flex items-start gap-2 px-3 py-2 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-bold">
+                <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {dbImportError}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

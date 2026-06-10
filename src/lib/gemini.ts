@@ -241,10 +241,13 @@ ${rechargeData}
 
 tableSummary：综合三个维度中所有 obtained=true 的词条，用一句话（40字内）提炼该玩家最关键的3-4个标签（例："40岁教师，晚间活跃，有意向购买封神武器，对PK挑衅敏感"）。无任何 obtained=true 词条时填"数据不足，暂无总结"。
 
-## 任务三：负面爆发核查（仅基于 Sheet1 聊天数据）
-- 识别明确出现在聊天记录中的负面情绪/投诉/发泄行为。
+## 任务三：负面爆发核查（覆盖全部玩家，仅基于 Sheet1 聊天数据）
+- 对 Sheet1 聊天记录中**所有出现过的玩家**（不限于 identifiedKeyPlayers）逐一排查负面情绪/投诉/发泄/质疑/争执行为。
+- 只要聊天中出现下列任一信号，即视为负面爆发：明确投诉、辱骂或发泄情绪、对外挂/不公平/Bug的质疑、对游戏机制的强烈抱怨、与其他玩家的冲突争执。
+- 每条负面事件输出到顶层 allNegativeOutbursts 数组（独立于 playerReports，覆盖全部玩家）。
 - 溯源上下文 3-5 条消息：time 字段原文照抄，内容原文照抄，不做任何改写。
 - 负面触发点：结合背景信息中的游戏机制进行归因，无法归因则填"需人工核实"。
+- 若所有玩家聊天均无以上信号，allNegativeOutbursts 输出空数组 []。
 
 ## 任务四：生态处置建议
 - 先检索参考案例库，有相似案例须注明"参考了案例[xxx]的处理逻辑"。
@@ -398,6 +401,27 @@ tableSummary：综合三个维度中所有 obtained=true 的词条，用一句�
       "hasIntervened": true或false,
       "interventionSummary": "一句话描述生态介入情况（无负面工单填'无负面工单'；有负面但无介入填'未发现介入记录'；有介入则描述介入方式）"
     }
+  ],
+  "allNegativeOutbursts": [
+    {
+      "playerName": "发生负面的玩家名（来自聊天记录中的任意玩家）",
+      "title": "案例标题（15字内）",
+      "tags": ["标签1", "标签2"],
+      "mergeStage": "从聊天推断合服阶段，无法推断填'未知'",
+      "caseBackground": "3-5句话案例背景（仅基于聊天数据）",
+      "trigger": "爆发负面的详细原因",
+      "triggerPoint": "具体触发点（结合游戏机制归因）",
+      "context": [
+        { "roleName": "发言人", "content": "原文消息内容", "time": "原文时间戳，无则填'原文无时间戳'" }
+      ],
+      "gsAdvice": {
+        "action": "具体引导动作（分步列举，每步以序号开头）",
+        "reason": "原因分析",
+        "disposalPlan": "处置策略",
+        "resultEvaluation": "预期处置效果",
+        "resultTags": ["结果标签1"]
+      }
+    }
   ]
 }
 `;
@@ -464,6 +488,27 @@ tableSummary：综合三个维度中所有 obtained=true 的词条，用一句�
       contentTypes: { inGame: r.contentTypes?.inGame ?? 0, outGame: r.contentTypes?.outGame ?? 0 },
       hasIntervened: r.hasIntervened ?? false,
       interventionSummary: r.interventionSummary ?? '',
+    })),
+    allNegativeOutbursts: (raw.allNegativeOutbursts ?? []).map((o: any) => ({
+      playerName: o.playerName ?? '',
+      title: o.title,
+      tags: o.tags ?? [],
+      mergeStage: o.mergeStage,
+      caseBackground: o.caseBackground,
+      trigger: o.trigger ?? '',
+      triggerPoint: o.triggerPoint ?? '',
+      context: (o.context ?? []).map((c: any) => ({
+        roleName: c.roleName ?? '',
+        content: c.content ?? '',
+        time: c.time ?? '原文无时间戳',
+      })),
+      gsAdvice: {
+        action: o.gsAdvice?.action ?? '',
+        reason: o.gsAdvice?.reason ?? '',
+        disposalPlan: o.gsAdvice?.disposalPlan ?? '',
+        resultEvaluation: o.gsAdvice?.resultEvaluation,
+        resultTags: o.gsAdvice?.resultTags ?? [],
+      },
     })),
   };
 }

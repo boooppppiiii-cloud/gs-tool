@@ -225,6 +225,8 @@ export default function App() {
     );
     if (matchedProfile) {
       setActiveProfileId(matchedProfile.id);
+    } else if (!activeProfileId && serverProfiles.length > 0) {
+      setActiveProfileId(serverProfiles[0].id);
     }
   };
 

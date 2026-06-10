@@ -82,6 +82,24 @@ export interface GsCommunicationReport {
   interventionSummary: string;
 }
 
+export interface NegativeOutburst {
+  playerName: string;
+  title?: string;
+  tags?: string[];
+  mergeStage?: string;
+  caseBackground?: string;
+  trigger: string;
+  triggerPoint: string;
+  context: { roleName: string; content: string; time: string }[];
+  gsAdvice: {
+    action: string;
+    reason: string;
+    disposalPlan: string;
+    resultEvaluation?: string;
+    resultTags?: string[];
+  };
+}
+
 export interface AnalysisResult {
   identifiedKeyPlayers: string[]; // AI determined key players
   playerReports: PlayerBehaviorReport[];
@@ -89,6 +107,7 @@ export interface AnalysisResult {
   serverEcology: string; // AI generated ecology summary
   chatTopics?: string[]; // AI generated topic list
   gsCommunicationReports?: GsCommunicationReport[];
+  allNegativeOutbursts?: NegativeOutburst[]; // top-level, covers all players
   _usage?: { inputTokens: number; outputTokens: number };
 }
 
