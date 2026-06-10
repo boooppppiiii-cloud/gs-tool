@@ -34,30 +34,31 @@ interface DbExploreResult {
   mysql?: { databases?: string[]; tables?: Record<string, string[]>; error?: string };
 }
 
-function parseCsvContent(text: string): { chat: ChatRecord[]; recharge: RechargeRecord[] } {
-  const sections = text.split(/(?:\r?\n){2,}/);
-  const chatLines = sections[0]?.split(/\r?\n/).filter(l => l.trim()) ?? [];
-  const rechargeLines = sections[1]?.split(/\r?\n/).filter(l => l.trim()) ?? [];
-
-  const chat: ChatRecord[] = chatLines.slice(1).map(line => {
+function parseCsvContent(text: string): ChatRecord[] {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  return lines.slice(1).map(line => {
     const cols = line.split(',').map(c => c.trim());
     return { time: cols[2] || '', roleName: cols[3] || '', type: cols[4] || '', content: cols[5] || '', target: cols[7] || '' };
-  }).filter(r => r.roleName && r.content);
-  chat.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+  }).filter(r => r.roleName && r.content)
+    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+}
 
-  // Sheet2 列格式与 Excel 对应：列1=金额(B), 列2=角色名(C), 列6=状态(G), 列7=方式(H)
-  const recharge: RechargeRecord[] = rechargeLines.slice(1).map(line => {
+function parseRechargeCsv(text: string): RechargeRecord[] {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  return lines.slice(1).map(line => {
     const cols = line.split(',').map(c => c.trim());
     return { amount: cols[1] || '', roleName: cols[2] || '', status: cols[6] || '', method: cols[7] || '' };
   }).filter(r => r.roleName);
-
-  return { chat, recharge };
 }
 
 export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
   // ── Upload mode ────────────────────────────────────────────────────────────
   const [fileName, setFileName] = React.useState<string | null>(null);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const [isLastFileCsv, setIsLastFileCsv] = React.useState(false);
+  const [csvChatRecords, setCsvChatRecords] = React.useState<ChatRecord[]>([]);
+  const [csvChatFileName, setCsvChatFileName] = React.useState<string | null>(null);
+  const [rechargeFileName, setRechargeFileName] = React.useState<string | null>(null);
 
   // ── Image mode ─────────────────────────────────────────────────────────────
   const [imgItems, setImgItems] = React.useState<{ file: File; dataUrl: string }[]>([]);
@@ -162,8 +163,12 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
       logUsage('excel_upload', `Started processing ${file.name}`);
       if (isCSV) {
         const text = await file.text();
-        const { chat: chatRecords, recharge: rechargeRecords } = parseCsvContent(text);
-        onDataLoaded(chatRecords, rechargeRecords, file.name);
+        const chatRecords = parseCsvContent(text);
+        setCsvChatRecords(chatRecords);
+        setCsvChatFileName(file.name);
+        setIsLastFileCsv(true);
+        setRechargeFileName(null);
+        onDataLoaded(chatRecords, [], file.name);
       } else {
         const data = await file.arrayBuffer();
         const workbook = XLSX.read(data);
@@ -179,12 +184,28 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
         const rechargeRecords: RechargeRecord[] = rechargeJson.slice(1).map(row => ({
           amount: String(row.B || ''), roleName: String(row.C || ''), status: String(row.G || ''), method: String(row.H || ''),
         })).filter(r => r.roleName);
+        setIsLastFileCsv(false);
         onDataLoaded(chatRecords, rechargeRecords, file.name);
       }
     } catch (err) {
       console.error(err);
       setUploadError('文件解析失败，请确认格式正确（Excel: Sheet1聊天/Sheet2充值；CSV: 空行前聊天记录，空行后充值记录）');
     }
+  };
+
+  // ── Recharge CSV handler ───────────────────────────────────────────────────
+  const handleRechargeCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !csvChatRecords.length) return;
+    try {
+      const text = await file.text();
+      const rechargeRecords = parseRechargeCsv(text);
+      setRechargeFileName(file.name);
+      onDataLoaded(csvChatRecords, rechargeRecords, csvChatFileName!);
+    } catch {
+      setUploadError('充值 CSV 解析失败，请确认列格式：B金额, C角色, G状态, H方式');
+    }
+    e.target.value = '';
   };
 
   // ── Image handlers ─────────────────────────────────────────────────────────
@@ -364,10 +385,33 @@ export default function ExcelUpload({ onDataLoaded, isAnalyzing }: Props) {
               <AlertTriangleIcon className="w-4 h-4" /> {uploadError}
             </div>
           )}
+          {isLastFileCsv && !isAnalyzing && (
+            <div className="mt-4 relative border-2 border-dashed border-indigo-100 rounded-xl p-4 hover:border-indigo-300 transition-colors">
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleRechargeCsvUpload}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+              <div className="flex items-center gap-3 pointer-events-none">
+                <div className="w-8 h-8 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-center shrink-0">
+                  <Upload className="w-4 h-4 text-indigo-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-600">
+                    {rechargeFileName
+                      ? <span className="text-emerald-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3 inline mr-1" />{rechargeFileName}</span>
+                      : '充值记录 CSV（可选，对应 Sheet2）'}
+                  </p>
+                  <p className="text-xs text-slate-400">列格式：B金额, C角色, G状态, H方式</p>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="mt-6 grid grid-cols-3 gap-4 text-xs text-slate-400">
             <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1" /><p>Sheet1: C时间, D角色, E类型, F内容, H目标</p></div>
             <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1" /><p>Sheet2: B金额, C角色, G状态, H方式</p></div>
-            <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1" /><p>CSV: 空行分隔两表（上聊天/下充值）</p></div>
+            <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-1" /><p>CSV: 聊天+充值可分两个文件上传</p></div>
           </div>
         </div>
       )}
