@@ -94,35 +94,48 @@ async function chatCompletion(
   messages: { role: string; content: string }[],
   jsonMode = false
 ): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
-  const res = await fetch('/api/gemini/chat/completions', {
+  // 提交任务，立即得到 jobId
+  const submitRes = await fetch('/api/gemini/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'gemini-2.5-flash',
       messages,
+      async: true,
       ...(jsonMode && { response_format: { type: 'json_object' } }),
     }),
   });
-  if (!res.ok) {
-    if (res.status === 429) {
-      let body: any = {};
-      try { body = await res.json(); } catch {}
-      const errStr = typeof body.error === 'string' ? body.error : JSON.stringify(body.error ?? '');
-      const isDaily = /DAILY|daily|per day|quota_exceeded/i.test(errStr);
-      throw new Error(isDaily ? '__DAILY_QUOTA__' : '__RATE_LIMIT__');
-    }
-    if (res.status === 503) {
-      throw new Error('__OVERLOAD__');
-    }
-    const err = await res.text();
-    throw new Error(`Gemini API 错误: ${res.status} ${err.slice(0, 200)}`);
+  if (!submitRes.ok) {
+    const err = await submitRes.text();
+    throw new Error(`提交失败: ${submitRes.status} ${err.slice(0, 200)}`);
   }
-  const data = await res.json();
-  return {
-    content: data.choices?.[0]?.message?.content ?? '',
-    inputTokens: data.usage?.prompt_tokens ?? 0,
-    outputTokens: data.usage?.completion_tokens ?? 0,
-  };
+  const { jobId } = await submitRes.json();
+
+  // 每3秒轮询，直到任务完成（最多等6分钟）
+  for (let attempt = 0; attempt < 120; attempt++) {
+    await new Promise(r => setTimeout(r, 3000));
+    const pollRes = await fetch(`/api/job/${jobId}`);
+    if (!pollRes.ok) throw new Error('轮询失败');
+    const job = await pollRes.json();
+    if (job.status === 'done') {
+      return {
+        content: job.result.choices[0].message.content ?? '',
+        inputTokens: job.result.usage.prompt_tokens ?? 0,
+        outputTokens: job.result.usage.completion_tokens ?? 0,
+      };
+    }
+    if (job.status === 'error') {
+      const errStr = typeof job.error?.body === 'string' ? job.error.body : '';
+      if (job.error?.status === 429) {
+        const isDaily = /DAILY|daily|per day|quota_exceeded/i.test(errStr);
+        throw new Error(isDaily ? '__DAILY_QUOTA__' : '__RATE_LIMIT__');
+      }
+      if (job.error?.status === 503) throw new Error('__OVERLOAD__');
+      throw new Error(`Gemini API 错误: ${job.error?.status} ${errStr.slice(0, 200)}`);
+    }
+    // 'pending' 或 'processing' 继续轮询
+  }
+  throw new Error('任务超时（超过6分钟）');
 }
 
 export async function analyzeGameEcology(

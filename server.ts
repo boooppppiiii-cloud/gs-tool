@@ -66,15 +66,36 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3): P
   return lastRes!;
 }
 
+interface JobData {
+  status: 'pending' | 'processing' | 'done' | 'error';
+  result?: { choices: any[]; usage: any };
+  error?: { status: number; body: string };
+  createdAt: number;
+  queuePosition: number;
+}
+const jobStore = new Map<string, JobData>();
+setInterval(() => {
+  const cutoff = Date.now() - 30 * 60 * 1000;
+  for (const [id, job] of jobStore.entries()) {
+    if (job.createdAt < cutoff) jobStore.delete(id);
+  }
+}, 5 * 60 * 1000);
+
 class GeminiQueue {
-  private queue: Array<{ fn: () => Promise<Response>; resolve: (v: Response) => void; reject: (e: unknown) => void }> = [];
+  private queue: Array<{ fn: () => Promise<Response>; resolve: (v: Response) => void; reject: (e: unknown) => void; jobId?: string }> = [];
   private processing = false;
   private lastCallTime = 0;
   private readonly minInterval = 7000; // 7s间隔 ≈ 8.5 RPM，低于免费层10 RPM限制
 
-  add(fn: () => Promise<Response>): Promise<Response> {
+  get queueLength() { return this.queue.length + (this.processing ? 1 : 0); }
+
+  add(fn: () => Promise<Response>, jobId?: string): Promise<Response> {
     return new Promise((resolve, reject) => {
-      this.queue.push({ fn, resolve, reject });
+      if (jobId) {
+        const job = jobStore.get(jobId);
+        if (job) job.queuePosition = this.queueLength;
+      }
+      this.queue.push({ fn, resolve, reject, jobId });
       if (!this.processing) this.process();
     });
   }
@@ -82,9 +103,13 @@ class GeminiQueue {
   private async process(): Promise<void> {
     if (this.queue.length === 0) { this.processing = false; return; }
     this.processing = true;
+    this.queue.forEach((item, i) => {
+      if (item.jobId) { const job = jobStore.get(item.jobId); if (job) job.queuePosition = i + 1; }
+    });
     const wait = Math.max(0, this.lastCallTime + this.minInterval - Date.now());
     if (wait > 0) await new Promise(r => setTimeout(r, wait));
     const item = this.queue.shift()!;
+    if (item.jobId) { const job = jobStore.get(item.jobId); if (job) { job.status = 'processing'; job.queuePosition = 0; } }
     this.lastCallTime = Date.now();
     try { item.resolve(await item.fn()); } catch (e) { item.reject(e); }
     this.process();
@@ -198,7 +223,28 @@ async function startServer() {
       }
 
       const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
-      console.log(`[Gemini] POST ${model}:generateContent (队列长度: ${(geminiQueue as any).queue.length})`);
+
+      // 异步任务模式：立即返回 jobId，后台入队处理
+      if (req.body.async === true) {
+        const jobId = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+        jobStore.set(jobId, { status: 'pending', createdAt: Date.now(), queuePosition: geminiQueue.queueLength });
+        console.log(`[Gemini Async] 任务 ${jobId} 入队 (队列长度: ${geminiQueue.queueLength})`);
+        geminiQueue.add(() => fetchWithRetry(targetUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) }), jobId)
+          .then(async (response) => {
+            const job = jobStore.get(jobId); if (!job) return;
+            const rawText = await response.text();
+            if (!response.ok) { job.status = 'error'; job.error = { status: response.status, body: rawText.slice(0, 300) }; return; }
+            const data = JSON.parse(rawText);
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            job.result = { choices: [{ message: { content: text, role: 'assistant' } }], usage: { prompt_tokens: data.usageMetadata?.promptTokenCount ?? 0, completion_tokens: data.usageMetadata?.candidatesTokenCount ?? 0 } };
+            job.status = 'done';
+            console.log(`[Gemini Async] 任务 ${jobId} 完成`);
+          })
+          .catch((e) => { const job = jobStore.get(jobId); if (job) { job.status = 'error'; job.error = { status: 500, body: String(e) }; } });
+        return res.json({ jobId, queuePosition: jobStore.get(jobId)!.queuePosition });
+      }
+
+      console.log(`[Gemini] POST ${model}:generateContent (队列长度: ${geminiQueue.queueLength})`);
       const response = await geminiQueue.add(() => fetchWithRetry(targetUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) }));
       const rawText = await response.text();
       const safeStatus = response.status >= 100 && response.status <= 599 ? response.status : 502;
@@ -220,6 +266,13 @@ async function startServer() {
       console.error('[Gemini] 网络错误:', err);
       if (!res.headersSent) res.status(502).json({ error: 'Gemini 代理请求失败', detail: String(err) });
     }
+  });
+
+  // 异步任务状态轮询
+  app.get('/api/job/:id', (req: any, res: any) => {
+    const job = jobStore.get(req.params.id);
+    if (!job) return res.status(404).json({ error: '任务不存在或已过期' });
+    res.json({ status: job.status, queuePosition: job.queuePosition, result: job.result, error: job.error });
   });
 
   // 管理员日志查询端点（服务端权限，全量不过滤）
