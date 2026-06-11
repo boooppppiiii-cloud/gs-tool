@@ -66,6 +66,32 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3): P
   return lastRes!;
 }
 
+class GeminiQueue {
+  private queue: Array<{ fn: () => Promise<Response>; resolve: (v: Response) => void; reject: (e: unknown) => void }> = [];
+  private processing = false;
+  private lastCallTime = 0;
+  private readonly minInterval = 7000; // 7s间隔 ≈ 8.5 RPM，低于免费层10 RPM限制
+
+  add(fn: () => Promise<Response>): Promise<Response> {
+    return new Promise((resolve, reject) => {
+      this.queue.push({ fn, resolve, reject });
+      if (!this.processing) this.process();
+    });
+  }
+
+  private async process(): Promise<void> {
+    if (this.queue.length === 0) { this.processing = false; return; }
+    this.processing = true;
+    const wait = Math.max(0, this.lastCallTime + this.minInterval - Date.now());
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+    const item = this.queue.shift()!;
+    this.lastCallTime = Date.now();
+    try { item.resolve(await item.fn()); } catch (e) { item.reject(e); }
+    this.process();
+  }
+}
+const geminiQueue = new GeminiQueue();
+
 async function startServer() {
   initAdminDb();
   const app = express();
@@ -139,7 +165,7 @@ async function startServer() {
       if (stream) {
         const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${process.env.GEMINI_API_KEY}`;
         console.log(`[Gemini Stream] POST ${model}:streamGenerateContent`);
-        const response = await fetchWithRetry(targetUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) });
+        const response = await geminiQueue.add(() => fetchWithRetry(targetUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) }));
         if (!response.ok) {
           const errText = await response.text();
           const safeStatus = response.status >= 100 && response.status <= 599 ? response.status : 502;
@@ -172,8 +198,8 @@ async function startServer() {
       }
 
       const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
-      console.log(`[Gemini] POST ${model}:generateContent`);
-      const response = await fetchWithRetry(targetUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) });
+      console.log(`[Gemini] POST ${model}:generateContent (队列长度: ${(geminiQueue as any).queue.length})`);
+      const response = await geminiQueue.add(() => fetchWithRetry(targetUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) }));
       const rawText = await response.text();
       const safeStatus = response.status >= 100 && response.status <= 599 ? response.status : 502;
       console.log(`[Gemini] status=${response.status} body=${rawText.slice(0, 200)}`);
