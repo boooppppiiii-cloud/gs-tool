@@ -54,7 +54,14 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3): P
   let lastRes: Response | undefined;
   for (let i = 0; i <= retries; i++) {
     const res = await fetch(url, options);
-    if (res.status === 429) return res; // rate-limited — return immediately, let client handle retry
+    if (res.status === 429) {
+      if (i < retries) {
+        console.log(`[Gemini] 429 过频，5s 后重试 (${i + 1}/${retries})...`);
+        await new Promise(r => setTimeout(r, 5000));
+        continue;
+      }
+      return res;
+    }
     if (res.status !== 503) return res;
     lastRes = res;
     if (i < retries) {
@@ -85,7 +92,7 @@ class GeminiQueue {
   private queue: Array<{ fn: () => Promise<Response>; resolve: (v: Response) => void; reject: (e: unknown) => void; jobId?: string }> = [];
   private processing = false;
   private lastCallTime = 0;
-  private readonly minInterval = 7000; // 7s间隔 ≈ 8.5 RPM，低于免费层10 RPM限制
+  private readonly minInterval = 500; // 0.5s间隔 = 120 RPM，适配付费层（1000 RPM上限）
 
   get queueLength() { return this.queue.length + (this.processing ? 1 : 0); }
 
